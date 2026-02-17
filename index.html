@@ -1,14 +1,105 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hello World</title>
-  <link href='/style.css' rel='stylesheet'>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settle Up | Modern Settlement</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Hello, world!</h1>
-  <button onclick="console.log('hello');">Press me</button>
-  <script defer type="text/javascript" src="/main.js"></script>
+    <div id="app">
+        <header>
+            <h1>Settle Up</h1>
+        </header>
+
+        <div id="main-container">
+            <!-- Sidebar -->
+            <aside id="left-pane">
+                <h2>정산 내역 조회</h2>
+                <input type="date" id="main-date-picker">
+                
+                <div id="settlement-list-container">
+                    <!-- Settlements list... -->
+                </div>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main id="right-pane">
+                <!-- Empty State -->
+                <div id="placeholder-right-pane">
+                    <i class="fas fa-wallet"></i>
+                    <p>정산 건을 선택하거나 새로운 정산을 시작하세요.</p>
+                </div>
+                
+                <!-- Calculator View -->
+                <div id="calculator" class="hidden">
+                    <div class="settlement-header">
+                        <h2 id="settlement-display"></h2>
+                        <span id="settlement-date-badge" class="settlement-date-badge"></span>
+                    </div>
+                    
+                    <!-- Summary Top Banner -->
+                    <div class="card" id="summary-card">
+                        <h2><i class="fas fa-chart-pie"></i> 정산 결과</h2>
+                        <div id="summary">
+                            <div id="total-expense">총 지출: 0 JPY</div>
+                            <div id="final-settlement">...</div>
+                        </div>
+                    </div>
+
+                    <!-- Expense Add Form -->
+                    <div class="card">
+                        <h2><i class="fas fa-plus-circle"></i> 지출 추가</h2>
+                        <div id="expense-form">
+                            <div class="expense-inputs-grid">
+                                <input type="text" id="item-name" placeholder="항목 (예: 블루 보틀 커피)">
+                                <input type="number" id="item-amount" placeholder="금액 (엔화)">
+                                <select id="item-payer">
+                                    <option value="A">A가 결제</option>
+                                    <option value="B">B가 결제</option>
+                                </select>
+                                <select id="split-method">
+                                    <option value="equal">똑같이 나누기 (1/N)</option>
+                                    <option value="percent">비율로 나누기 (%)</option>
+                                    <option value="amount">금액으로 나누기</option>
+                                </select>
+                            </div>
+                            
+                            <div id="split-amount-inputs" class="hidden split-inputs">
+                                <div class="expense-inputs-grid">
+                                    <input type="number" id="split-amount-a" placeholder="A 부담액">
+                                    <input type="number" id="split-amount-b" placeholder="B 부담액">
+                                </div>
+                            </div>
+                            <button id="add-expense-btn">기록하기</button>
+                        </div>
+                    </div>
+
+                    <!-- Expense List -->
+                    <div class="card" id="expense-list-card">
+                        <h2><i class="fas fa-list"></i> 상세 지출 목록</h2>
+                        <div id="expense-list">
+                            <ul></ul>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <button id="add-settlement-fab" class="hidden"><i class="fas fa-plus"></i></button>
+
+        <!-- New Settlement Modal -->
+        <div id="add-settlement-modal" class="hidden">
+            <div class="modal-content card">
+                <span class="close-modal-btn"><i class="fas fa-times"></i></span>
+                <h2>새로운 정산 건 생성</h2>
+                <p id="modal-date-display"></p>
+                <input type="text" id="new-settlement-title" placeholder="어떤 정산인가요? (예: 오사카 먹방 여행)">
+                <button id="create-settlement-btn">생성하기</button>
+            </div>
+        </div>
+    </div>
+    <script src="main.js"></script>
 </body>
 </html>
