@@ -93,8 +93,10 @@
         <div id="add-settlement-modal" class="hidden">
             <div class="modal-content card">
                 <span class="close-modal-btn"><i class="fas fa-times"></i></span>
-                <h2>새로운 정산 건 생성</h2>
-                <p id="modal-date-display"></p>
+                <div class="modal-header">
+                    <h2>새로운 정산 건 생성</h2>
+                    <span id="modal-date-display" class="settlement-date-badge"></span>
+                </div>
                 <input type="text" id="new-settlement-title" placeholder="어떤 정산인가요? (예: 오사카 먹방 여행)">
                 <button id="create-settlement-btn">생성하기</button>
             </div>
