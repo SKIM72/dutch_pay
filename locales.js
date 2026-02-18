@@ -35,13 +35,15 @@ const locales = {
         settlementDone: "정산이 완료되었습니다.",
         paysTo: "(이)가",
         completeSettlement: "정산 완료하기",
-        editSettlement: "정산 수정하기", // 새로 추가
+        editSettlement: "정산 수정하기",
         baseCurrency: "기준 통화",
         exchangeRateTitle: "환율 정보",
         baseDate: "기준",
         excelNotImplemented: "다중 통화 엑셀 다운로드는 현재 준비중입니다.",
         splitEqually: "1/N 분담",
         splitByAmount: "금액 직접 입력",
+        editExpense: "지출 수정", // 새로 추가
+        saveChanges: "변경 사항 저장", // 새로 추가
     },
     en: {
         appTitle: "Settle Up | Easy Settlement Helper",
@@ -79,13 +81,15 @@ const locales = {
         settlementDone: "Settlement complete.",
         paysTo: "pays to",
         completeSettlement: "Complete Settlement",
-        editSettlement: "Edit Settlement", // Added
+        editSettlement: "Edit Settlement",
         baseCurrency: "Base Currency",
         exchangeRateTitle: "Exchange Rate Information",
         baseDate: "as of",
         excelNotImplemented: "Excel download for multi-currency is not yet implemented.",
         splitEqually: "Split Equally",
         splitByAmount: "Split by Amount",
+        editExpense: "Edit Expense", // Added
+        saveChanges: "Save Changes", // Added
     },
     ja: {
         appTitle: "Settle Up | 簡単精算ヘルパー",
@@ -123,12 +127,14 @@ const locales = {
         settlementDone: "精算が完了しました。",
         paysTo: "が",
         completeSettlement: "精算を完了する",
-        editSettlement: "精算を修正する", // 新規追加
+        editSettlement: "精算を修正する",
         baseCurrency: "基準通貨",
         exchangeRateTitle: "為替レート情報",
         baseDate: "基準",
         excelNotImplemented: "多通貨のExcelダウンロードは現在準備中です。",
         splitEqually: "割り勘",
         splitByAmount: "金額を直接入力",
+        editExpense: "支出の修正", // 新規追加
+        saveChanges: "変更内容を保存", // 新規追加
     }
 };

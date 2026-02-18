@@ -129,10 +129,14 @@ button:hover { background: var(--primary-hover); }
 #expense-table-container { overflow-x: auto; }
 #expense-table { width: 100%; border-collapse: collapse; }
 #expense-table th, #expense-table td {
-    padding: 0.75rem 1rem; text-align: center; 
+    padding: 0.75rem 1rem; text-align: left; 
     border-bottom: 1px solid var(--border); font-size: 0.9rem; vertical-align: middle;
 }
-#expense-table th { background-color: var(--side-bg); color: var(--text-muted); font-weight: 600; }
+#expense-table tbody tr { transition: background-color 0.2s; }
+#expense-table tbody tr:not(.is-settled) { cursor: pointer; }
+#expense-table tbody tr:not(.is-settled):hover { background-color: #f8fafc; }
+#expense-table th { background-color: var(--side-bg); color: var(--text-muted); font-weight: 600; text-align: left; }
+#expense-table td:last-child, #expense-table th:last-child { text-align: center; }
 
 .delete-expense-btn { 
     background: transparent; border: none; color: var(--text-muted); cursor: pointer;
@@ -154,7 +158,7 @@ button:hover { background: var(--primary-hover); }
     font-size: 1.2rem; 
 }
 
-#add-settlement-modal, #exchange-rate-modal {
+#add-settlement-modal, #exchange-rate-modal, #edit-expense-modal {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
     background: rgba(15, 23, 42, 0.6); 
     display: flex; justify-content: center; align-items: center; 
@@ -163,6 +167,7 @@ button:hover { background: var(--primary-hover); }
 }
 
 .modal-content { max-width: 500px; width: 90%; position: relative; animation: slideInUp 0.3s ease-out;}
+.modal-content.card { max-width: 700px; } /* Wider modal for editing */
 .modal-content input, .currency-select-wrapper { margin-bottom: 1rem; }
 .modal-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
 .modal-header h2 { margin-bottom: 0; font-size: 1.4rem; }

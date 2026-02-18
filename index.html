@@ -142,6 +142,29 @@
             </div>
         </div>
 
+        <!-- Edit Expense Modal -->
+        <div id="edit-expense-modal" class="hidden">
+            <div class="modal-content card">
+                <span class="close-modal-btn"><i class="fas fa-times"></i></span>
+                <input type="hidden" id="edit-expense-id">
+                <h2 data-i18n="editExpense">지출 수정</h2>
+                <div class="expense-inputs-grid" style="margin-top: 1rem;">
+                    <input type="text" id="edit-item-name" data-i18n-placeholder="expenseItem">
+                    <div class="amount-input-wrapper">
+                        <input type="text" id="edit-item-amount" data-i18n-placeholder="amount" inputmode="decimal">
+                        <select id="edit-item-currency"></select>
+                    </div>
+                    <select id="edit-item-payer"></select>
+                    <select id="edit-split-method" data-i18n-options="splitEqually,splitByAmount"></select>
+                </div>
+                <div id="edit-split-amount-inputs" class="hidden expense-inputs-grid">
+                    <input type="text" id="edit-split-amount-a" inputmode="decimal">
+                    <input type="text" id="edit-split-amount-b" inputmode="decimal">
+                </div>
+                <button id="save-expense-changes-btn" data-i18n="saveChanges"></button>
+            </div>
+        </div>
+
     </div>
     <script src="locales.js"></script>
     <script src="main.js"></script>

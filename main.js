@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let settlements = {};
     let currentSettlement = null;
     let currentLang = 'ko';
-    const exchangeRatesCache = {}; // Cache for exchange rates
+    let currentEditingExpenseId = null; // To track the expense being edited
+    const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD'];
 
     // --- Element References ---
@@ -17,8 +18,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const placeholderRightPane = document.getElementById('placeholder-right-pane');
     const calculatorView = document.getElementById('calculator');
     
-    // Add/Edit Settlement Modal
+    // Modals
     const addSettlementModal = document.getElementById('add-settlement-modal');
+    const exchangeRateModal = document.getElementById('exchange-rate-modal');
+    const editExpenseModal = document.getElementById('edit-expense-modal');
+
+    // Add Settlement Modal
     const modalDateDisplay = document.getElementById('modal-date-display');
     const newSettlementTitleInput = document.getElementById('new-settlement-title');
     const newParticipantAInput = document.getElementById('new-participant-a');
@@ -27,9 +32,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const createSettlementBtn = document.getElementById('create-settlement-btn');
 
     // Exchange Rate Modal
-    const exchangeRateModal = document.getElementById('exchange-rate-modal');
     const exchangeRateDate = document.getElementById('exchange-rate-date');
     const exchangeRateInfo = document.getElementById('exchange-rate-info');
+    
+    // Edit Expense Modal
+    const editExpenseIdInput = document.getElementById('edit-expense-id');
+    const editItemNameInput = document.getElementById('edit-item-name');
+    const editItemAmountInput = document.getElementById('edit-item-amount');
+    const editItemCurrencySelect = document.getElementById('edit-item-currency');
+    const editItemPayerSelect = document.getElementById('edit-item-payer');
+    const editSplitMethodSelect = document.getElementById('edit-split-method');
+    const editSplitAmountInputs = document.getElementById('edit-split-amount-inputs');
+    const editSplitAmountAInput = document.getElementById('edit-split-amount-a');
+    const editSplitAmountBInput = document.getElementById('edit-split-amount-b');
+    const saveExpenseChangesBtn = document.getElementById('save-expense-changes-btn');
 
     // Calculator View
     const settlementDisplay = document.getElementById('settlement-display');
@@ -72,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         document.querySelectorAll('[data-i18n-options]').forEach(el => {
             const keys = el.getAttribute('data-i18n-options').split(',');
-            el.innerHTML = ''; // Clear existing options
+            el.innerHTML = '';
             keys.forEach(key => {
                 const option = document.createElement('option');
                 const value = key.trim();
@@ -101,7 +117,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (base === target) return 1;
         const cacheKey = `${date}_${base}_${target}`;
         if (exchangeRatesCache[cacheKey]) return exchangeRatesCache[cacheKey];
-
         const requestDate = new Date(date) > new Date() ? 'latest' : date;
 
         try {
@@ -143,13 +158,14 @@ document.addEventListener('DOMContentLoaded', () => {
             newSettlementTitleInput.focus();
         });
         
-        [addSettlementModal, exchangeRateModal].forEach(modal => {
+        [addSettlementModal, exchangeRateModal, editExpenseModal].forEach(modal => {
             modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
             modal.querySelector('.close-modal-btn').addEventListener('click', () => modal.classList.add('hidden'));
         });
 
         createSettlementBtn.addEventListener('click', createSettlement);
         addExpenseBtn.addEventListener('click', addExpense);
+        saveExpenseChangesBtn.addEventListener('click', saveExpenseChanges);
         settlementDateBadge.addEventListener('click', showExchangeRateModal);
 
         completeSettlementBtn.addEventListener('click', () => {
@@ -159,9 +175,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        splitMethodSelect.addEventListener('change', handleSplitMethodChange);
+        splitMethodSelect.addEventListener('change', () => handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs, splitAmountAInput, splitAmountBInput));
+        editSplitMethodSelect.addEventListener('change', () => handleSplitMethodChange(editSplitMethodSelect, editItemAmountInput, editSplitAmountInputs, editSplitAmountAInput, editSplitAmountBInput));
 
-        [itemAmountInput, splitAmountAInput, splitAmountBInput].forEach(input => {
+        const allAmountInputs = [itemAmountInput, splitAmountAInput, splitAmountBInput, editItemAmountInput, editSplitAmountAInput, editSplitAmountBInput];
+        allAmountInputs.forEach(input => {
             input.addEventListener('input', (e) => {
                 const value = e.target.value;
                 const hasDecimal = value.includes('.');
@@ -183,18 +201,30 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+        [editSplitAmountAInput, editSplitAmountBInput].forEach(input => {
+            input.addEventListener('input', () => {
+                 if (editSplitMethodSelect.value === 'amount') {
+                    const amountA = parseFormattedNumber(editSplitAmountAInput.value);
+                    const amountB = parseFormattedNumber(editSplitAmountBInput.value);
+                    editItemAmountInput.value = formatNumber(amountA + amountB, 0);
+                 }
+            });
+        });
+
         downloadExcelBtn.addEventListener('click', downloadExcel);
     }
 
-    function handleSplitMethodChange() {
-        const isManualAmount = splitMethodSelect.value === 'amount';
-        splitAmountInputs.classList.toggle('hidden', !isManualAmount);
-        itemAmountInput.readOnly = isManualAmount;
+    function handleSplitMethodChange(selectEl, amountEl, splitInputsEl, splitAEl, splitBEl) {
+        const isManualAmount = selectEl.value === 'amount';
+        splitInputsEl.classList.toggle('hidden', !isManualAmount);
+        amountEl.readOnly = isManualAmount;
         if (isManualAmount) {
-            const amountA = parseFormattedNumber(splitAmountAInput.value);
-            const amountB = parseFormattedNumber(splitAmountBInput.value);
-            itemAmountInput.value = formatNumber(amountA + amountB, 0);
-        } else { itemAmountInput.value = ''; }
+            const amountA = parseFormattedNumber(splitAEl.value);
+            const amountB = parseFormattedNumber(splitBEl.value);
+            amountEl.value = formatNumber(amountA + amountB, 0);
+        } else {
+            amountEl.value = amountEl.dataset.originalValue || '';
+        }
     }
 
     // --- Settlement Management ---
@@ -263,15 +293,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateParticipantNames(participants) {
         const [userA, userB] = participants;
-        itemPayerSelect.innerHTML = `<option value="${userA}">${locales[currentLang]?.paidBy.replace('{payer}', userA)}</option><option value="${userB}">${locales[currentLang]?.paidBy.replace('{payer}', userB)}</option>`;
+        const paidByString = locales[currentLang]?.paidBy;
         const shareOfString = locales[currentLang]?.shareOf;
+
+        // Update options for all relevant selects
+        [itemPayerSelect, editItemPayerSelect].forEach(select => {
+            select.innerHTML = `<option value="${userA}">${paidByString.replace('{payer}', userA)}</option><option value="${userB}">${paidByString.replace('{payer}', userB)}</option>`;
+        });
+        
         document.getElementById('table-header-user-a').textContent = shareOfString.replace('{name}', userA);
         document.getElementById('table-header-user-b').textContent = shareOfString.replace('{name}', userB);
-        splitAmountAInput.placeholder = shareOfString.replace('{name}', userA);
-        splitAmountBInput.placeholder = shareOfString.replace('{name}', userB);
+
+        // Update placeholders
+        [splitAmountAInput, editSplitAmountAInput].forEach(input => input.placeholder = shareOfString.replace('{name}', userA));
+        [splitAmountBInput, editSplitAmountBInput].forEach(input => input.placeholder = shareOfString.replace('{name}', userB));
     }
 
-    // --- Expense Management ---
+    // --- Expense Management (Add, Edit, Delete) ---
     async function addExpense() {
         if (!currentSettlement) return;
         const name = itemNameInput.value.trim();
@@ -302,6 +340,71 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentSettlement.isSettled) currentSettlement.isSettled = false;
         render();
         clearInputs();
+    }
+
+    function openEditExpenseModal(expenseId) {
+        const expense = currentSettlement.expenses.find(e => e.id === expenseId);
+        if (!expense) return;
+
+        currentEditingExpenseId = expenseId;
+
+        editExpenseIdInput.value = expense.id;
+        editItemNameInput.value = expense.name;
+        editItemAmountInput.value = formatNumber(expense.originalAmount, 0);
+        editItemAmountInput.dataset.originalValue = formatNumber(expense.originalAmount, 0);
+        
+        editItemCurrencySelect.innerHTML = SUPPORTED_CURRENCIES.map(c => `<option value="${c}" ${c === expense.currency ? 'selected' : ''}>${c}</option>`).join('');
+        editItemPayerSelect.value = expense.payer;
+        editSplitMethodSelect.value = expense.split;
+
+        if (expense.split === 'amount') {
+            const rate = expense.amount / expense.originalAmount; // Calculate rate from stored values
+            const originalShareA = expense.shares[currentSettlement.participants[0]] / rate;
+            const originalShareB = expense.shares[currentSettlement.participants[1]] / rate;
+            editSplitAmountAInput.value = formatNumber(originalShareA, 0);
+            editSplitAmountBInput.value = formatNumber(originalShareB, 0);
+        }
+
+        handleSplitMethodChange(editSplitMethodSelect, editItemAmountInput, editSplitAmountInputs, editSplitAmountAInput, editSplitAmountBInput);
+        editExpenseModal.classList.remove('hidden');
+    }
+
+    async function saveExpenseChanges() {
+        if (!currentSettlement || currentEditingExpenseId === null) return;
+
+        const name = editItemNameInput.value.trim();
+        const originalAmount = parseFormattedNumber(editItemAmountInput.value);
+        const currency = editItemCurrencySelect.value;
+        if (!name || originalAmount <= 0) { alert(locales[currentLang]?.invalidInput); return; }
+
+        const rate = await getExchangeRate(currentSettlement.date, currency, currentSettlement.baseCurrency);
+        if (rate === null) return;
+
+        const convertedAmount = originalAmount * rate;
+        const [userA, userB] = currentSettlement.participants;
+        const payer = editItemPayerSelect.value;
+        const splitMethod = editSplitMethodSelect.value;
+        let shares = { [userA]: 0, [userB]: 0 };
+
+        if (splitMethod === 'equal') {
+            shares[userA] = shares[userB] = convertedAmount / 2;
+        } else if (splitMethod === 'amount') {
+            const shareA_original = parseFormattedNumber(editSplitAmountAInput.value);
+            const shareB_original = parseFormattedNumber(editSplitAmountBInput.value);
+            if (Math.abs(shareA_original + shareB_original - originalAmount) > 0.01) { alert(locales[currentLang]?.amountMismatch); return; }
+            shares[userA] = shareA_original * rate;
+            shares[userB] = shareB_original * rate;
+        }
+
+        const expenseIndex = currentSettlement.expenses.findIndex(e => e.id === currentEditingExpenseId);
+        if (expenseIndex > -1) {
+            currentSettlement.expenses[expenseIndex] = { ...currentSettlement.expenses[expenseIndex], name, originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares };
+        }
+
+        if (currentSettlement.isSettled) currentSettlement.isSettled = false;
+        render();
+        editExpenseModal.classList.add('hidden');
+        currentEditingExpenseId = null;
     }
     
     function deleteExpense(expenseId) {
@@ -339,9 +442,13 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseTableBody.innerHTML = '';
         if (!currentSettlement || !currentSettlement.expenses) return;
         const [userA, userB] = currentSettlement.participants;
-        const baseCurrency = currentSettlement.baseCurrency;
+        const isLocked = currentSettlement.isSettled;
+
         currentSettlement.expenses.forEach(exp => {
             const row = expenseTableBody.insertRow();
+            row.dataset.id = exp.id;
+            row.classList.toggle('is-settled', isLocked);
+
             row.innerHTML = `
                 <td>${exp.name}</td>
                 <td>${formatNumber(exp.originalAmount, 2)} ${exp.currency}</td>
@@ -350,9 +457,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${formatNumber(exp.shares[userB], 2)}</td>
                 <td><button class="delete-expense-btn" data-id="${exp.id}"><i class="fas fa-trash-alt"></i></button></td>
             `;
+            
+            if (!isLocked) {
+                row.addEventListener('click', (e) => {
+                    if (e.target.closest('.delete-expense-btn')) return; // Prevent opening modal when delete is clicked
+                    openEditExpenseModal(exp.id);
+                });
+            }
         });
         expenseTableBody.querySelectorAll('.delete-expense-btn').forEach(btn => 
-            btn.addEventListener('click', (e) => deleteExpense(parseInt(e.currentTarget.dataset.id)))
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent row click event from firing
+                deleteExpense(parseInt(e.currentTarget.dataset.id))
+            })
         );
     }
     
@@ -405,7 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
         splitAmountAInput.value = ''; splitAmountBInput.value = '';
         splitMethodSelect.value = 'equal';
         if(currentSettlement) itemCurrencySelect.value = currentSettlement.baseCurrency;
-        handleSplitMethodChange();
+        handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs, splitAmountAInput, splitAmountBInput);
         itemNameInput.focus();
     }
 
