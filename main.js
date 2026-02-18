@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Calculator View
     const settlementDisplay = document.getElementById('settlement-display');
     const settlementDateBadge = document.getElementById('settlement-date-badge');
+    const expenseFormCard = document.getElementById('expense-form-card');
     const itemPayerSelect = document.getElementById('item-payer');
     const itemCurrencySelect = document.getElementById('item-currency');
     const splitMethodSelect = document.getElementById('split-method');
@@ -101,7 +102,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const cacheKey = `${date}_${base}_${target}`;
         if (exchangeRatesCache[cacheKey]) return exchangeRatesCache[cacheKey];
 
-        // Use "latest" for future dates as frankfurter.app doesn't support them
         const requestDate = new Date(date) > new Date() ? 'latest' : date;
 
         try {
@@ -112,11 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if(!rate) throw new Error(`Rate not found for ${target}`);
             exchangeRatesCache[cacheKey] = rate;
             return rate;
-        } catch (error) {
-            console.error('Error fetching exchange rate:', error);
-            alert(`Failed to fetch exchange rate for ${date}. Please check your connection or try again later.`);
-            return null;
-        }
+        } catch (error) { console.error('Error fetching exchange rate:', error); alert(`Failed to fetch exchange rate for ${date}.`); return null; }
     }
 
     // --- Initialization ---
@@ -147,7 +143,6 @@ document.addEventListener('DOMContentLoaded', () => {
             newSettlementTitleInput.focus();
         });
         
-        // Modal Closing Listeners
         [addSettlementModal, exchangeRateModal].forEach(modal => {
             modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
             modal.querySelector('.close-modal-btn').addEventListener('click', () => modal.classList.add('hidden'));
@@ -158,8 +153,8 @@ document.addEventListener('DOMContentLoaded', () => {
         settlementDateBadge.addEventListener('click', showExchangeRateModal);
 
         completeSettlementBtn.addEventListener('click', () => {
-            if(currentSettlement) {
-                currentSettlement.isSettled = true;
+            if (currentSettlement) {
+                currentSettlement.isSettled = !currentSettlement.isSettled;
                 render();
             }
         });
@@ -174,9 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (hasDecimal) {
                     const parts = value.split('.');
                     e.target.value = formatNumber(parseFloat(parts[0]), 0) + '.' + (parts[1] || '');
-                } else {
-                    e.target.value = formatNumber(numericValue, 0);
-                }
+                } else { e.target.value = formatNumber(numericValue, 0); }
             });
         });
 
@@ -201,9 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const amountA = parseFormattedNumber(splitAmountAInput.value);
             const amountB = parseFormattedNumber(splitAmountBInput.value);
             itemAmountInput.value = formatNumber(amountA + amountB, 0);
-        } else {
-             itemAmountInput.value = '';
-        }
+        } else { itemAmountInput.value = ''; }
     }
 
     // --- Settlement Management ---
@@ -216,22 +207,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!title || !date) return;
         if (!settlements[date]) settlements[date] = [];
-        const newSettlement = { 
-            id: Date.now(), 
-            title, 
-            date, 
-            participants: [participantA, participantB], 
-            baseCurrency,
-            expenses: [], 
-            isSettled: false 
-        };
+        const newSettlement = { id: Date.now(), title, date, participants: [participantA, participantB], baseCurrency, expenses: [], isSettled: false };
         settlements[date].push(newSettlement);
         renderSettlementList(date);
         selectSettlement(newSettlement);
         addSettlementModal.classList.add('hidden');
         newSettlementTitleInput.value = '';
-        newParticipantAInput.value = 'A'; 
-        newParticipantBInput.value = 'B';
+        newParticipantAInput.value = 'A'; newParticipantBInput.value = 'B';
     }
     
     function deleteSettlement(date, settlementId) {
@@ -262,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderSettlementList(date) {
         const list = settlements[date] || [];
         settlementListContainer.innerHTML = list.length === 0 
-            ? `<p class="subtitle" style="padding: 0; font-size: 0.9rem; color: var(--text-muted); text-align: center;">${locales[currentLang]?.noHistory}</p>`
+            ? `<p class="subtitle">${locales[currentLang]?.noHistory}</p>`
             : list.map(s => `
                 <div class="settlement-item-wrapper">
                     <button class="settlement-item" data-id="${s.id}">
@@ -286,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('table-header-user-a').textContent = shareOfString.replace('{name}', userA);
         document.getElementById('table-header-user-b').textContent = shareOfString.replace('{name}', userB);
         splitAmountAInput.placeholder = shareOfString.replace('{name}', userA);
-        splitAmountBInput.placeholder = shareOfString.replace('{\name}', userB);
+        splitAmountBInput.placeholder = shareOfString.replace('{name}', userB);
     }
 
     // --- Expense Management ---
@@ -298,10 +280,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!name || originalAmount <= 0) { alert(locales[currentLang]?.invalidInput); return; }
 
         const rate = await getExchangeRate(currentSettlement.date, currency, currentSettlement.baseCurrency);
-        if (rate === null) return; // Stop if rate fetching fails
+        if (rate === null) return;
 
         const convertedAmount = originalAmount * rate;
-
         const [userA, userB] = currentSettlement.participants;
         const payer = itemPayerSelect.value;
         const splitMethod = splitMethodSelect.value;
@@ -312,16 +293,13 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (splitMethod === 'amount') {
             const shareA_original = parseFormattedNumber(splitAmountAInput.value);
             const shareB_original = parseFormattedNumber(splitAmountBInput.value);
-            if (Math.abs(shareA_original + shareB_original - originalAmount) > 0.01) {
-                alert(locales[currentLang]?.amountMismatch);
-                return;
-            }
+            if (Math.abs(shareA_original + shareB_original - originalAmount) > 0.01) { alert(locales[currentLang]?.amountMismatch); return; }
             shares[userA] = shareA_original * rate;
             shares[userB] = shareB_original * rate;
         }
 
         currentSettlement.expenses.push({ id: Date.now(), name, originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares });
-        currentSettlement.isSettled = false;
+        if (currentSettlement.isSettled) currentSettlement.isSettled = false;
         render();
         clearInputs();
     }
@@ -329,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function deleteExpense(expenseId) {
         if (confirm(locales[currentLang]?.deleteConfirm)) {
             currentSettlement.expenses = currentSettlement.expenses.filter(exp => exp.id !== expenseId);
-            currentSettlement.isSettled = false;
+            if (currentSettlement.isSettled) currentSettlement.isSettled = false;
             render();
         }
     }
@@ -338,24 +316,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentSettlement) return;
         const { date, baseCurrency } = currentSettlement;
         exchangeRateDate.textContent = `${date} ${locales[currentLang].baseDate}`;
-        
-        let ratesInfoHTML = '';
+        let ratesInfoHTML = `<div class="rate-item"><span class="base">1 ${baseCurrency}</span> =</div>`;
         const targetCurrencies = SUPPORTED_CURRENCIES.filter(c => c !== baseCurrency);
-
-        ratesInfoHTML = `<div class="rate-item"><span class="base">1 ${baseCurrency}</span> =</div>`;
 
         for (const target of targetCurrencies) {
             const rate = await getExchangeRate(date, baseCurrency, target);
-            if (rate !== null) {
-                ratesInfoHTML += `<div class="rate-item"><span>${formatNumber(rate, 4)}</span><span>${target}</span></div>`;
-            }
+            if (rate !== null) ratesInfoHTML += `<div class="rate-item"><span>${formatNumber(rate, 4)}</span><span>${target}</span></div>`;
         }
-
         exchangeRateInfo.innerHTML = ratesInfoHTML;
         exchangeRateModal.classList.remove('hidden');
     }
 
-    function render() { if (currentSettlement) { renderExpenses(); updateSummary(); } }
+    function render() { 
+        if (currentSettlement) { 
+            renderExpenses(); 
+            updateSummary(); 
+            toggleExpenseForm(currentSettlement.isSettled);
+        }
+    }
 
     function renderExpenses() {
         expenseTableBody.innerHTML = '';
@@ -368,8 +346,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${exp.name}</td>
                 <td>${formatNumber(exp.originalAmount, 2)} ${exp.currency}</td>
                 <td>${exp.payer}</td>
-                <td>${formatNumber(exp.shares[userA], 2)} ${baseCurrency}</td>
-                <td>${formatNumber(exp.shares[userB], 2)} ${baseCurrency}</td>
+                <td>${formatNumber(exp.shares[userA], 2)}</td>
+                <td>${formatNumber(exp.shares[userB], 2)}</td>
                 <td><button class="delete-expense-btn" data-id="${exp.id}"><i class="fas fa-trash-alt"></i></button></td>
             `;
         });
@@ -398,10 +376,28 @@ document.addEventListener('DOMContentLoaded', () => {
             if (balanceA > 0.01) settlementText = `${userB}${paysToString}${userA}: ${formatNumber(balanceA)} ${baseCurrency}`;
             else if (balanceA < -0.01) settlementText = `${userA}${paysToString}${userB}: ${formatNumber(Math.abs(balanceA))} ${baseCurrency}`;
             finalSettlementP.textContent = settlementText;
-        } else if (expenses.length > 0) {
-            finalSettlementP.textContent = locales[currentLang]?.settlementInProgress;
+            completeSettlementBtn.textContent = locales[currentLang]?.editSettlement;
+            completeSettlementBtn.classList.add('edit-mode');
             completeSettlementBtn.classList.remove('hidden');
+        } else {
+            finalSettlementP.textContent = locales[currentLang]?.settlementInProgress;
+            if (expenses.length > 0) {
+                completeSettlementBtn.textContent = locales[currentLang]?.completeSettlement;
+                completeSettlementBtn.classList.remove('edit-mode');
+                completeSettlementBtn.classList.remove('hidden');
+            }
         }
+    }
+    
+    function toggleExpenseForm(isLocked) {
+        expenseFormCard.classList.toggle('is-settled', isLocked);
+        const formElements = expenseFormCard.querySelectorAll('input, select, button');
+        formElements.forEach(el => el.disabled = isLocked);
+        expenseTableBody.querySelectorAll('.delete-expense-btn').forEach(btn => {
+            btn.disabled = isLocked;
+            btn.style.pointerEvents = isLocked ? 'none' : 'auto';
+            btn.style.opacity = isLocked ? 0.5 : 1;
+        });
     }
 
     function clearInputs() {
@@ -414,7 +410,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function downloadExcel() {
-        if (!currentSettlement) return;
+        if (!currentSettlement || currentSettlement.isSettled) return;
         alert(locales[currentLang]?.excelNotImplemented);
     }
 

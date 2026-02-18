@@ -30,7 +30,7 @@ body { font-family: var(--font-family); background-color: var(--app-bg); color: 
 
 header {
     height: 60px; background: white; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between; /* Changed */
+    display: flex; align-items: center; justify-content: space-between; 
     padding: 0 2rem; z-index: 10;
 }
 header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-spacing: -0.5px; cursor: pointer; transition: color 0.2s; }
@@ -58,20 +58,11 @@ header h1:hover { color: var(--primary-hover); }
 #main-date-picker { width: 100%; margin-bottom: 1rem; border: 1px solid var(--border); padding: 0.5rem; border-radius: 6px; font-size: 0.875rem; }
 .settlement-item-wrapper { display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-bottom: 0.5rem; }
 .settlement-item { 
-    flex-grow: 1; /* Take remaining space */
-    padding: 0.75rem 1rem; 
-    border-radius: 8px; 
-    background: white; 
-    border: 1px solid var(--border);
-    cursor: pointer; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    transition: all 0.2s; 
-    font-size: 0.9rem; 
-    color: var(--text-main); 
-    white-space: nowrap; 
-    box-shadow: var(--shadow-sm);
+    flex-grow: 1; padding: 0.75rem 1rem; 
+    border-radius: 8px; background: white; border: 1px solid var(--border);
+    cursor: pointer; display: flex; justify-content: space-between; align-items: center; 
+    transition: all 0.2s; font-size: 0.9rem; color: var(--text-main); 
+    white-space: nowrap; box-shadow: var(--shadow-sm);
 }
 .settlement-item:hover { background: #f9fafb; border-color: #d1d5db; }
 .settlement-item.active { background: var(--primary); color: white; border-color: var(--primary); }
@@ -80,18 +71,9 @@ header h1:hover { color: var(--primary-hover); }
 .item-participants { font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem; }
 
 .delete-settlement-btn {
-    background: #fee2e2;
-    color: var(--danger);
-    border: 1px solid #fecaca;
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    cursor: pointer;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
+    background: #fee2e2; color: var(--danger); border: 1px solid #fecaca;
+    width: 36px; height: 36px; border-radius: 8px; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
 }
 .delete-settlement-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
 
@@ -112,69 +94,53 @@ header h1:hover { color: var(--primary-hover); }
 
 .card { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm); }
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
-.card h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.5rem; }
+.card h2 { font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0; }
 
-#summary-card { background: linear-gradient(to right, #6366f1, #818cf8); color: white; border: none; }
-#summary-card h2 { color: white; opacity: 0.9; margin-bottom: 1rem;}
-#summary { display: flex; justify-content: space-between; align-items: center; }
+#summary-card { 
+    background: linear-gradient(to right, #6366f1, #818cf8); color: white; border: none;
+    display: flex; justify-content: space-between; align-items: center;
+}
+#summary-card h2 { color: white; opacity: 0.9; margin-bottom: 0.5rem;}
+.summary-left { flex-grow: 1; }
+.summary-right { text-align: right; }
 #total-expense { font-size: 1rem; opacity: 0.9; }
-#final-settlement { font-size: 1.5rem; font-weight: 700; }
+#final-settlement { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
 
-.expense-inputs-grid { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+#expense-form-card.is-settled { 
+    opacity: 0.6;
+    pointer-events: none; 
+    user-select: none;
+}
+#expense-form-card.is-settled h2 { color: var(--text-muted); }
+
+.expense-inputs-grid { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr; gap: 1rem; margin-top: 1.25rem; margin-bottom: 1rem; }
 input, select { width: 100%; padding: 0.625rem 0.875rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; background: #fcfcfc; }
 
-/* --- New Amount Input Wrapper --- */
 .amount-input-wrapper { display: flex; }
-.amount-input-wrapper input { 
-    flex-grow: 1;
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-    border-right: none;
-}
-.amount-input-wrapper select {
-    width: auto;
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
-    background-color: #f8fafc;
-}
+.amount-input-wrapper input { flex-grow: 1; border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none;}
+.amount-input-wrapper select { width: auto; border-top-left-radius: 0; border-bottom-left-radius: 0; background-color: #f8fafc;}
 
 button { background: var(--primary); color: white; padding: 0.75rem 1.25rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; font-size: 0.95rem; }
 button:hover { background: var(--primary-hover); }
+#complete-settlement-btn.edit-mode { background-color: var(--secondary); }
+#complete-settlement-btn.edit-mode:hover { background-color: var(--secondary-hover); }
 
 /* --- Expense Table --- */
 #expense-table-container { overflow-x: auto; }
 #expense-table { width: 100%; border-collapse: collapse; }
 #expense-table th, #expense-table td {
-    padding: 0.75rem 1rem;
-    text-align: center; /* Centered all table text */
-    border-bottom: 1px solid var(--border);
-    font-size: 0.9rem;
-    vertical-align: middle;
+    padding: 0.75rem 1rem; text-align: center; 
+    border-bottom: 1px solid var(--border); font-size: 0.9rem; vertical-align: middle;
 }
-#expense-table th { 
-    background-color: var(--side-bg);
-    color: var(--text-muted);
-    font-weight: 600; 
-}
+#expense-table th { background-color: var(--side-bg); color: var(--text-muted); font-weight: 600; }
 
-.delete-expense-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 50%;
-    width: 32px;
-    height: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+.delete-expense-btn { 
+    background: transparent; border: none; color: var(--text-muted); cursor: pointer;
+    padding: 0.5rem; border-radius: 50%; width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
     transition: background-color 0.2s, color 0.2s;
 }
-.delete-expense-btn:hover {
-    background-color: #fee2e2;
-    color: var(--danger);
-}
+.delete-expense-btn:hover { background-color: #fee2e2; color: var(--danger); }
 
 #download-excel-btn { background-color: var(--secondary); font-size: 0.85rem; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; }
 #download-excel-btn:hover { background-color: var(--secondary-hover); }
@@ -196,11 +162,7 @@ button:hover { background: var(--primary-hover); }
     animation: fadeIn 0.2s ease;
 }
 
-.modal-content { 
-    max-width: 500px; width: 90%; position: relative;
-    animation: slideInUp 0.3s ease-out;
-}
-
+.modal-content { max-width: 500px; width: 90%; position: relative; animation: slideInUp 0.3s ease-out;}
 .modal-content input, .currency-select-wrapper { margin-bottom: 1rem; }
 .modal-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
 .modal-header h2 { margin-bottom: 0; font-size: 1.4rem; }
@@ -208,10 +170,7 @@ button:hover { background: var(--primary-hover); }
 .close-modal-btn { position: absolute; top: 1rem; right: 1rem; cursor: pointer; color: var(--text-muted); font-size: 1.2rem; transition: color 0.2s; }
 .close-modal-btn:hover { color: var(--text-main); }
 
-.currency-select-wrapper label {
-    display: block; margin-bottom: 0.5rem;
-    color: var(--text-muted); font-size: 0.9rem;
-}
+.currency-select-wrapper label { display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.9rem;}
 
 /* --- Exchange Rate Modal Specifics --- */
 #exchange-rate-date { 
@@ -219,10 +178,7 @@ button:hover { background: var(--primary-hover); }
     margin-bottom: 1.5rem; padding-bottom: 1rem; 
     border-bottom: 1px solid var(--border);
 }
-#exchange-rate-info .rate-item {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 0.8rem 0; font-size: 1rem;
-}
+#exchange-rate-info .rate-item { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 0; font-size: 1rem;}
 #exchange-rate-info .rate-item:not(:last-child) { border-bottom: 1px solid var(--app-bg); }
 #exchange-rate-info .base { font-weight: 600; color: var(--primary); }
 
@@ -230,6 +186,8 @@ button:hover { background: var(--primary-hover); }
     #left-pane, #left-pane.collapsed { width: 100% !important; height: auto; border-right: none; border-bottom: 1px solid var(--border); opacity: 1; }
     #main-container { flex-direction: column; }
     #right-pane { padding: 1.5rem; }
+    #summary-card { flex-direction: column; align-items: flex-start; }
+    .summary-right { text-align: left; margin-top: 1rem; }
     .expense-inputs-grid { grid-template-columns: 1fr; }
     .participant-inputs { grid-template-columns: 1fr; }
     #add-settlement-fab { left: auto; right: 1.5rem; transform: none !important; }

@@ -44,17 +44,17 @@
                     </div>
                     
                     <div class="card" id="summary-card">
-                        <h2><i class="fas fa-chart-pie"></i><span data-i18n="settlementResult"></span></h2>
-                        <div id="summary">
+                        <div class="summary-left">
+                            <h2><i class="fas fa-chart-pie"></i><span data-i18n="settlementResult"></span></h2>
                             <div id="total-expense" data-i18n="totalExpense">총 지출: 0 JPY</div>
-                            <div id="final-settlement-display">
-                                <p id="final-settlement"></p>
-                                <button id="complete-settlement-btn" class="hidden" data-i18n="completeSettlement"></button>
-                            </div>
+                        </div>
+                        <div class="summary-right">
+                            <p id="final-settlement"></p>
+                            <button id="complete-settlement-btn" class="hidden"></button>
                         </div>
                     </div>
 
-                    <div class="card">
+                    <div class="card" id="expense-form-card">
                         <h2><i class="fas fa-plus-circle"></i><span data-i18n="addExpense"></span></h2>
                         <div id="expense-form">
                              <div class="expense-inputs-grid">
