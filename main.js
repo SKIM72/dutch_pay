@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
     // --- Global State ---
-    let settlements = {}; // This will now be populated from Supabase
+    let settlements = {};
     let currentSettlement = null;
     let currentLang = 'ko';
     let currentEditingExpenseId = null;
@@ -12,7 +12,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD'];
 
     // --- Element References ---
-    // (Element references remain the same as before)
     const languageSwitcher = document.getElementById('language-switcher');
     const sidebar = document.getElementById('left-pane');
     const appTitle = document.querySelector('header h1');
@@ -70,7 +69,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const parseFormattedNumber = (str) => parseFloat(String(str).replace(/,/g, '')) || 0;
 
     // --- i18n (Localization) ---
-    // (i18n functions remain the same)
     function updateUI(lang) {
         currentLang = lang;
         const translations = locales[lang];
@@ -113,7 +111,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- Exchange Rate API ---
-    // (Exchange rate function remains the same)
     async function getExchangeRate(date, base, target) {
         if (base === target) return 1;
         const cacheKey = `${date}_${base}_${target}`;
@@ -146,10 +143,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function loadData() {
         const { data, error } = await supabaseClient
             .from('settlements')
-            .select(`
-                *,
-                expenses (*)
-            `);
+            .select(`* , expenses (*)`)
+            .order('created_at');
 
         if (error) {
             console.error('Error loading data from Supabase:', error);
@@ -159,9 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         settlements = {};
         data.forEach(s => {
             const settlementDate = s.date;
-            if (!settlements[settlementDate]) {
-                settlements[settlementDate] = [];
-            }
+            if (!settlements[settlementDate]) settlements[settlementDate] = [];
             settlements[settlementDate].push(s);
         });
         renderSettlementList(mainDatePicker.value);
@@ -174,7 +167,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // --- Event Listeners Setup ---
-    // (Event listeners setup remains mostly the same, with async modifications)
     function setupEventListeners() {
         languageSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
         appTitle.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
@@ -192,7 +184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         createSettlementBtn.addEventListener('click', createSettlement);
         addExpenseBtn.addEventListener('click', addExpense);
-        saveExpenseChangesBtn.addEventListener('click', saveExpenseChanges);
+        saveExpenseChangesBtn.addEventListener('click', handleSaveExpenseChanges);
         settlementDateBadge.addEventListener('click', showExchangeRateModal);
 
         completeSettlementBtn.addEventListener('click', async () => {
@@ -204,6 +196,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     .eq('id', currentSettlement.id);
                 if (error) console.error('Error updating settlement state:', error);
                 render();
+                renderSettlementList(mainDatePicker.value); // Re-render list to show settled status
             }
         });
         
@@ -272,15 +265,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { data, error } = await supabaseClient
             .from('settlements')
             .insert([{ title, date, participants: [participantA, participantB], base_currency: baseCurrency, is_settled: false }])
-            .select();
+            .select('*, expenses (*)');
 
         if (error) {
             console.error('Error creating settlement:', error);
             return;
         }
         
-        const newSettlement = { ...data[0], expenses: [] };
-
+        const newSettlement = data[0];
         if (!settlements[date]) settlements[date] = [];
         settlements[date].push(newSettlement);
         
@@ -293,25 +285,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     async function deleteSettlement(date, settlementId) {
         if (confirm(locales[currentLang]?.deleteSettlementConfirm)) {
-            // First, delete all associated expenses
-            const { error: expenseError } = await supabaseClient
-                .from('expenses')
-                .delete()
-                .eq('settlement_id', settlementId);
-
-            if (expenseError) {
-                console.error('Error deleting expenses:', expenseError);
-                return;
-            }
-
-            // Then, delete the settlement itself
-            const { error: settlementError } = await supabaseClient
-                .from('settlements')
-                .delete()
-                .eq('id', settlementId);
-            
-            if (settlementError) {
-                console.error('Error deleting settlement:', settlementError);
+            const { error } = await supabaseClient.from('settlements').delete().eq('id', settlementId);
+            if (error) {
+                console.error('Error deleting settlement:', error);
+                alert('Error: ' + error.message);
                 return;
             }
             
@@ -341,11 +318,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderSettlementList(date) {
         const list = settlements[date] || [];
         settlementListContainer.innerHTML = list.length === 0 
-            ? `<p class="subtitle">${locales[currentLang]?.noHistory}</p>`
+            ? `<p class="subtitle">${locales[currentLang]?.noHistory || 'History does not exist.'}</p>`
             : list.map(s => `
                 <div class="settlement-item-wrapper">
-                    <button class="settlement-item" data-id="${s.id}">
-                        <div>
+                    <button class="settlement-item ${s.is_settled ? 'is-settled' : ''}" data-id="${s.id}">
+                        <div class="item-content">
+                            ${s.is_settled ? '<i class="fas fa-check-circle settled-icon"></i>' : ''}
                             <span class="item-title">${s.title}</span>
                             <span class="item-participants">(${s.participants.join(', ')}) - ${s.base_currency}</span>
                         </div>
@@ -354,19 +332,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <button class="delete-settlement-btn" data-date="${date}" data-id="${s.id}"><i class="fas fa-trash-alt"></i></button>
                 </div>`).join('');
         
-        settlementListContainer.querySelectorAll('.settlement-item').forEach(btn => btn.addEventListener('click', (e) => selectSettlement(list.find(s => s.id == e.currentTarget.dataset.id))));
-        settlementListContainer.querySelectorAll('.delete-settlement-btn').forEach(btn => btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.settlement-item').forEach(btn => {
+            const settlementId = parseInt(btn.dataset.id);
+            const settlement = list.find(s => s.id === settlementId);
+            if(settlement) btn.addEventListener('click', () => selectSettlement(settlement));
+        });
+
+        document.querySelectorAll('.delete-settlement-btn').forEach(btn => btn.addEventListener('click', (e) => {
             e.stopPropagation();
             deleteSettlement(e.currentTarget.dataset.date, parseInt(e.currentTarget.dataset.id))
         }));
+        
+        if(currentSettlement) {
+            const currentItem = document.querySelector(`.settlement-item[data-id='${currentSettlement.id}']`);
+            if (currentItem) currentItem.classList.add('active');
+        }
     }
 
     function updateParticipantNames(participants) {
         const [userA, userB] = participants;
-        const paidByString = locales[currentLang]?.paidBy;
-        const shareOfString = locales[currentLang]?.shareOf;
+        const paidByString = locales[currentLang]?.paidBy || 'Paid by {payer}';
+        const shareOfString = locales[currentLang]?.shareOf || "{name}'s share";
 
-        // Update options for all relevant selects
         [itemPayerSelect, editItemPayerSelect].forEach(select => {
             select.innerHTML = `<option value="${userA}">${paidByString.replace('{payer}', userA)}</option><option value="${userB}">${paidByString.replace('{payer}', userB)}</option>`;
         });
@@ -374,7 +361,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('table-header-user-a').textContent = shareOfString.replace('{name}', userA);
         document.getElementById('table-header-user-b').textContent = shareOfString.replace('{name}', userB);
 
-        // Update placeholders
         [splitAmountAInput, editSplitAmountAInput].forEach(input => input.placeholder = shareOfString.replace('{name}', userA));
         [splitAmountBInput, editSplitAmountBInput].forEach(input => input.placeholder = shareOfString.replace('{name}', userB));
     }
@@ -408,36 +394,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const { data, error } = await supabaseClient
             .from('expenses')
-            .insert([{ 
-                settlement_id: currentSettlement.id, 
-                name, 
-                original_amount: originalAmount, 
-                currency, 
-                amount: convertedAmount, 
-                payer, 
-                split: splitMethod, 
-                shares 
-            }])
+            .insert([{ settlement_id: currentSettlement.id, name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares }])
             .select();
 
-        if (error) {
-            console.error('Error adding expense:', error);
-            return;
-        }
+        if (error) { console.error('Error adding expense:', error); return; }
         
         const newExpense = data[0];
         currentSettlement.expenses.push(newExpense);
 
         if (currentSettlement.is_settled) {
             currentSettlement.is_settled = false;
-            const { error } = await supabaseClient
-                .from('settlements')
-                .update({ is_settled: false })
-                .eq('id', currentSettlement.id);
-             if (error) console.error('Error updating settlement state:', error);
+            const { error } = await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
+            if (error) console.error('Error updating settlement state:', error);
         }
         
         render();
+        renderSettlementList(mainDatePicker.value);
         clearInputs();
     }
 
@@ -468,7 +440,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         editExpenseModal.classList.remove('hidden');
     }
 
-    async function saveExpenseChanges() {
+    async function handleSaveExpenseChanges() {
         if (!currentSettlement || currentEditingExpenseId === null) return;
 
         const name = editItemNameInput.value.trim();
@@ -501,53 +473,38 @@ document.addEventListener('DOMContentLoaded', async () => {
             .eq('id', currentEditingExpenseId)
             .select();
 
-        if (error) {
-            console.error('Error saving expense changes:', error);
-            return;
-        }
+        if (error) { console.error('Error saving expense changes:', error); return; }
         
         const updatedExpense = data[0];
         const expenseIndex = currentSettlement.expenses.findIndex(e => e.id === currentEditingExpenseId);
-        if (expenseIndex > -1) {
-            currentSettlement.expenses[expenseIndex] = updatedExpense;
-        }
+        if (expenseIndex > -1) currentSettlement.expenses[expenseIndex] = updatedExpense;
 
         if (currentSettlement.is_settled) {
-             currentSettlement.is_settled = false;
-            const { error } = await supabaseClient
-                .from('settlements')
-                .update({ is_settled: false })
-                .eq('id', currentSettlement.id);
-             if (error) console.error('Error updating settlement state:', error);
+            currentSettlement.is_settled = false;
+            const { error } = await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
+            if (error) console.error('Error updating settlement state:', error);
         }
 
         render();
+        renderSettlementList(mainDatePicker.value);
         editExpenseModal.classList.add('hidden');
         currentEditingExpenseId = null;
     }
     
     async function deleteExpense(expenseId) {
         if (confirm(locales[currentLang]?.deleteConfirm)) {
-             const { error } = await supabaseClient
-                .from('expenses')
-                .delete()
-                .eq('id', expenseId);
-            
-            if (error) {
-                console.error('Error deleting expense:', error);
-                return;
-            }
+             const { error } = await supabaseClient.from('expenses').delete().eq('id', expenseId);
+            if (error) { console.error('Error deleting expense:', error); return; }
 
             currentSettlement.expenses = currentSettlement.expenses.filter(exp => exp.id !== expenseId);
+
             if (currentSettlement.is_settled) {
                 currentSettlement.is_settled = false;
-                const { error: updateError } = await supabaseClient
-                    .from('settlements')
-                    .update({ is_settled: false })
-                    .eq('id', currentSettlement.id);
+                const { error: updateError } = await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
                 if (updateError) console.error('Error updating settlement state:', updateError);
             }
             render();
+            renderSettlementList(mainDatePicker.value);
         }
     }
 
@@ -591,7 +548,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td>${exp.payer}</td>
                 <td>${formatNumber(exp.shares[userA], 2)}</td>
                 <td>${formatNumber(exp.shares[userB], 2)}</td>
-                <td><button class="delete-expense-btn" data-id="${exp.id}"><i class="fas fa-trash-alt"></i></button></td>
+                <td><button class="delete-expense-btn" data-id="${exp.id}" ${isLocked ? 'disabled' : ''}><i class="fas fa-trash-alt"></i></button></td>
             `;
             
             if (!isLocked) {
@@ -613,7 +570,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentSettlement) return;
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
         const totalAmount = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-        totalExpenseP.textContent = `${locales[currentLang]?.totalExpense}: ${formatNumber(totalAmount, 2)} ${base_currency}`;
+        totalExpenseP.textContent = `${locales[currentLang]?.totalExpense || 'Total Expense'}: ${formatNumber(totalAmount, 2)} ${base_currency}`;
 
         finalSettlementP.textContent = '';
         completeSettlementBtn.classList.add('hidden');
@@ -624,18 +581,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             const totalOwedByA = expenses.reduce((sum, exp) => sum + exp.shares[userA], 0);
             const balanceA = amountPaidByA - totalOwedByA;
 
-            let settlementText = locales[currentLang]?.settlementDone;
-            const paysToString = ` ${locales[currentLang]?.paysTo} `;
-            if (balanceA > 0.01) settlementText = `${userB}${paysToString}${userA}: ${formatNumber(balanceA)} ${base_currency}`;
-            else if (balanceA < -0.01) settlementText = `${userA}${paysToString}${userB}: ${formatNumber(Math.abs(balanceA))} ${base_currency}`;
+            let settlementText = locales[currentLang]?.settlementDone || 'Settlement complete';
+            if (balanceA > 0.01) settlementText = `${userB} → ${userA}: ${formatNumber(balanceA)} ${base_currency}`;
+            else if (balanceA < -0.01) settlementText = `${userA} → ${userB}: ${formatNumber(Math.abs(balanceA))} ${base_currency}`;
+            
             finalSettlementP.textContent = settlementText;
-            completeSettlementBtn.textContent = locales[currentLang]?.editSettlement;
+            completeSettlementBtn.textContent = locales[currentLang]?.editSettlement || 'Reopen Settlement';
             completeSettlementBtn.classList.add('edit-mode');
             completeSettlementBtn.classList.remove('hidden');
         } else {
-            finalSettlementP.textContent = locales[currentLang]?.settlementInProgress;
+            finalSettlementP.textContent = locales[currentLang]?.settlementInProgress || 'Settlement in progress...';
             if (expenses.length > 0) {
-                completeSettlementBtn.textContent = locales[currentLang]?.completeSettlement;
+                completeSettlementBtn.textContent = locales[currentLang]?.completeSettlement || 'Complete Settlement';
                 completeSettlementBtn.classList.remove('edit-mode');
                 completeSettlementBtn.classList.remove('hidden');
             }
@@ -644,13 +601,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     function toggleExpenseForm(isLocked) {
         expenseFormCard.classList.toggle('is-settled', isLocked);
-        const formElements = expenseFormCard.querySelectorAll('input, select, button');
-        formElements.forEach(el => el.disabled = isLocked);
-        expenseTableBody.querySelectorAll('.delete-expense-btn').forEach(btn => {
-            btn.disabled = isLocked;
-            btn.style.pointerEvents = isLocked ? 'none' : 'auto';
-            btn.style.opacity = isLocked ? 0.5 : 1;
-        });
+        expenseFormCard.querySelectorAll('input, select, button').forEach(el => { el.disabled = isLocked; });
     }
 
     function clearInputs() {
@@ -663,8 +614,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function downloadExcel() {
-        if (!currentSettlement || currentSettlement.is_settled) return;
-        alert(locales[currentLang]?.excelNotImplemented);
+        // This feature can be implemented later.
+        const excelInfo = locales[currentLang]?.excelNotImplemented || 'Excel export will be available soon.';
+        alert(excelInfo);
     }
 
     // --- Start the App ---
