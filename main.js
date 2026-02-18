@@ -1,14 +1,18 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+
+    // --- Supabase Client Initialization ---
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
     // --- Global State ---
-    let settlements = {};
+    let settlements = {}; // This will now be populated from Supabase
     let currentSettlement = null;
     let currentLang = 'ko';
-    let currentEditingExpenseId = null; // To track the expense being edited
+    let currentEditingExpenseId = null;
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD'];
 
     // --- Element References ---
+    // (Element references remain the same as before)
     const languageSwitcher = document.getElementById('language-switcher');
     const sidebar = document.getElementById('left-pane');
     const appTitle = document.querySelector('header h1');
@@ -18,12 +22,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const placeholderRightPane = document.getElementById('placeholder-right-pane');
     const calculatorView = document.getElementById('calculator');
     
-    // Modals
     const addSettlementModal = document.getElementById('add-settlement-modal');
     const exchangeRateModal = document.getElementById('exchange-rate-modal');
     const editExpenseModal = document.getElementById('edit-expense-modal');
 
-    // Add Settlement Modal
     const modalDateDisplay = document.getElementById('modal-date-display');
     const newSettlementTitleInput = document.getElementById('new-settlement-title');
     const newParticipantAInput = document.getElementById('new-participant-a');
@@ -31,11 +33,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const baseCurrencySelect = document.getElementById('base-currency');
     const createSettlementBtn = document.getElementById('create-settlement-btn');
 
-    // Exchange Rate Modal
     const exchangeRateDate = document.getElementById('exchange-rate-date');
     const exchangeRateInfo = document.getElementById('exchange-rate-info');
     
-    // Edit Expense Modal
     const editExpenseIdInput = document.getElementById('edit-expense-id');
     const editItemNameInput = document.getElementById('edit-item-name');
     const editItemAmountInput = document.getElementById('edit-item-amount');
@@ -47,7 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const editSplitAmountBInput = document.getElementById('edit-split-amount-b');
     const saveExpenseChangesBtn = document.getElementById('save-expense-changes-btn');
 
-    // Calculator View
     const settlementDisplay = document.getElementById('settlement-display');
     const settlementDateBadge = document.getElementById('settlement-date-badge');
     const expenseFormCard = document.getElementById('expense-form-card');
@@ -71,6 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const parseFormattedNumber = (str) => parseFloat(String(str).replace(/,/g, '')) || 0;
 
     // --- i18n (Localization) ---
+    // (i18n functions remain the same)
     function updateUI(lang) {
         currentLang = lang;
         const translations = locales[lang];
@@ -113,6 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Exchange Rate API ---
+    // (Exchange rate function remains the same)
     async function getExchangeRate(date, base, target) {
         if (base === target) return 1;
         const cacheKey = `${date}_${base}_${target}`;
@@ -131,14 +132,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Initialization ---
-    function initialize() {
+    async function initialize() {
         const preferredLang = localStorage.getItem('preferredLang');
         const browserLang = navigator.language.split('-')[0];
         const initialLang = preferredLang || (['ko', 'en', 'ja'].includes(browserLang) ? browserLang : 'en');
         
         setupEventListeners();
-        setInitialDate();     
+        setInitialDate();
+        await loadData();
         setLanguage(initialLang);
+    }
+
+    async function loadData() {
+        const { data, error } = await supabase
+            .from('settlements')
+            .select(`
+                *,
+                expenses (*)
+            `);
+
+        if (error) {
+            console.error('Error loading data from Supabase:', error);
+            return;
+        }
+
+        settlements = {};
+        data.forEach(s => {
+            const settlementDate = s.date;
+            if (!settlements[settlementDate]) {
+                settlements[settlementDate] = [];
+            }
+            settlements[settlementDate].push(s);
+        });
+        renderSettlementList(mainDatePicker.value);
     }
 
     function setInitialDate() {
@@ -148,6 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Event Listeners Setup ---
+    // (Event listeners setup remains mostly the same, with async modifications)
     function setupEventListeners() {
         languageSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
         appTitle.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
@@ -168,9 +195,14 @@ document.addEventListener('DOMContentLoaded', () => {
         saveExpenseChangesBtn.addEventListener('click', saveExpenseChanges);
         settlementDateBadge.addEventListener('click', showExchangeRateModal);
 
-        completeSettlementBtn.addEventListener('click', () => {
+        completeSettlementBtn.addEventListener('click', async () => {
             if (currentSettlement) {
-                currentSettlement.isSettled = !currentSettlement.isSettled;
+                currentSettlement.is_settled = !currentSettlement.is_settled;
+                const { error } = await supabase
+                    .from('settlements')
+                    .update({ is_settled: currentSettlement.is_settled })
+                    .eq('id', currentSettlement.id);
+                if (error) console.error('Error updating settlement state:', error);
                 render();
             }
         });
@@ -227,8 +259,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Settlement Management ---
-    function createSettlement() {
+    // --- Settlement Management (Supabase Integrated) ---
+    async function createSettlement() {
         const title = newSettlementTitleInput.value.trim();
         const date = mainDatePicker.value;
         const participantA = newParticipantAInput.value.trim() || 'A';
@@ -236,9 +268,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const baseCurrency = baseCurrencySelect.value;
 
         if (!title || !date) return;
+
+        const { data, error } = await supabase
+            .from('settlements')
+            .insert([{ title, date, participants: [participantA, participantB], base_currency: baseCurrency, is_settled: false }])
+            .select();
+
+        if (error) {
+            console.error('Error creating settlement:', error);
+            return;
+        }
+        
+        const newSettlement = { ...data[0], expenses: [] };
+
         if (!settlements[date]) settlements[date] = [];
-        const newSettlement = { id: Date.now(), title, date, participants: [participantA, participantB], baseCurrency, expenses: [], isSettled: false };
         settlements[date].push(newSettlement);
+        
         renderSettlementList(date);
         selectSettlement(newSettlement);
         addSettlementModal.classList.add('hidden');
@@ -246,8 +291,30 @@ document.addEventListener('DOMContentLoaded', () => {
         newParticipantAInput.value = 'A'; newParticipantBInput.value = 'B';
     }
     
-    function deleteSettlement(date, settlementId) {
+    async function deleteSettlement(date, settlementId) {
         if (confirm(locales[currentLang]?.deleteSettlementConfirm)) {
+            // First, delete all associated expenses
+            const { error: expenseError } = await supabase
+                .from('expenses')
+                .delete()
+                .eq('settlement_id', settlementId);
+
+            if (expenseError) {
+                console.error('Error deleting expenses:', expenseError);
+                return;
+            }
+
+            // Then, delete the settlement itself
+            const { error: settlementError } = await supabase
+                .from('settlements')
+                .delete()
+                .eq('id', settlementId);
+            
+            if (settlementError) {
+                console.error('Error deleting settlement:', settlementError);
+                return;
+            }
+            
             settlements[date] = settlements[date].filter(s => s.id !== settlementId);
             if (currentSettlement && currentSettlement.id === settlementId) {
                 currentSettlement = null;
@@ -264,7 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
         calculatorView.classList.remove('hidden');
         settlementDisplay.textContent = settlement.title;
         settlementDateBadge.textContent = settlement.date;
-        itemCurrencySelect.value = settlement.baseCurrency;
+        itemCurrencySelect.value = settlement.base_currency;
         updateParticipantNames(settlement.participants);
         document.querySelectorAll('.settlement-item').forEach(item => item.classList.toggle('active', item.dataset.id == settlement.id));
         if (window.innerWidth <= 768) sidebar.classList.add('collapsed');
@@ -280,7 +347,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button class="settlement-item" data-id="${s.id}">
                         <div>
                             <span class="item-title">${s.title}</span>
-                            <span class="item-participants">(${s.participants.join(', ')}) - ${s.baseCurrency}</span>
+                            <span class="item-participants">(${s.participants.join(', ')}) - ${s.base_currency}</span>
                         </div>
                         <i class="fas fa-chevron-right"></i>
                     </button>
@@ -288,7 +355,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`).join('');
         
         settlementListContainer.querySelectorAll('.settlement-item').forEach(btn => btn.addEventListener('click', (e) => selectSettlement(list.find(s => s.id == e.currentTarget.dataset.id))));
-        settlementListContainer.querySelectorAll('.delete-settlement-btn').forEach(btn => btn.addEventListener('click', (e) => deleteSettlement(e.currentTarget.dataset.date, parseInt(e.currentTarget.dataset.id))));
+        settlementListContainer.querySelectorAll('.delete-settlement-btn').forEach(btn => btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteSettlement(e.currentTarget.dataset.date, parseInt(e.currentTarget.dataset.id))
+        }));
     }
 
     function updateParticipantNames(participants) {
@@ -309,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
         [splitAmountBInput, editSplitAmountBInput].forEach(input => input.placeholder = shareOfString.replace('{name}', userB));
     }
 
-    // --- Expense Management (Add, Edit, Delete) ---
+    // --- Expense Management (Supabase Integrated) ---
     async function addExpense() {
         if (!currentSettlement) return;
         const name = itemNameInput.value.trim();
@@ -317,7 +387,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const currency = itemCurrencySelect.value;
         if (!name || originalAmount <= 0) { alert(locales[currentLang]?.invalidInput); return; }
 
-        const rate = await getExchangeRate(currentSettlement.date, currency, currentSettlement.baseCurrency);
+        const rate = await getExchangeRate(currentSettlement.date, currency, currentSettlement.base_currency);
         if (rate === null) return;
 
         const convertedAmount = originalAmount * rate;
@@ -336,8 +406,37 @@ document.addEventListener('DOMContentLoaded', () => {
             shares[userB] = shareB_original * rate;
         }
 
-        currentSettlement.expenses.push({ id: Date.now(), name, originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares });
-        if (currentSettlement.isSettled) currentSettlement.isSettled = false;
+        const { data, error } = await supabase
+            .from('expenses')
+            .insert([{ 
+                settlement_id: currentSettlement.id, 
+                name, 
+                original_amount: originalAmount, 
+                currency, 
+                amount: convertedAmount, 
+                payer, 
+                split: splitMethod, 
+                shares 
+            }])
+            .select();
+
+        if (error) {
+            console.error('Error adding expense:', error);
+            return;
+        }
+        
+        const newExpense = data[0];
+        currentSettlement.expenses.push(newExpense);
+
+        if (currentSettlement.is_settled) {
+            currentSettlement.is_settled = false;
+            const { error } = await supabase
+                .from('settlements')
+                .update({ is_settled: false })
+                .eq('id', currentSettlement.id);
+             if (error) console.error('Error updating settlement state:', error);
+        }
+        
         render();
         clearInputs();
     }
@@ -350,15 +449,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         editExpenseIdInput.value = expense.id;
         editItemNameInput.value = expense.name;
-        editItemAmountInput.value = formatNumber(expense.originalAmount, 0);
-        editItemAmountInput.dataset.originalValue = formatNumber(expense.originalAmount, 0);
+        editItemAmountInput.value = formatNumber(expense.original_amount, 0);
+        editItemAmountInput.dataset.originalValue = formatNumber(expense.original_amount, 0);
         
         editItemCurrencySelect.innerHTML = SUPPORTED_CURRENCIES.map(c => `<option value="${c}" ${c === expense.currency ? 'selected' : ''}>${c}</option>`).join('');
         editItemPayerSelect.value = expense.payer;
         editSplitMethodSelect.value = expense.split;
 
         if (expense.split === 'amount') {
-            const rate = expense.amount / expense.originalAmount; // Calculate rate from stored values
+            const rate = expense.amount / expense.original_amount;
             const originalShareA = expense.shares[currentSettlement.participants[0]] / rate;
             const originalShareB = expense.shares[currentSettlement.participants[1]] / rate;
             editSplitAmountAInput.value = formatNumber(originalShareA, 0);
@@ -377,7 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const currency = editItemCurrencySelect.value;
         if (!name || originalAmount <= 0) { alert(locales[currentLang]?.invalidInput); return; }
 
-        const rate = await getExchangeRate(currentSettlement.date, currency, currentSettlement.baseCurrency);
+        const rate = await getExchangeRate(currentSettlement.date, currency, currentSettlement.base_currency);
         if (rate === null) return;
 
         const convertedAmount = originalAmount * rate;
@@ -395,35 +494,72 @@ document.addEventListener('DOMContentLoaded', () => {
             shares[userA] = shareA_original * rate;
             shares[userB] = shareB_original * rate;
         }
+        
+        const { data, error } = await supabase
+            .from('expenses')
+            .update({ name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares })
+            .eq('id', currentEditingExpenseId)
+            .select();
 
+        if (error) {
+            console.error('Error saving expense changes:', error);
+            return;
+        }
+        
+        const updatedExpense = data[0];
         const expenseIndex = currentSettlement.expenses.findIndex(e => e.id === currentEditingExpenseId);
         if (expenseIndex > -1) {
-            currentSettlement.expenses[expenseIndex] = { ...currentSettlement.expenses[expenseIndex], name, originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares };
+            currentSettlement.expenses[expenseIndex] = updatedExpense;
         }
 
-        if (currentSettlement.isSettled) currentSettlement.isSettled = false;
+        if (currentSettlement.is_settled) {
+             currentSettlement.is_settled = false;
+            const { error } = await supabase
+                .from('settlements')
+                .update({ is_settled: false })
+                .eq('id', currentSettlement.id);
+             if (error) console.error('Error updating settlement state:', error);
+        }
+
         render();
         editExpenseModal.classList.add('hidden');
         currentEditingExpenseId = null;
     }
     
-    function deleteExpense(expenseId) {
+    async function deleteExpense(expenseId) {
         if (confirm(locales[currentLang]?.deleteConfirm)) {
+             const { error } = await supabase
+                .from('expenses')
+                .delete()
+                .eq('id', expenseId);
+            
+            if (error) {
+                console.error('Error deleting expense:', error);
+                return;
+            }
+
             currentSettlement.expenses = currentSettlement.expenses.filter(exp => exp.id !== expenseId);
-            if (currentSettlement.isSettled) currentSettlement.isSettled = false;
+            if (currentSettlement.is_settled) {
+                currentSettlement.is_settled = false;
+                const { error: updateError } = await supabase
+                    .from('settlements')
+                    .update({ is_settled: false })
+                    .eq('id', currentSettlement.id);
+                if (updateError) console.error('Error updating settlement state:', updateError);
+            }
             render();
         }
     }
 
     async function showExchangeRateModal() {
         if (!currentSettlement) return;
-        const { date, baseCurrency } = currentSettlement;
+        const { date, base_currency } = currentSettlement;
         exchangeRateDate.textContent = `${date} ${locales[currentLang].baseDate}`;
-        let ratesInfoHTML = `<div class="rate-item"><span class="base">1 ${baseCurrency}</span> =</div>`;
-        const targetCurrencies = SUPPORTED_CURRENCIES.filter(c => c !== baseCurrency);
+        let ratesInfoHTML = `<div class="rate-item"><span class="base">1 ${base_currency}</span> =</div>`;
+        const targetCurrencies = SUPPORTED_CURRENCIES.filter(c => c !== base_currency);
 
         for (const target of targetCurrencies) {
-            const rate = await getExchangeRate(date, baseCurrency, target);
+            const rate = await getExchangeRate(date, base_currency, target);
             if (rate !== null) ratesInfoHTML += `<div class="rate-item"><span>${formatNumber(rate, 4)}</span><span>${target}</span></div>`;
         }
         exchangeRateInfo.innerHTML = ratesInfoHTML;
@@ -434,7 +570,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentSettlement) { 
             renderExpenses(); 
             updateSummary(); 
-            toggleExpenseForm(currentSettlement.isSettled);
+            toggleExpenseForm(currentSettlement.is_settled);
         }
     }
 
@@ -442,7 +578,7 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseTableBody.innerHTML = '';
         if (!currentSettlement || !currentSettlement.expenses) return;
         const [userA, userB] = currentSettlement.participants;
-        const isLocked = currentSettlement.isSettled;
+        const isLocked = currentSettlement.is_settled;
 
         currentSettlement.expenses.forEach(exp => {
             const row = expenseTableBody.insertRow();
@@ -451,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             row.innerHTML = `
                 <td>${exp.name}</td>
-                <td>${formatNumber(exp.originalAmount, 2)} ${exp.currency}</td>
+                <td>${formatNumber(exp.original_amount, 2)} ${exp.currency}</td>
                 <td>${exp.payer}</td>
                 <td>${formatNumber(exp.shares[userA], 2)}</td>
                 <td>${formatNumber(exp.shares[userB], 2)}</td>
@@ -460,14 +596,14 @@ document.addEventListener('DOMContentLoaded', () => {
             
             if (!isLocked) {
                 row.addEventListener('click', (e) => {
-                    if (e.target.closest('.delete-expense-btn')) return; // Prevent opening modal when delete is clicked
+                    if (e.target.closest('.delete-expense-btn')) return;
                     openEditExpenseModal(exp.id);
                 });
             }
         });
         expenseTableBody.querySelectorAll('.delete-expense-btn').forEach(btn => 
             btn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent row click event from firing
+                e.stopPropagation();
                 deleteExpense(parseInt(e.currentTarget.dataset.id))
             })
         );
@@ -475,14 +611,14 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function updateSummary() {
         if (!currentSettlement) return;
-        const { expenses, participants, baseCurrency, isSettled } = currentSettlement;
+        const { expenses, participants, base_currency, is_settled } = currentSettlement;
         const totalAmount = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-        totalExpenseP.textContent = `${locales[currentLang]?.totalExpense}: ${formatNumber(totalAmount, 2)} ${baseCurrency}`;
+        totalExpenseP.textContent = `${locales[currentLang]?.totalExpense}: ${formatNumber(totalAmount, 2)} ${base_currency}`;
 
         finalSettlementP.textContent = '';
         completeSettlementBtn.classList.add('hidden');
 
-        if (isSettled) {
+        if (is_settled) {
             const [userA, userB] = participants;
             const amountPaidByA = expenses.filter(exp => exp.payer === userA).reduce((sum, exp) => sum + exp.amount, 0);
             const totalOwedByA = expenses.reduce((sum, exp) => sum + exp.shares[userA], 0);
@@ -490,8 +626,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let settlementText = locales[currentLang]?.settlementDone;
             const paysToString = ` ${locales[currentLang]?.paysTo} `;
-            if (balanceA > 0.01) settlementText = `${userB}${paysToString}${userA}: ${formatNumber(balanceA)} ${baseCurrency}`;
-            else if (balanceA < -0.01) settlementText = `${userA}${paysToString}${userB}: ${formatNumber(Math.abs(balanceA))} ${baseCurrency}`;
+            if (balanceA > 0.01) settlementText = `${userB}${paysToString}${userA}: ${formatNumber(balanceA)} ${base_currency}`;
+            else if (balanceA < -0.01) settlementText = `${userA}${paysToString}${userB}: ${formatNumber(Math.abs(balanceA))} ${base_currency}`;
             finalSettlementP.textContent = settlementText;
             completeSettlementBtn.textContent = locales[currentLang]?.editSettlement;
             completeSettlementBtn.classList.add('edit-mode');
@@ -521,13 +657,13 @@ document.addEventListener('DOMContentLoaded', () => {
         itemNameInput.value = ''; itemAmountInput.value = '';
         splitAmountAInput.value = ''; splitAmountBInput.value = '';
         splitMethodSelect.value = 'equal';
-        if(currentSettlement) itemCurrencySelect.value = currentSettlement.baseCurrency;
+        if(currentSettlement) itemCurrencySelect.value = currentSettlement.base_currency;
         handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs, splitAmountAInput, splitAmountBInput);
         itemNameInput.focus();
     }
 
     function downloadExcel() {
-        if (!currentSettlement || currentSettlement.isSettled) return;
+        if (!currentSettlement || currentSettlement.is_settled) return;
         alert(locales[currentLang]?.excelNotImplemented);
     }
 
