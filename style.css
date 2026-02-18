@@ -236,6 +236,29 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
     .form-grid-row { grid-template-columns: 1fr; }
     .participant-inputs { grid-template-columns: 1fr; }
     #add-settlement-fab { left: auto; right: 1.5rem; transform: none !important; }
+
+    /* Larger controls for left-pane on mobile */
+    #main-date-picker {
+        padding: 0.8rem;
+        font-size: 1rem;
+        height: 52px;
+    }
+
+    .settlement-item {
+        padding: 0.8rem 1rem;
+        font-size: 0.95rem;
+        min-height: 52px;
+        align-items: center;
+    }
+    
+    .delete-settlement-btn {
+        width: 52px;
+        height: 52px;
+    }
+
+    .delete-settlement-btn i {
+        font-size: 1rem;
+    }
 }
 
 @keyframes slideInUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
