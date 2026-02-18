@@ -196,7 +196,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     .eq('id', currentSettlement.id);
                 if (error) console.error('Error updating settlement state:', error);
                 render();
-                renderSettlementList(mainDatePicker.value); // Re-render list to show settled status
+                renderSettlementList(mainDatePicker.value);
             }
         });
         
@@ -285,10 +285,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     async function deleteSettlement(date, settlementId) {
         if (confirm(locales[currentLang]?.deleteSettlementConfirm)) {
-            const { error } = await supabaseClient.from('settlements').delete().eq('id', settlementId);
-            if (error) {
-                console.error('Error deleting settlement:', error);
-                alert('Error: ' + error.message);
+            // First, delete all associated expenses
+            const { error: expenseError } = await supabaseClient
+                .from('expenses')
+                .delete()
+                .eq('settlement_id', settlementId);
+
+            if (expenseError) {
+                console.error('Error deleting expenses:', expenseError);
+                // Even if deleting expenses fails, try to delete the settlement
+            }
+
+            // Then, delete the settlement itself
+            const { error: settlementError } = await supabaseClient
+                .from('settlements')
+                .delete()
+                .eq('id', settlementId);
+            
+            if (settlementError) {
+                console.error('Error deleting settlement:', settlementError);
+                alert('Error: ' + settlementError.message);
                 return;
             }
             
@@ -325,7 +341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <div class="item-content">
                             ${s.is_settled ? '<i class="fas fa-check-circle settled-icon"></i>' : ''}
                             <span class="item-title">${s.title}</span>
-                            <span class="item-participants">(${s.participants.join(', ')}) - ${s.base_currency}</span>
+                            <span class="item-participants">(${(s.participants || []).join(', ')}) - ${s.base_currency}</span>
                         </div>
                         <i class="fas fa-chevron-right"></i>
                     </button>
@@ -350,7 +366,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function updateParticipantNames(participants) {
-        const [userA, userB] = participants;
+        const [userA, userB] = participants || ['A', 'B'];
         const paidByString = locales[currentLang]?.paidBy || 'Paid by {payer}';
         const shareOfString = locales[currentLang]?.shareOf || "{name}'s share";
 
@@ -430,8 +446,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (expense.split === 'amount') {
             const rate = expense.amount / expense.original_amount;
-            const originalShareA = expense.shares[currentSettlement.participants[0]] / rate;
-            const originalShareB = expense.shares[currentSettlement.participants[1]] / rate;
+            const [userA, userB] = currentSettlement.participants;
+            const originalShareA = (expense.shares[userA] || 0) / rate;
+            const originalShareB = (expense.shares[userB] || 0) / rate;
             editSplitAmountAInput.value = formatNumber(originalShareA, 0);
             editSplitAmountBInput.value = formatNumber(originalShareB, 0);
         }
@@ -546,8 +563,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td>${exp.name}</td>
                 <td>${formatNumber(exp.original_amount, 2)} ${exp.currency}</td>
                 <td>${exp.payer}</td>
-                <td>${formatNumber(exp.shares[userA], 2)}</td>
-                <td>${formatNumber(exp.shares[userB], 2)}</td>
+                <td>${formatNumber(exp.shares[userA] || 0, 2)}</td>
+                <td>${formatNumber(exp.shares[userB] || 0, 2)}</td>
                 <td><button class="delete-expense-btn" data-id="${exp.id}" ${isLocked ? 'disabled' : ''}><i class="fas fa-trash-alt"></i></button></td>
             `;
             
@@ -569,7 +586,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateSummary() {
         if (!currentSettlement) return;
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
-        const totalAmount = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+        const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         totalExpenseP.textContent = `${locales[currentLang]?.totalExpense || 'Total Expense'}: ${formatNumber(totalAmount, 2)} ${base_currency}`;
 
         finalSettlementP.textContent = '';
@@ -577,13 +594,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (is_settled) {
             const [userA, userB] = participants;
-            const amountPaidByA = expenses.filter(exp => exp.payer === userA).reduce((sum, exp) => sum + exp.amount, 0);
-            const totalOwedByA = expenses.reduce((sum, exp) => sum + exp.shares[userA], 0);
+            const amountPaidByA = expenses.filter(exp => exp.payer === userA).reduce((sum, exp) => sum + (exp.amount || 0), 0);
+            const totalOwedByA = expenses.reduce((sum, exp) => sum + (exp.shares[userA] || 0), 0);
             const balanceA = amountPaidByA - totalOwedByA;
 
             let settlementText = locales[currentLang]?.settlementDone || 'Settlement complete';
-            if (balanceA > 0.01) settlementText = `${userB} → ${userA}: ${formatNumber(balanceA)} ${base_currency}`;
-            else if (balanceA < -0.01) settlementText = `${userA} → ${userB}: ${formatNumber(Math.abs(balanceA))} ${base_currency}`;
+            if (balanceA > 0.01) settlementText = `${userB} → ${userA}: ${formatNumber(balanceA, 2)} ${base_currency}`;
+            else if (balanceA < -0.01) settlementText = `${userA} → ${userB}: ${formatNumber(Math.abs(balanceA), 2)} ${base_currency}`;
             
             finalSettlementP.textContent = settlementText;
             completeSettlementBtn.textContent = locales[currentLang]?.editSettlement || 'Reopen Settlement';
@@ -614,9 +631,53 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function downloadExcel() {
-        // This feature can be implemented later.
-        const excelInfo = locales[currentLang]?.excelNotImplemented || 'Excel export will be available soon.';
-        alert(excelInfo);
+        if (!currentSettlement || currentSettlement.expenses.length === 0) {
+            alert(locales[currentLang]?.noDataToExport || 'No expense data to export.');
+            return;
+        }
+    
+        const { title, participants, expenses, base_currency } = currentSettlement;
+        const [userA, userB] = participants;
+    
+        const dataForExport = [];
+        const translations = locales[currentLang] || {};
+    
+        const header = [
+            translations.tableHeaderItem || 'Item',
+            translations.tableHeaderTotal || 'Total Amount',
+            translations.tableHeaderPayer || 'Payer',
+            (translations.shareOf || '{name} Share').replace('{name}', userA),
+            (translations.shareOf || '{name} Share').replace('{name}', userB),
+        ];
+        dataForExport.push(header);
+    
+        expenses.forEach(exp => {
+            dataForExport.push([
+                exp.name,
+                `${formatNumber(exp.original_amount, 2)} ${exp.currency}`,
+                exp.payer,
+                formatNumber(exp.shares[userA] || 0, 2),
+                formatNumber(exp.shares[userB] || 0, 2),
+            ]);
+        });
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(dataForExport);
+    
+        const range = XLSX.utils.decode_range(ws['!ref']);
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
+                if (!ws[cell_ref]) continue;
+                ws[cell_ref].s = {
+                    alignment: { horizontal: "center", vertical: "center" }
+                };
+            }
+        }
+    
+        XLSX.utils.book_append_sheet(wb, ws, 'Expenses');
+        const fileName = `${translations.expenseReport || 'Expense_Report'}_${title}.xlsx`;
+        XLSX.writeFile(wb, fileName, { cellStyles: true });
     }
 
     // --- Start the App ---

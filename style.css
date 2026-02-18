@@ -121,7 +121,16 @@ header h1:hover { color: var(--primary-hover); }
     user-select: none;
 }
 
-.expense-inputs-grid { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr; gap: 1rem; margin-top: 1.25rem; margin-bottom: 1rem; }
+.form-grid-row { 
+    display: grid; 
+    grid-template-columns: 1fr 1fr; 
+    gap: 1rem; 
+    margin-bottom: 1rem; 
+}
+
+#expense-form { margin-top: 1.25rem; }
+#expense-form button { width: 100%; margin-top: 0.5rem; }
+
 input, select { 
     width: 100%; 
     padding: 0.625rem 0.875rem; 
@@ -196,13 +205,16 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 
 .modal-content { max-width: 500px; width: 90%; position: relative; animation: slideInUp 0.3s ease-out;}
 .modal-content.card { max-width: 700px; } /* Wider modal for editing */
-.modal-content input, .modal-content .currency-select-wrapper { margin-bottom: 1rem; }
+.modal-content .form-grid-row { margin-bottom: 1rem; }
+.modal-content #save-expense-changes-btn { width: 100%; margin-top: 0.5rem; }
+
 .modal-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
 .modal-header h2 { margin-bottom: 0; font-size: 1.4rem; }
-.participant-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.participant-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
 .close-modal-btn { position: absolute; top: 1rem; right: 1rem; cursor: pointer; color: var(--text-muted); font-size: 1.2rem; transition: color 0.2s; }
 .close-modal-btn:hover { color: var(--text-main); }
 
+.currency-select-wrapper { margin-bottom: 1rem; }
 .currency-select-wrapper label { display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.9rem;}
 
 /* --- Exchange Rate Modal Specifics --- */
@@ -221,7 +233,7 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
     #right-pane { padding: 1.5rem; }
     #summary-card { flex-direction: column; align-items: flex-start; }
     .summary-right { text-align: left; margin-top: 1rem; }
-    .expense-inputs-grid { grid-template-columns: 1fr; }
+    .form-grid-row { grid-template-columns: 1fr; }
     .participant-inputs { grid-template-columns: 1fr; }
     #add-settlement-fab { left: auto; right: 1.5rem; transform: none !important; }
 }
