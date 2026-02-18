@@ -55,10 +55,46 @@ header h1:hover { color: var(--primary-hover); }
 #left-pane.collapsed { width: 0; opacity: 0; border-right-color: transparent; }
 .sidebar-content { padding: 1.5rem; width: var(--sidebar-width); }
 #left-pane h2 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 1rem; }
-#main-date-picker { width: 100%; margin-bottom: 2rem; border: 1px solid var(--border); padding: 0.5rem; border-radius: 6px; font-size: 0.875rem; }
-.settlement-item { padding: 0.75rem 1rem; border-radius: 8px; background: transparent; border: none; margin-bottom: 0.5rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; font-size: 0.95rem; color: var(--text-main); white-space: nowrap; }
-.settlement-item:hover { background: #e2e8f0; }
-.settlement-item.active { background: var(--primary); color: white; }
+#main-date-picker { width: 100%; margin-bottom: 1rem; border: 1px solid var(--border); padding: 0.5rem; border-radius: 6px; font-size: 0.875rem; }
+.settlement-item-wrapper { display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-bottom: 0.5rem; }
+.settlement-item { 
+    flex-grow: 1; /* Take remaining space */
+    padding: 0.75rem 1rem; 
+    border-radius: 8px; 
+    background: white; 
+    border: 1px solid var(--border);
+    cursor: pointer; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    transition: all 0.2s; 
+    font-size: 0.9rem; 
+    color: var(--text-main); 
+    white-space: nowrap; 
+    box-shadow: var(--shadow-sm);
+}
+.settlement-item:hover { background: #f9fafb; border-color: #d1d5db; }
+.settlement-item.active { background: var(--primary); color: white; border-color: var(--primary); }
+.settlement-item.active .item-participants { color: white; opacity: 0.8; }
+.item-title { font-weight: 600; }
+.item-participants { font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem; }
+
+.delete-settlement-btn {
+    background: #fee2e2;
+    color: var(--danger);
+    border: 1px solid #fecaca;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+.delete-settlement-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
+
 
 /* --- Main Content --- */
 #right-pane { flex: 1; background-color: var(--main-bg); overflow-y: auto; padding: 2.5rem; display: flex; flex-direction: column; align-items: center; }

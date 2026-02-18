@@ -47,7 +47,10 @@
                         <h2><i class="fas fa-chart-pie"></i><span data-i18n="settlementResult"></span></h2>
                         <div id="summary">
                             <div id="total-expense" data-i18n="totalExpense">총 지출: 0 JPY</div>
-                            <div id="final-settlement" data-i18n="finalSettlement">...</div>
+                            <div id="final-settlement-display">
+                                <p id="final-settlement"></p>
+                                <button id="complete-settlement-btn" class="hidden" data-i18n="completeSettlement"></button>
+                            </div>
                         </div>
                     </div>
 
@@ -56,13 +59,13 @@
                         <div id="expense-form">
                              <div class="expense-inputs-grid">
                                 <input type="text" id="item-name" data-i18n-placeholder="expenseItem">
-                                <input type="number" id="item-amount" data-i18n-placeholder="amountInYen">
+                                <input type="text" id="item-amount" data-i18n-placeholder="amountInYen" inputmode="decimal">
                                 <select id="item-payer"></select>
-                                <select id="split-method" data-i18n-options="splitEqually,splitByPercentage,splitByAmount"></select>
+                                <select id="split-method" data-i18n-options="splitEqually,splitByAmount"></select>
                             </div>
                             <div id="split-amount-inputs" class="hidden expense-inputs-grid">
-                                <input type="number" id="split-amount-a" data-i18n-placeholder="participant1Share">
-                                <input type="number" id="split-amount-b" data-i18n-placeholder="participant2Share">
+                                <input type="text" id="split-amount-a" data-i18n-placeholder="participant1Share" inputmode="decimal">
+                                <input type="text" id="split-amount-b" data-i18n-placeholder="participant2Share" inputmode="decimal">
                             </div>
                             <button id="add-expense-btn" data-i18n="recordExpense"></button>
                         </div>

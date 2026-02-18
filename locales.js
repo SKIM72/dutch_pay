@@ -13,7 +13,6 @@ const locales = {
         "payer": "결제자",
         "splitMethod": "분배 방식",
         "splitEqually": "똑같이 나누기 (1/N)",
-        "splitByPercentage": "비율로 나누기 (%)",
         "splitByAmount": "금액으로 나누기",
         "participant1Share": "참가자 1 부담액",
         "participant2Share": "참가자 2 부담액",
@@ -33,11 +32,13 @@ const locales = {
         "create": "생성하기",
         "noHistory": "내역 없음",
         "settlementDone": "정산 완료",
+        "settlementInProgress": "정산이 필요합니다.",
+        "completeSettlement": "정산 완료하기",
         "paysTo": "→",
         "paidBy": "{payer}가 결제",
         "shareOf": "{name} 부담액",
-        "promptPayerShare": "{name}의 부담 비율(%):",
-        "deleteConfirm": "이 항목을 정말 삭제하시겠습니까?"
+        "deleteConfirm": "이 항목을 정말 삭제하시겠습니까?",
+        "deleteSettlementConfirm": "이 정산 건을 삭제하면 포함된 모든 지출 내역이 사라집니다. 정말 삭제하시겠습니까?"
     },
     "en": {
         "appTitle": "Settle Up | Easy Settlements",
@@ -53,7 +54,6 @@ const locales = {
         "payer": "Payer",
         "splitMethod": "Split Method",
         "splitEqually": "Split Equally (1/N)",
-        "splitByPercentage": "Split by Percentage (%)",
         "splitByAmount": "Split by Amount",
         "participant1Share": "Participant 1's Share",
         "participant2Share": "Participant 2's Share",
@@ -73,11 +73,13 @@ const locales = {
         "create": "Create",
         "noHistory": "No History",
         "settlementDone": "Settled",
+        "settlementInProgress": "Settlement required.",
+        "completeSettlement": "Complete Settlement",
         "paysTo": "→",
         "paidBy": "Paid by {payer}",
         "shareOf": "{name}'s Share",
-        "promptPayerShare": "Share for {name} (%):",
-        "deleteConfirm": "Are you sure you want to delete this item?"
+        "deleteConfirm": "Are you sure you want to delete this item?",
+        "deleteSettlementConfirm": "Deleting this settlement will remove all its expenses. Are you sure?"
     },
     "ja": {
         "appTitle": "Settle Up | 簡単精算",
@@ -93,7 +95,6 @@ const locales = {
         "payer": "支払者",
         "splitMethod": "分割方法",
         "splitEqually": "割り勘 (1/N)",
-        "splitByPercentage": "比率で分割 (%)",
         "splitByAmount": "金額で分割",
         "participant1Share": "参加者1の負担額",
         "participant2Share": "参加者2の負担額",
@@ -113,10 +114,12 @@ const locales = {
         "create": "作成",
         "noHistory": "履歴なし",
         "settlementDone": "精算完了",
+        "settlementInProgress": "精算が必要です。",
+        "completeSettlement": "精算を完了する",
         "paysTo": "→",
         "paidBy": "{payer}が支払い",
         "shareOf": "{name}の負担額",
-        "promptPayerShare": "{name}の負担比率(%):",
-        "deleteConfirm": "この項目を本当に削除しますか？"
+        "deleteConfirm": "この項目を本当に削除しますか？",
+        "deleteSettlementConfirm": "この精算を削除すると、すべての支出履歴が失われます。本当に削除しますか？"
     }
 };
