@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Supabase Client Initialization ---
-    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
     // --- Global State ---
     let settlements = {}; // This will now be populated from Supabase
@@ -144,7 +144,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function loadData() {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('settlements')
             .select(`
                 *,
@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         completeSettlementBtn.addEventListener('click', async () => {
             if (currentSettlement) {
                 currentSettlement.is_settled = !currentSettlement.is_settled;
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('settlements')
                     .update({ is_settled: currentSettlement.is_settled })
                     .eq('id', currentSettlement.id);
@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (!title || !date) return;
 
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('settlements')
             .insert([{ title, date, participants: [participantA, participantB], base_currency: baseCurrency, is_settled: false }])
             .select();
@@ -294,7 +294,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function deleteSettlement(date, settlementId) {
         if (confirm(locales[currentLang]?.deleteSettlementConfirm)) {
             // First, delete all associated expenses
-            const { error: expenseError } = await supabase
+            const { error: expenseError } = await supabaseClient
                 .from('expenses')
                 .delete()
                 .eq('settlement_id', settlementId);
@@ -305,7 +305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             // Then, delete the settlement itself
-            const { error: settlementError } = await supabase
+            const { error: settlementError } = await supabaseClient
                 .from('settlements')
                 .delete()
                 .eq('id', settlementId);
@@ -406,7 +406,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             shares[userB] = shareB_original * rate;
         }
 
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('expenses')
             .insert([{ 
                 settlement_id: currentSettlement.id, 
@@ -430,7 +430,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (currentSettlement.is_settled) {
             currentSettlement.is_settled = false;
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('settlements')
                 .update({ is_settled: false })
                 .eq('id', currentSettlement.id);
@@ -495,7 +495,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             shares[userB] = shareB_original * rate;
         }
         
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('expenses')
             .update({ name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares })
             .eq('id', currentEditingExpenseId)
@@ -514,7 +514,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (currentSettlement.is_settled) {
              currentSettlement.is_settled = false;
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('settlements')
                 .update({ is_settled: false })
                 .eq('id', currentSettlement.id);
@@ -528,7 +528,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     async function deleteExpense(expenseId) {
         if (confirm(locales[currentLang]?.deleteConfirm)) {
-             const { error } = await supabase
+             const { error } = await supabaseClient
                 .from('expenses')
                 .delete()
                 .eq('id', expenseId);
@@ -541,7 +541,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentSettlement.expenses = currentSettlement.expenses.filter(exp => exp.id !== expenseId);
             if (currentSettlement.is_settled) {
                 currentSettlement.is_settled = false;
-                const { error: updateError } = await supabase
+                const { error: updateError } = await supabaseClient
                     .from('settlements')
                     .update({ is_settled: false })
                     .eq('id', currentSettlement.id);
