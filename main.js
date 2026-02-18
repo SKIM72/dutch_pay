@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-    const leftPane = document.getElementById('left-pane');
-    const rightPane = document.getElementById('right-pane');
+    const sidebar = document.getElementById('left-pane');
+    const appTitle = document.querySelector('header h1');
     const placeholderRightPane = document.getElementById('placeholder-right-pane');
     const calculatorView = document.getElementById('calculator');
     const mainDatePicker = document.getElementById('main-date-picker');
@@ -18,6 +18,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let settlements = {}; 
     let currentSettlement = null;
     let userA = 'A', userB = 'B';
+
+    // Toggle sidebar by clicking the main title
+    appTitle.addEventListener('click', () => {
+        sidebar.classList.toggle('collapsed');
+    });
 
     mainDatePicker.addEventListener('change', () => {
         const selectedDate = mainDatePicker.value;
@@ -59,13 +64,18 @@ document.addEventListener('DOMContentLoaded', () => {
         placeholderRightPane.classList.add('hidden');
         calculatorView.classList.remove('hidden');
         
-        // Update Title and Date Badge
         settlementDisplay.textContent = settlement.title;
         settlementDateBadge.textContent = settlement.date;
         
         document.querySelectorAll('.settlement-item').forEach(item => {
             item.classList.toggle('active', item.dataset.id == settlement.id);
         });
+
+        // Automatically collapse sidebar on selection
+        if (window.innerWidth > 768) {
+            sidebar.classList.add('collapsed');
+        }
+
         render();
     }
 

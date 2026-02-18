@@ -14,6 +14,7 @@
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
     --font-family: 'Inter', sans-serif;
+    --sidebar-width: 300px;
 }
 
 /* --- General Styles --- */
@@ -46,7 +47,6 @@ header h1 {
     font-size: 1.25rem;
     color: var(--primary);
     font-weight: 700;
-    letter-spacing: -0.5px;
 }
 
 /* --- Layout Container --- */
@@ -56,53 +56,55 @@ header h1 {
     overflow: hidden;
 }
 
-/* --- Left Pane (Sidebar) --- */
+/* Sidebar with Slide Animation */
 #left-pane {
-    width: 300px;
+    width: var(--sidebar-width);
     background-color: var(--side-bg);
     border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    padding: 1.5rem;
+    transition: margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
     overflow-y: auto;
+    flex-shrink: 0;
+}
+
+#left-pane.collapsed {
+    margin-left: calc(var(--sidebar-width) * -1);
+    opacity: 0;
+}
+
+.sidebar-content {
+    padding: 1.5rem;
+    width: var(--sidebar-width);
 }
 
 #left-pane h2 {
     font-size: 0.875rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
     color: var(--text-muted);
     margin-bottom: 1rem;
 }
 
 #main-date-picker {
+    width: 100%;
     margin-bottom: 2rem;
     border: 1px solid var(--border);
     padding: 0.5rem;
     border-radius: 6px;
-    font-size: 0.875rem;
 }
 
 .settlement-item {
     padding: 0.75rem 1rem;
     border-radius: 8px;
-    background: transparent;
-    border: none;
     margin-bottom: 0.5rem;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
     transition: all 0.2s;
-    font-size: 0.95rem;
-    color: var(--text-main);
 }
-
-.settlement-item:hover { background: #f1f5f9; }
+.settlement-item:hover { background: #e2e8f0; }
 .settlement-item.active { background: var(--primary); color: white; }
-.settlement-item i { font-size: 0.8rem; opacity: 0.7; }
 
-/* --- Right Pane (Main Work Area) --- */
+/* Right Pane */
 #right-pane {
     flex: 1;
     background-color: var(--main-bg);
@@ -111,156 +113,74 @@ header h1 {
     display: flex;
     flex-direction: column;
     align-items: center;
+    transition: padding 0.4s;
 }
 
-#right-pane > div {
-    width: 100%;
-    max-width: 800px;
-}
+#right-pane > div { width: 100%; max-width: 800px; }
 
+/* Placeholder */
 #placeholder-right-pane {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    color: var(--text-muted);
+    height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-muted);
 }
+#placeholder-right-pane i { font-size: 4rem; margin-bottom: 1.5rem; color: var(--border); }
 
-#placeholder-right-pane i {
-    font-size: 4rem;
-    margin-bottom: 1.5rem;
-    color: var(--border);
-}
-
-/* --- Calculator & Summary UI --- */
-#calculator {
-    animation: fadeIn 0.4s ease-out;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-/* --- Updated Settlement Header (Title + Date) --- */
+/* Calculator Header with Toggle Button */
 .settlement-header {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
     margin-bottom: 2rem;
     padding-bottom: 1rem;
     border-bottom: 2px solid var(--app-bg);
 }
 
-#settlement-display {
-    font-size: 1.75rem;
-    font-weight: 800;
-    color: var(--text-main);
-}
-
-.settlement-date-badge {
-    background-color: #eef2ff;
+#sidebar-open-btn {
+    display: none; /* Only show when collapsed */
+    background: #f1f5f9;
+    border: none;
+    padding: 0.5rem;
+    border-radius: 6px;
+    cursor: pointer;
     color: var(--primary);
-    padding: 0.4rem 0.8rem;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    border: 1px solid rgba(99, 102, 241, 0.2);
+    width: 36px; height: 36px;
 }
 
-.card {
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: var(--shadow-sm);
-}
-
-.card h2 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    margin-bottom: 1.25rem;
+#left-pane.collapsed ~ #right-pane #sidebar-open-btn {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
 }
 
-#summary-card {
-    background: linear-gradient(to right, #6366f1, #818cf8);
-    color: white;
-    border: none;
+#settlement-display { font-size: 1.75rem; font-weight: 800; }
+.settlement-date-badge {
+    background-color: #eef2ff; color: var(--primary);
+    padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.9rem; font-weight: 600;
 }
 
-#summary-card h2 { color: white; opacity: 0.9; }
+/* Cards & Components */
+.card { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm); }
+#summary-card { background: linear-gradient(to right, #6366f1, #818cf8); color: white; border: none; }
 #summary { display: flex; justify-content: space-between; align-items: center; }
 #total-expense { font-size: 1rem; opacity: 0.9; }
 #final-settlement { font-size: 1.5rem; font-weight: 700; }
 
-#expense-list ul { list-style: none; }
-.expense-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 0;
-    border-bottom: 1px solid var(--border);
-}
-.expense-item:last-child { border-bottom: none; }
-.item-main { display: flex; flex-direction: column; }
-.item-name { font-weight: 600; margin-bottom: 0.25rem; }
+.expense-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.item-name { font-weight: 600; }
 .item-meta { font-size: 0.85rem; color: var(--text-muted); }
 .item-amount { font-weight: 600; text-align: right; }
-.item-share { font-size: 0.8rem; color: var(--text-muted); }
 
-.expense-inputs-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
+.expense-inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+input, select { width: 100%; padding: 0.625rem 0.875rem; border: 1px solid var(--border); border-radius: 6px; }
+button { background: var(--primary); color: white; padding: 0.75rem 1.25rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; }
 
-input, select {
-    width: 100%;
-    padding: 0.625rem 0.875rem;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 0.95rem;
-    background: #fcfcfc;
-}
+#add-settlement-fab { position: fixed; bottom: 2rem; left: 20px; width: 48px; height: 48px; border-radius: 50%; box-shadow: var(--shadow-md); z-index: 5; transition: transform 0.4s; }
+#left-pane.collapsed ~ #add-settlement-fab { transform: translateX(-100px); }
 
-button {
-    background: var(--primary);
-    color: white;
-    padding: 0.75rem 1.25rem;
-    border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-button:hover { background: var(--primary-hover); }
-
-#add-settlement-fab {
-    position: absolute;
-    bottom: 2rem;
-    left: 240px;
-    width: 48px; height: 48px; border-radius: 50%;
-    box-shadow: var(--shadow-md);
-    z-index: 5;
-}
-
-#add-settlement-modal {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000;
-    backdrop-filter: blur(4px);
-}
+#add-settlement-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); }
+.modal-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
 
 @media (max-width: 768px) {
     #main-container { flex-direction: column; }
-    #left-pane { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
-    #right-pane { padding: 1.5rem; }
-    #add-settlement-fab { left: auto; right: 1.5rem; }
-    .settlement-header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+    #left-pane { width: 100% !important; margin-left: 0 !important; }
+    #sidebar-open-btn { display: none !important; }
 }
