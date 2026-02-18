@@ -120,8 +120,23 @@ header h1:hover { color: var(--primary-hover); }
 #total-expense { font-size: 1rem; opacity: 0.9; }
 #final-settlement { font-size: 1.5rem; font-weight: 700; }
 
-.expense-inputs-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem; }
+.expense-inputs-grid { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
 input, select { width: 100%; padding: 0.625rem 0.875rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.95rem; background: #fcfcfc; }
+
+/* --- New Amount Input Wrapper --- */
+.amount-input-wrapper { display: flex; }
+.amount-input-wrapper input { 
+    flex-grow: 1;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-right: none;
+}
+.amount-input-wrapper select {
+    width: auto;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    background-color: #f8fafc;
+}
 
 button { background: var(--primary); color: white; padding: 0.75rem 1.25rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; font-size: 0.95rem; }
 button:hover { background: var(--primary-hover); }
@@ -166,33 +181,50 @@ button:hover { background: var(--primary-hover); }
 
 /* --- Modals & FAB --- */
 #add-settlement-fab {
-    /* Centering the icon */
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 0; /* Removing default button padding */
-
-    position: fixed;
-    bottom: 2rem;
-    left: 20px;
-    width: 48px;
-    height: 48px;
-    border-radius: 50%;
-    box-shadow: var(--shadow-md);
-    z-index: 5;
-    transition: transform 0.3s;
-    font-size: 1.2rem; /* Making icon slightly larger */
+    display: flex; justify-content: center; align-items: center; padding: 0; 
+    position: fixed; bottom: 2rem; left: 20px; 
+    width: 48px; height: 48px; border-radius: 50%;
+    box-shadow: var(--shadow-md); z-index: 5; transition: transform 0.3s;
+    font-size: 1.2rem; 
 }
 
-#left-pane.collapsed ~ #main-container #add-settlement-fab { transform: translateX(calc(var(--sidebar-width) * -1 - 40px)); }
+#add-settlement-modal, #exchange-rate-modal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(15, 23, 42, 0.6); 
+    display: flex; justify-content: center; align-items: center; 
+    z-index: 1000; backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease;
+}
 
-#add-settlement-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); }
-.modal-content { max-width: 500px; width: 90%; }
-.modal-content input { margin-bottom: 1rem; }
+.modal-content { 
+    max-width: 500px; width: 90%; position: relative;
+    animation: slideInUp 0.3s ease-out;
+}
+
+.modal-content input, .currency-select-wrapper { margin-bottom: 1rem; }
 .modal-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
 .modal-header h2 { margin-bottom: 0; font-size: 1.4rem; }
 .participant-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.close-modal-btn { position: absolute; top: 1rem; right: 1rem; cursor: pointer; color: var(--text-muted); font-size: 1.2rem; }
+.close-modal-btn { position: absolute; top: 1rem; right: 1rem; cursor: pointer; color: var(--text-muted); font-size: 1.2rem; transition: color 0.2s; }
+.close-modal-btn:hover { color: var(--text-main); }
+
+.currency-select-wrapper label {
+    display: block; margin-bottom: 0.5rem;
+    color: var(--text-muted); font-size: 0.9rem;
+}
+
+/* --- Exchange Rate Modal Specifics --- */
+#exchange-rate-date { 
+    font-size: 0.9rem; color: var(--text-muted); 
+    margin-bottom: 1.5rem; padding-bottom: 1rem; 
+    border-bottom: 1px solid var(--border);
+}
+#exchange-rate-info .rate-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.8rem 0; font-size: 1rem;
+}
+#exchange-rate-info .rate-item:not(:last-child) { border-bottom: 1px solid var(--app-bg); }
+#exchange-rate-info .base { font-weight: 600; color: var(--primary); }
 
 @media (max-width: 768px) {
     #left-pane, #left-pane.collapsed { width: 100% !important; height: auto; border-right: none; border-bottom: 1px solid var(--border); opacity: 1; }
@@ -202,3 +234,5 @@ button:hover { background: var(--primary-hover); }
     .participant-inputs { grid-template-columns: 1fr; }
     #add-settlement-fab { left: auto; right: 1.5rem; transform: none !important; }
 }
+
+@keyframes slideInUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }

@@ -4,6 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let settlements = {};
     let currentSettlement = null;
     let currentLang = 'ko';
+    const exchangeRatesCache = {}; // Cache for exchange rates
+    const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD'];
 
     // --- Element References ---
     const languageSwitcher = document.getElementById('language-switcher');
@@ -14,16 +16,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const addSettlementFab = document.getElementById('add-settlement-fab');
     const placeholderRightPane = document.getElementById('placeholder-right-pane');
     const calculatorView = document.getElementById('calculator');
+    
+    // Add/Edit Settlement Modal
     const addSettlementModal = document.getElementById('add-settlement-modal');
     const modalDateDisplay = document.getElementById('modal-date-display');
     const newSettlementTitleInput = document.getElementById('new-settlement-title');
     const newParticipantAInput = document.getElementById('new-participant-a');
     const newParticipantBInput = document.getElementById('new-participant-b');
+    const baseCurrencySelect = document.getElementById('base-currency');
     const createSettlementBtn = document.getElementById('create-settlement-btn');
-    const closeModalBtn = document.querySelector('.close-modal-btn');
+
+    // Exchange Rate Modal
+    const exchangeRateModal = document.getElementById('exchange-rate-modal');
+    const exchangeRateDate = document.getElementById('exchange-rate-date');
+    const exchangeRateInfo = document.getElementById('exchange-rate-info');
+
+    // Calculator View
     const settlementDisplay = document.getElementById('settlement-display');
     const settlementDateBadge = document.getElementById('settlement-date-badge');
     const itemPayerSelect = document.getElementById('item-payer');
+    const itemCurrencySelect = document.getElementById('item-currency');
     const splitMethodSelect = document.getElementById('split-method');
     const splitAmountAInput = document.getElementById('split-amount-a');
     const splitAmountBInput = document.getElementById('split-amount-b');
@@ -38,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const splitAmountInputs = document.getElementById('split-amount-inputs');
 
     // --- Utility Functions ---
-    const formatNumber = (num) => isNaN(num) ? '0' : num.toLocaleString('en-US');
+    const formatNumber = (num, decimals = 2) => isNaN(num) ? '0' : num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     const parseFormattedNumber = (str) => parseFloat(String(str).replace(/,/g, '')) || 0;
 
     // --- i18n (Localization) ---
@@ -49,12 +61,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         document.querySelectorAll('[data-i18n]').forEach(el => {
             const key = el.getAttribute('data-i18n');
-            el.innerHTML = translations[key] || el.innerHTML;
+            if (translations[key]) el.innerHTML = translations[key];
         });
 
         document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
             const key = el.getAttribute('data-i18n-placeholder');
-            el.placeholder = translations[key] || el.placeholder;
+             if (translations[key]) el.placeholder = translations[key];
         });
         
         document.querySelectorAll('[data-i18n-options]').forEach(el => {
@@ -72,8 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (currentSettlement) {
             updateParticipantNames(currentSettlement.participants);
-            updateSummary();
-            renderExpenses();
+            render();
         }
         renderSettlementList(mainDatePicker.value);
     }
@@ -82,6 +93,30 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('preferredLang', lang);
         languageSwitcher.value = lang;
         updateUI(lang);
+    }
+
+    // --- Exchange Rate API ---
+    async function getExchangeRate(date, base, target) {
+        if (base === target) return 1;
+        const cacheKey = `${date}_${base}_${target}`;
+        if (exchangeRatesCache[cacheKey]) return exchangeRatesCache[cacheKey];
+
+        // Use "latest" for future dates as frankfurter.app doesn't support them
+        const requestDate = new Date(date) > new Date() ? 'latest' : date;
+
+        try {
+            const response = await fetch(`https://api.frankfurter.app/${requestDate}?from=${base}&to=${target}`);
+            if (!response.ok) throw new Error('Network response was not ok');
+            const data = await response.json();
+            const rate = data.rates[target];
+            if(!rate) throw new Error(`Rate not found for ${target}`);
+            exchangeRatesCache[cacheKey] = rate;
+            return rate;
+        } catch (error) {
+            console.error('Error fetching exchange rate:', error);
+            alert(`Failed to fetch exchange rate for ${date}. Please check your connection or try again later.`);
+            return null;
+        }
     }
 
     // --- Initialization ---
@@ -111,14 +146,21 @@ document.addEventListener('DOMContentLoaded', () => {
             addSettlementModal.classList.remove('hidden');
             newSettlementTitleInput.focus();
         });
-        closeModalBtn.addEventListener('click', closeModal);
-        addSettlementModal.addEventListener('click', (e) => { if (e.target.id === 'add-settlement-modal') closeModal(); });
+        
+        // Modal Closing Listeners
+        [addSettlementModal, exchangeRateModal].forEach(modal => {
+            modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+            modal.querySelector('.close-modal-btn').addEventListener('click', () => modal.classList.add('hidden'));
+        });
+
         createSettlementBtn.addEventListener('click', createSettlement);
         addExpenseBtn.addEventListener('click', addExpense);
+        settlementDateBadge.addEventListener('click', showExchangeRateModal);
+
         completeSettlementBtn.addEventListener('click', () => {
             if(currentSettlement) {
                 currentSettlement.isSettled = true;
-                updateSummary();
+                render();
             }
         });
         
@@ -127,8 +169,14 @@ document.addEventListener('DOMContentLoaded', () => {
         [itemAmountInput, splitAmountAInput, splitAmountBInput].forEach(input => {
             input.addEventListener('input', (e) => {
                 const value = e.target.value;
-                const numericValue = parseFormattedNumber(value);
-                e.target.value = formatNumber(numericValue);
+                const hasDecimal = value.includes('.');
+                let numericValue = parseFormattedNumber(value);
+                if (hasDecimal) {
+                    const parts = value.split('.');
+                    e.target.value = formatNumber(parseFloat(parts[0]), 0) + '.' + (parts[1] || '');
+                } else {
+                    e.target.value = formatNumber(numericValue, 0);
+                }
             });
         });
 
@@ -137,7 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  if (splitMethodSelect.value === 'amount') {
                     const amountA = parseFormattedNumber(splitAmountAInput.value);
                     const amountB = parseFormattedNumber(splitAmountBInput.value);
-                    itemAmountInput.value = formatNumber(amountA + amountB);
+                    itemAmountInput.value = formatNumber(amountA + amountB, 0);
                  }
             });
         });
@@ -152,13 +200,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isManualAmount) {
             const amountA = parseFormattedNumber(splitAmountAInput.value);
             const amountB = parseFormattedNumber(splitAmountBInput.value);
-            itemAmountInput.value = formatNumber(amountA + amountB);
+            itemAmountInput.value = formatNumber(amountA + amountB, 0);
         } else {
-             itemAmountInput.value = ''; // Clear main amount when switching back to 1/N
+             itemAmountInput.value = '';
         }
     }
-
-    function closeModal() { addSettlementModal.classList.add('hidden'); }
 
     // --- Settlement Management ---
     function createSettlement() {
@@ -166,16 +212,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const date = mainDatePicker.value;
         const participantA = newParticipantAInput.value.trim() || 'A';
         const participantB = newParticipantBInput.value.trim() || 'B';
+        const baseCurrency = baseCurrencySelect.value;
 
         if (!title || !date) return;
         if (!settlements[date]) settlements[date] = [];
-        const newSettlement = { id: Date.now(), title, date, participants: [participantA, participantB], expenses: [], isSettled: false };
+        const newSettlement = { 
+            id: Date.now(), 
+            title, 
+            date, 
+            participants: [participantA, participantB], 
+            baseCurrency,
+            expenses: [], 
+            isSettled: false 
+        };
         settlements[date].push(newSettlement);
         renderSettlementList(date);
         selectSettlement(newSettlement);
-        closeModal();
+        addSettlementModal.classList.add('hidden');
         newSettlementTitleInput.value = '';
-        newParticipantAInput.value = 'A'; newParticipantBInput.value = 'B';
+        newParticipantAInput.value = 'A'; 
+        newParticipantBInput.value = 'B';
     }
     
     function deleteSettlement(date, settlementId) {
@@ -196,6 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
         calculatorView.classList.remove('hidden');
         settlementDisplay.textContent = settlement.title;
         settlementDateBadge.textContent = settlement.date;
+        itemCurrencySelect.value = settlement.baseCurrency;
         updateParticipantNames(settlement.participants);
         document.querySelectorAll('.settlement-item').forEach(item => item.classList.toggle('active', item.dataset.id == settlement.id));
         if (window.innerWidth <= 768) sidebar.classList.add('collapsed');
@@ -211,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button class="settlement-item" data-id="${s.id}">
                         <div>
                             <span class="item-title">${s.title}</span>
-                            <span class="item-participants">(${s.participants.join(', ')})</span>
+                            <span class="item-participants">(${s.participants.join(', ')}) - ${s.baseCurrency}</span>
                         </div>
                         <i class="fas fa-chevron-right"></i>
                     </button>
@@ -229,15 +286,21 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('table-header-user-a').textContent = shareOfString.replace('{name}', userA);
         document.getElementById('table-header-user-b').textContent = shareOfString.replace('{name}', userB);
         splitAmountAInput.placeholder = shareOfString.replace('{name}', userA);
-        splitAmountBInput.placeholder = shareOfString.replace('{name}', userB);
+        splitAmountBInput.placeholder = shareOfString.replace('{\name}', userB);
     }
 
     // --- Expense Management ---
-    function addExpense() {
+    async function addExpense() {
         if (!currentSettlement) return;
         const name = itemNameInput.value.trim();
-        let totalAmount = parseFormattedNumber(itemAmountInput.value);
-        if (!name || totalAmount <= 0) { alert('Invalid input'); return; }
+        const originalAmount = parseFormattedNumber(itemAmountInput.value);
+        const currency = itemCurrencySelect.value;
+        if (!name || originalAmount <= 0) { alert(locales[currentLang]?.invalidInput); return; }
+
+        const rate = await getExchangeRate(currentSettlement.date, currency, currentSettlement.baseCurrency);
+        if (rate === null) return; // Stop if rate fetching fails
+
+        const convertedAmount = originalAmount * rate;
 
         const [userA, userB] = currentSettlement.participants;
         const payer = itemPayerSelect.value;
@@ -245,17 +308,20 @@ document.addEventListener('DOMContentLoaded', () => {
         let shares = { [userA]: 0, [userB]: 0 };
 
         if (splitMethod === 'equal') {
-            shares[userA] = shares[userB] = totalAmount / 2;
+            shares[userA] = shares[userB] = convertedAmount / 2;
         } else if (splitMethod === 'amount') {
-            shares[userA] = parseFormattedNumber(splitAmountAInput.value);
-            shares[userB] = parseFormattedNumber(splitAmountBInput.value);
-            if (Math.abs(shares[userA] + shares[userB] - totalAmount) > 0.01) {
-                alert('Amounts must sum to total'); return;
+            const shareA_original = parseFormattedNumber(splitAmountAInput.value);
+            const shareB_original = parseFormattedNumber(splitAmountBInput.value);
+            if (Math.abs(shareA_original + shareB_original - originalAmount) > 0.01) {
+                alert(locales[currentLang]?.amountMismatch);
+                return;
             }
+            shares[userA] = shareA_original * rate;
+            shares[userB] = shareB_original * rate;
         }
 
-        currentSettlement.expenses.push({ id: Date.now(), name, amount: totalAmount, payer, split: splitMethod, shares });
-        currentSettlement.isSettled = false; // Re-open settlement
+        currentSettlement.expenses.push({ id: Date.now(), name, originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares });
+        currentSettlement.isSettled = false;
         render();
         clearInputs();
     }
@@ -263,9 +329,30 @@ document.addEventListener('DOMContentLoaded', () => {
     function deleteExpense(expenseId) {
         if (confirm(locales[currentLang]?.deleteConfirm)) {
             currentSettlement.expenses = currentSettlement.expenses.filter(exp => exp.id !== expenseId);
-            currentSettlement.isSettled = false; // Re-open settlement
+            currentSettlement.isSettled = false;
             render();
         }
+    }
+
+    async function showExchangeRateModal() {
+        if (!currentSettlement) return;
+        const { date, baseCurrency } = currentSettlement;
+        exchangeRateDate.textContent = `${date} ${locales[currentLang].baseDate}`;
+        
+        let ratesInfoHTML = '';
+        const targetCurrencies = SUPPORTED_CURRENCIES.filter(c => c !== baseCurrency);
+
+        ratesInfoHTML = `<div class="rate-item"><span class="base">1 ${baseCurrency}</span> =</div>`;
+
+        for (const target of targetCurrencies) {
+            const rate = await getExchangeRate(date, baseCurrency, target);
+            if (rate !== null) {
+                ratesInfoHTML += `<div class="rate-item"><span>${formatNumber(rate, 4)}</span><span>${target}</span></div>`;
+            }
+        }
+
+        exchangeRateInfo.innerHTML = ratesInfoHTML;
+        exchangeRateModal.classList.remove('hidden');
     }
 
     function render() { if (currentSettlement) { renderExpenses(); updateSummary(); } }
@@ -274,14 +361,15 @@ document.addEventListener('DOMContentLoaded', () => {
         expenseTableBody.innerHTML = '';
         if (!currentSettlement || !currentSettlement.expenses) return;
         const [userA, userB] = currentSettlement.participants;
+        const baseCurrency = currentSettlement.baseCurrency;
         currentSettlement.expenses.forEach(exp => {
             const row = expenseTableBody.insertRow();
             row.innerHTML = `
                 <td>${exp.name}</td>
-                <td>${formatNumber(exp.amount)}</td>
+                <td>${formatNumber(exp.originalAmount, 2)} ${exp.currency}</td>
                 <td>${exp.payer}</td>
-                <td>${formatNumber(Math.round(exp.shares[userA]))}</td>
-                <td>${formatNumber(Math.round(exp.shares[userB]))}</td>
+                <td>${formatNumber(exp.shares[userA], 2)} ${baseCurrency}</td>
+                <td>${formatNumber(exp.shares[userB], 2)} ${baseCurrency}</td>
                 <td><button class="delete-expense-btn" data-id="${exp.id}"><i class="fas fa-trash-alt"></i></button></td>
             `;
         });
@@ -292,9 +380,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     function updateSummary() {
         if (!currentSettlement) return;
-        const { expenses, participants, isSettled } = currentSettlement;
+        const { expenses, participants, baseCurrency, isSettled } = currentSettlement;
         const totalAmount = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-        totalExpenseP.textContent = `${locales[currentLang]?.totalExpense}: ${formatNumber(totalAmount)} JPY`;
+        totalExpenseP.textContent = `${locales[currentLang]?.totalExpense}: ${formatNumber(totalAmount, 2)} ${baseCurrency}`;
 
         finalSettlementP.textContent = '';
         completeSettlementBtn.classList.add('hidden');
@@ -307,8 +395,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let settlementText = locales[currentLang]?.settlementDone;
             const paysToString = ` ${locales[currentLang]?.paysTo} `;
-            if (balanceA > 0.01) settlementText = `${userB}${paysToString}${userA}: ${formatNumber(Math.round(balanceA))} JPY`;
-            else if (balanceA < -0.01) settlementText = `${userA}${paysToString}${userB}: ${formatNumber(Math.round(Math.abs(balanceA)))} JPY`;
+            if (balanceA > 0.01) settlementText = `${userB}${paysToString}${userA}: ${formatNumber(balanceA)} ${baseCurrency}`;
+            else if (balanceA < -0.01) settlementText = `${userA}${paysToString}${userB}: ${formatNumber(Math.abs(balanceA))} ${baseCurrency}`;
             finalSettlementP.textContent = settlementText;
         } else if (expenses.length > 0) {
             finalSettlementP.textContent = locales[currentLang]?.settlementInProgress;
@@ -320,13 +408,14 @@ document.addEventListener('DOMContentLoaded', () => {
         itemNameInput.value = ''; itemAmountInput.value = '';
         splitAmountAInput.value = ''; splitAmountBInput.value = '';
         splitMethodSelect.value = 'equal';
+        if(currentSettlement) itemCurrencySelect.value = currentSettlement.baseCurrency;
         handleSplitMethodChange();
         itemNameInput.focus();
     }
 
     function downloadExcel() {
         if (!currentSettlement) return;
-        // ... (Excel download logic remains the same)
+        alert(locales[currentLang]?.excelNotImplemented);
     }
 
     // --- Start the App ---

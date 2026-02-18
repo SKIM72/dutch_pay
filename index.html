@@ -40,7 +40,7 @@
                 <div id="calculator" class="hidden">
                     <div class="settlement-header">
                         <h2 id="settlement-display"></h2>
-                        <span id="settlement-date-badge" class="settlement-date-badge"></span>
+                        <span id="settlement-date-badge" class="settlement-date-badge" style="cursor: pointer;" title="환율 정보 보기"></span>
                     </div>
                     
                     <div class="card" id="summary-card">
@@ -59,7 +59,14 @@
                         <div id="expense-form">
                              <div class="expense-inputs-grid">
                                 <input type="text" id="item-name" data-i18n-placeholder="expenseItem">
-                                <input type="text" id="item-amount" data-i18n-placeholder="amountInYen" inputmode="decimal">
+                                <div class="amount-input-wrapper">
+                                    <input type="text" id="item-amount" data-i18n-placeholder="amount" inputmode="decimal">
+                                    <select id="item-currency">
+                                        <option value="JPY">JPY</option>
+                                        <option value="KRW">KRW</option>
+                                        <option value="USD">USD</option>
+                                    </select>
+                                </div>
                                 <select id="item-payer"></select>
                                 <select id="split-method" data-i18n-options="splitEqually,splitByAmount"></select>
                             </div>
@@ -96,8 +103,9 @@
             </main>
         </div>
 
-        <button id="add-settlement-fab" class="hidden"><i class="fas fa-plus"></i></button>
+        <button id="add-settlement-fab"><i class="fas fa-plus"></i></button>
 
+        <!-- Add Settlement Modal -->
         <div id="add-settlement-modal" class="hidden">
              <div class="modal-content card">
                 <span class="close-modal-btn"><i class="fas fa-times"></i></span>
@@ -110,9 +118,30 @@
                     <input type="text" id="new-participant-a" value="A" data-i18n-placeholder="participant1Name">
                     <input type="text" id="new-participant-b" value="B" data-i18n-placeholder="participant2Name">
                 </div>
+                <div class="currency-select-wrapper">
+                    <label for="base-currency" data-i18n="baseCurrency">기준 통화:</label>
+                    <select id="base-currency">
+                        <option value="JPY">JPY (일본 엔)</option>
+                        <option value="KRW">KRW (한국 원)</option>
+                        <option value="USD">USD (미국 달러)</option>
+                    </select>
+                </div>
                 <button id="create-settlement-btn" data-i18n="create"></button>
             </div>
         </div>
+
+        <!-- Exchange Rate Modal -->
+        <div id="exchange-rate-modal" class="hidden">
+            <div class="modal-content card">
+                <span class="close-modal-btn"><i class="fas fa-times"></i></span>
+                <div class="modal-header">
+                    <h2 data-i18n="exchangeRateTitle">환율 정보</h2>
+                </div>
+                <p id="exchange-rate-date"></p>
+                <div id="exchange-rate-info"></div>
+            </div>
+        </div>
+
     </div>
     <script src="locales.js"></script>
     <script src="main.js"></script>
