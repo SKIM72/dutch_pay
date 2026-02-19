@@ -122,18 +122,6 @@ header h1:hover { color: var(--primary-hover); }
     user-select: none;
 }
 
-.is-settled .delete-expense-btn {
-    color: var(--border);
-    cursor: default;
-    pointer-events: none;
-    user-select: none;
-}
-
-.is-settled .delete-expense-btn:hover {
-    background-color: transparent;
-    color: var(--border);
-}
-
 .form-grid-row { 
     display: grid; 
     grid-template-columns: 1fr 1fr; 
@@ -195,6 +183,15 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
     transition: background-color 0.2s, color 0.2s;
 }
 .delete-expense-btn:hover { background-color: #fee2e2; color: var(--danger); }
+
+/* Final fix for settled delete button */
+#expense-table tbody tr.is-settled .delete-expense-btn {
+    background-color: transparent !important;
+    color: var(--border) !important;
+    pointer-events: none;
+    cursor: default;
+}
+
 
 #download-excel-btn { background-color: var(--secondary); font-size: 0.85rem; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; }
 #download-excel-btn:hover { background-color: var(--secondary-hover); }
