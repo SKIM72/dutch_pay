@@ -115,10 +115,23 @@ header h1:hover { color: var(--primary-hover); }
 #total-expense { font-size: 1rem; opacity: 0.9; }
 #final-settlement { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
 
-#expense-form-card.is-settled, .is-settled .delete-expense-btn, .is-settled .delete-settlement-btn {
+#expense-form-card.is-settled,
+.is-settled .delete-settlement-btn {
     opacity: 0.6;
-    pointer-events: none; 
+    pointer-events: none;
     user-select: none;
+}
+
+.is-settled .delete-expense-btn {
+    color: var(--border);
+    cursor: default;
+    pointer-events: none;
+    user-select: none;
+}
+
+.is-settled .delete-expense-btn:hover {
+    background-color: transparent;
+    color: var(--border);
 }
 
 .form-grid-row { 
