@@ -61,41 +61,34 @@ header h1:hover { color: var(--primary-hover); }
     width: 100%; 
     margin-bottom: 1.5rem; 
     padding: 0.75rem 1rem; 
-    background-color: #f8fafc; /* 살짝 톤 다운된 고급스러운 배경색 */
+    background-color: #f8fafc; 
     border: 1px solid #e2e8f0; 
-    border-radius: 10px; /* 트렌디하게 모서리를 더 둥글게 */
+    border-radius: 10px; 
     font-size: 0.95rem; 
     font-weight: 500;
-    font-family: var(--font-family); /* 앱 전체 폰트와 일치시킴 */
+    font-family: var(--font-family); 
     color: var(--text-main);
     cursor: pointer;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); /* 미세한 안쪽 그림자로 입체감 부여 */
-    transition: all 0.2s ease-in-out; /* 부드러운 애니메이션 효과 */
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); 
+    transition: all 0.2s ease-in-out; 
 }
-
-/* 마우스를 올렸을 때의 반응 */
 #main-date-picker:hover {
     background-color: #ffffff;
     border-color: #cbd5e1;
 }
-
-/* 클릭(터치)해서 활성화되었을 때의 반응 */
 #main-date-picker:focus {
     outline: none;
     background-color: #ffffff;
     border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); /* 토스나 애플 느낌의 은은한 포커스 링 */
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); 
 }
-
-/* 달력 아이콘 부분 커스텀 (크롬, 사파리 등) */
 #main-date-picker::-webkit-calendar-picker-indicator {
     cursor: pointer;
-    opacity: 0.5; /* 평소엔 살짝 연하게 */
+    opacity: 0.5; 
     transition: opacity 0.2s;
 }
-
 #main-date-picker::-webkit-calendar-picker-indicator:hover {
-    opacity: 1; /* 마우스 올리면 진해짐 */
+    opacity: 1; 
 }
 
 .settlement-item-wrapper { display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-bottom: 0.5rem; }
@@ -158,7 +151,6 @@ header h1:hover { color: var(--primary-hover); }
 }
 .delete-settlement-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
 
-
 /* --- Main Content --- */
 #right-pane { flex: 1; background-color: var(--main-bg); overflow-y: auto; padding: 2.5rem; display: flex; flex-direction: column; align-items: center; }
 #right-pane > div { width: 100%; max-width: 800px; }
@@ -204,29 +196,49 @@ header h1:hover { color: var(--primary-hover); }
 #expense-form { margin-top: 1.25rem; }
 #expense-form button { width: 100%; margin-top: 0.5rem; }
 
+/* --- 세련된 입력창 및 셀렉트 박스 스타일 --- */
 input, select { 
     width: 100%; 
-    padding: 0.625rem 0.875rem; 
-    border: 1px solid var(--border); 
-    border-radius: 6px; 
+    padding: 0.75rem 1rem; 
+    border: 1px solid #e2e8f0; 
+    border-radius: 10px; 
     font-size: 0.95rem; 
-    background: #fcfcfc; 
+    font-family: var(--font-family);
+    color: var(--text-main);
+    background-color: #f8fafc; 
     -webkit-appearance: none;
     appearance: none;
     text-overflow: ellipsis;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); 
+    transition: all 0.2s ease-in-out;
+}
+
+input:hover, select:hover {
+    background-color: #ffffff;
+    border-color: #cbd5e1;
+}
+
+input:focus, select:focus {
+    outline: none;
+    background-color: #ffffff;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); 
+    position: relative;
+    z-index: 1; 
 }
 
 select { 
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 0.5rem center;
+    background-position: right 1rem center;
     background-repeat: no-repeat;
-    background-size: 1.5em 1.5em;
+    background-size: 1.2em 1.2em;
     padding-right: 2.5rem;
+    cursor: pointer;
 }
 
 .amount-input-wrapper { display: flex; }
-.amount-input-wrapper input { flex-grow: 1; border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none;}
-.amount-input-wrapper select { width: auto; border-top-left-radius: 0; border-bottom-left-radius: 0; background-color: #f8fafc;}
+.amount-input-wrapper input { flex-grow: 1; border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none; }
+.amount-input-wrapper select { width: auto; border-top-left-radius: 0; border-bottom-left-radius: 0; }
 
 button { background: var(--primary); color: white; padding: 0.75rem 1.25rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; font-size: 0.95rem; }
 button:hover { background: var(--primary-hover); }
@@ -240,7 +252,7 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 #expense-table { width: 100%; border-collapse: collapse; }
 #expense-table th, #expense-table td {
     padding: 0.75rem 1rem; 
-    text-align: center; /* 전체 데이터를 가운데 정렬합니다 */
+    text-align: center; 
     border-bottom: 1px solid var(--border); 
     font-size: 0.9rem; 
     vertical-align: middle;
@@ -331,6 +343,7 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
         padding: 0.8rem;
         font-size: 1rem;
         height: 52px;
+        margin-bottom: 1rem; /* 모바일에서는 여백을 약간 줄임 */
     }
 
     .settlement-item {
