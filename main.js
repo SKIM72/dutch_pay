@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const languageSwitcher = document.getElementById('language-switcher');
     const sidebar = document.getElementById('left-pane');
     const appTitle = document.querySelector('header h1');
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn'); // 이 줄을 추가하세요!
     const mainDatePicker = document.getElementById('main-date-picker');
     const settlementListContainer = document.getElementById('settlement-list-container');
     const addSettlementFab = document.getElementById('add-settlement-fab');
@@ -170,6 +171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function setupEventListeners() {
         languageSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
         appTitle.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
+        mobileMenuBtn.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
         mainDatePicker.addEventListener('change', () => renderSettlementList(mainDatePicker.value));
         addSettlementFab.addEventListener('click', () => {
             modalDateDisplay.textContent = mainDatePicker.value;

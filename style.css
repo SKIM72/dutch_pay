@@ -36,6 +36,20 @@ header {
 header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-spacing: -0.5px; cursor: pointer; transition: color 0.2s; }
 header h1:hover { color: var(--primary-hover); }
 
+/* --- Header Controls & Mobile Menu Button --- */
+.header-controls { display: flex; align-items: center; gap: 1rem; }
+#mobile-menu-btn { 
+    display: none; /* PC에서는 숨김 */
+    background: transparent; 
+    border: none; 
+    color: var(--text-main); 
+    font-size: 1.4rem; 
+    cursor: pointer; 
+    padding: 0; 
+    transition: color 0.2s; 
+}
+#mobile-menu-btn:hover { color: var(--primary); }
+
 /* --- Language Selector --- */
 .language-selector { display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); }
 .language-selector i { font-size: 0.9rem; }
@@ -327,8 +341,29 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 #exchange-rate-info .rate-item:not(:last-child) { border-bottom: 1px solid var(--app-bg); }
 #exchange-rate-info .base { font-weight: 600; color: var(--primary); }
 
+/* --- Mobile Responsiveness --- */
 @media (max-width: 768px) {
-    #left-pane, #left-pane.collapsed { width: 100% !important; height: auto; border-right: none; border-bottom: 1px solid var(--border); opacity: 1; }
+    /* 모바일에서 햄버거 버튼 보이기 */
+    #mobile-menu-btn { display: block; }
+    
+    /* 열려 있을 때 (기본) - 부드러운 애니메이션 추가 */
+    #left-pane { 
+        width: 100% !important; 
+        max-height: 500px; /* 스르륵 열리기 위한 최대 높이 설정 */
+        overflow-y: auto; /* 내역이 많아지면 내부에서 스크롤되도록 UX 개선 */
+        border-right: none; 
+        border-bottom: 1px solid var(--border); 
+        opacity: 1; 
+        transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; 
+    }
+    
+    /* 닫혔을 때 부드럽게 숨김 (display: none 대신 높이와 투명도를 0으로 조절) */
+    #left-pane.collapsed { 
+        max-height: 0; 
+        opacity: 0; 
+        border-bottom-color: transparent; 
+    }
+    
     .sidebar-content { width: 100%; }    
     #main-container { flex-direction: column; }
     #right-pane { padding: 1.5rem; }
@@ -343,7 +378,7 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
         padding: 0.8rem;
         font-size: 1rem;
         height: 52px;
-        margin-bottom: 1rem; /* 모바일에서는 여백을 약간 줄임 */
+        margin-bottom: 1rem;
     }
 
     .settlement-item {
