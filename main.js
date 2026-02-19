@@ -565,7 +565,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td>${exp.payer}</td>
                 <td>${formatNumber(exp.shares[userA] || 0, 2)}</td>
                 <td>${formatNumber(exp.shares[userB] || 0, 2)}</td>
-                <td><button class="delete-expense-btn" data-id="${exp.id}" ${isLocked ? 'disabled' : ''}><i class="fas fa-trash-alt"></i></button></td>
+                <td><button class="delete-expense-btn" data-id="${exp.id}"><i class="fas fa-trash-alt"></i></button></td>
             `;
             
             if (!isLocked) {
@@ -618,7 +618,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     function toggleExpenseForm(isLocked) {
         expenseFormCard.classList.toggle('is-settled', isLocked);
-        expenseFormCard.querySelectorAll('input, select, button').forEach(el => { el.disabled = isLocked; });
+        document.querySelectorAll('#expense-form input, #expense-form select, #expense-form button').forEach(el => { el.disabled = isLocked; });
     }
 
     function clearInputs() {

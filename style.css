@@ -184,14 +184,12 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 }
 .delete-expense-btn:hover { background-color: #fee2e2; color: var(--danger); }
 
-/* Final fix for settled delete button */
+/* Final, correct style for the settled delete button */
 #expense-table tbody tr.is-settled .delete-expense-btn {
-    background-color: transparent !important;
     color: var(--border) !important;
+    background-color: transparent !important;
     pointer-events: none;
-    cursor: default;
 }
-
 
 #download-excel-btn { background-color: var(--secondary); font-size: 0.85rem; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; }
 #download-excel-btn:hover { background-color: var(--secondary-hover); }
