@@ -618,7 +618,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     function toggleExpenseForm(isLocked) {
         expenseFormCard.classList.toggle('is-settled', isLocked);
-        document.querySelectorAll('#expense-form input, #expense-form select, #expense-form button').forEach(el => { el.disabled = isLocked; });
+        expenseFormCard.querySelectorAll('input, select, button').forEach(el => { 
+            el.disabled = isLocked; 
+        });
     }
 
     function clearInputs() {

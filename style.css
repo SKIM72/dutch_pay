@@ -64,8 +64,23 @@ header h1:hover { color: var(--primary-hover); }
     transition: all 0.2s; font-size: 0.9rem; color: var(--text-main); 
     box-shadow: var(--shadow-sm); overflow: hidden;
 }
-.settlement-item .item-content { display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.settlement-item .item-title { text-overflow: ellipsis; overflow: hidden; white-space: nowrap; }
+
+.settlement-item .item-content { 
+    display: flex; 
+    flex-wrap: wrap; /* 공간이 부족하면 자연스럽게 아랫줄로 넘깁니다 */
+    align-items: center; 
+    flex: 1; 
+    min-width: 0; 
+}
+
+.settlement-item .item-title { 
+    flex: 1; /* 제목이 윗줄의 남은 공간을 꽉 채우도록 합니다 */
+    min-width: 50px;
+    font-weight: 600; /* 제목을 살짝 굵게 해서 가독성을 높입니다 */
+    text-overflow: ellipsis; 
+    overflow: hidden; 
+    white-space: nowrap; 
+}
 
 .settlement-item:hover { background: #f9fafb; border-color: #d1d5db; }
 .settlement-item.active { background: var(--primary); color: white; border-color: var(--primary); }
@@ -74,10 +89,23 @@ header h1:hover { color: var(--primary-hover); }
 /* Settled Item Styles */
 .settlement-item.is-settled { opacity: 0.7; }
 .settlement-item.is-settled .item-title { text-decoration: line-through; }
-.settled-icon { color: var(--secondary); margin-right: 0.5rem; }
+.settled-icon { 
+    color: var(--secondary); 
+    margin-right: 0.5rem; 
+    flex-shrink: 0; /* 아이콘이 찌그러지는 것을 방지합니다 */
+}
 .settlement-item.active.is-settled { background: #5a67d8; }
 
-.item-participants { font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem; white-space: nowrap; }
+.item-participants { 
+    width: 100%; /* 강제로 100%를 주어 두 번째 줄로 예쁘게 내립니다 */
+    font-size: 0.8rem; 
+    color: var(--text-muted); 
+    margin-left: 0; /* 기존 여백 제거 */
+    margin-top: 0.25rem; /* 제목과 살짝 띄워줍니다 */
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+}
 
 .delete-settlement-btn {
     background: #fee2e2; color: var(--danger); border: 1px solid #fecaca;
@@ -184,11 +212,9 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 }
 .delete-expense-btn:hover { background-color: #fee2e2; color: var(--danger); }
 
-/* Final, correct style for the settled delete button */
 #expense-table tbody tr.is-settled .delete-expense-btn {
-    color: var(--border) !important;
-    background-color: transparent !important;
-    pointer-events: none;
+    opacity: 0.3; /* 아이콘의 투명도를 낮춰 자연스럽게 옅어지게 만듭니다 */
+    pointer-events: none; /* 클릭 이벤트 방지 (그대로 유지) */
 }
 
 #download-excel-btn { background-color: var(--secondary); font-size: 0.85rem; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; }
@@ -237,6 +263,7 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 
 @media (max-width: 768px) {
     #left-pane, #left-pane.collapsed { width: 100% !important; height: auto; border-right: none; border-bottom: 1px solid var(--border); opacity: 1; }
+    .sidebar-content { width: 100%; }    
     #main-container { flex-direction: column; }
     #right-pane { padding: 1.5rem; }
     #summary-card { flex-direction: column; align-items: flex-start; }
