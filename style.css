@@ -55,7 +55,49 @@ header h1:hover { color: var(--primary-hover); }
 #left-pane.collapsed { width: 0; opacity: 0; border-right-color: transparent; }
 .sidebar-content { padding: 1.5rem; width: var(--sidebar-width); }
 #left-pane h2 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 1rem; }
-#main-date-picker { width: 100%; margin-bottom: 1rem; border: 1px solid var(--border); padding: 0.5rem; border-radius: 6px; font-size: 0.875rem; }
+
+/* --- 세련된 날짜 선택 창 스타일 --- */
+#main-date-picker { 
+    width: 100%; 
+    margin-bottom: 1.5rem; 
+    padding: 0.75rem 1rem; 
+    background-color: #f8fafc; /* 살짝 톤 다운된 고급스러운 배경색 */
+    border: 1px solid #e2e8f0; 
+    border-radius: 10px; /* 트렌디하게 모서리를 더 둥글게 */
+    font-size: 0.95rem; 
+    font-weight: 500;
+    font-family: var(--font-family); /* 앱 전체 폰트와 일치시킴 */
+    color: var(--text-main);
+    cursor: pointer;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); /* 미세한 안쪽 그림자로 입체감 부여 */
+    transition: all 0.2s ease-in-out; /* 부드러운 애니메이션 효과 */
+}
+
+/* 마우스를 올렸을 때의 반응 */
+#main-date-picker:hover {
+    background-color: #ffffff;
+    border-color: #cbd5e1;
+}
+
+/* 클릭(터치)해서 활성화되었을 때의 반응 */
+#main-date-picker:focus {
+    outline: none;
+    background-color: #ffffff;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); /* 토스나 애플 느낌의 은은한 포커스 링 */
+}
+
+/* 달력 아이콘 부분 커스텀 (크롬, 사파리 등) */
+#main-date-picker::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.5; /* 평소엔 살짝 연하게 */
+    transition: opacity 0.2s;
+}
+
+#main-date-picker::-webkit-calendar-picker-indicator:hover {
+    opacity: 1; /* 마우스 올리면 진해짐 */
+}
+
 .settlement-item-wrapper { display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-bottom: 0.5rem; }
 .settlement-item { 
     flex-grow: 1; padding: 0.75rem 1rem; 
@@ -67,19 +109,20 @@ header h1:hover { color: var(--primary-hover); }
 
 .settlement-item .item-content { 
     display: flex; 
-    flex-wrap: wrap; /* 공간이 부족하면 자연스럽게 아랫줄로 넘깁니다 */
+    flex-wrap: wrap; 
     align-items: center; 
     flex: 1; 
     min-width: 0; 
 }
 
 .settlement-item .item-title { 
-    flex: 1; /* 제목이 윗줄의 남은 공간을 꽉 채우도록 합니다 */
+    flex: 1; 
     min-width: 50px;
-    font-weight: 600; /* 제목을 살짝 굵게 해서 가독성을 높입니다 */
+    font-weight: 600; 
     text-overflow: ellipsis; 
     overflow: hidden; 
     white-space: nowrap; 
+    text-align: left;
 }
 
 .settlement-item:hover { background: #f9fafb; border-color: #d1d5db; }
@@ -92,19 +135,20 @@ header h1:hover { color: var(--primary-hover); }
 .settled-icon { 
     color: var(--secondary); 
     margin-right: 0.5rem; 
-    flex-shrink: 0; /* 아이콘이 찌그러지는 것을 방지합니다 */
+    flex-shrink: 0; 
 }
 .settlement-item.active.is-settled { background: #5a67d8; }
 
 .item-participants { 
-    width: 100%; /* 강제로 100%를 주어 두 번째 줄로 예쁘게 내립니다 */
+    width: 100%; 
     font-size: 0.8rem; 
     color: var(--text-muted); 
-    margin-left: 0; /* 기존 여백 제거 */
-    margin-top: 0.25rem; /* 제목과 살짝 띄워줍니다 */
+    margin-left: 0; 
+    margin-top: 0.25rem; 
     white-space: nowrap; 
     overflow: hidden; 
     text-overflow: ellipsis; 
+    text-align: left;
 }
 
 .delete-settlement-btn {
@@ -195,13 +239,23 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 #expense-table-container { overflow-x: auto; }
 #expense-table { width: 100%; border-collapse: collapse; }
 #expense-table th, #expense-table td {
-    padding: 0.75rem 1rem; text-align: left; 
-    border-bottom: 1px solid var(--border); font-size: 0.9rem; vertical-align: middle;
+    padding: 0.75rem 1rem; 
+    text-align: center; /* 전체 데이터를 가운데 정렬합니다 */
+    border-bottom: 1px solid var(--border); 
+    font-size: 0.9rem; 
+    vertical-align: middle;
+    white-space: nowrap; 
 }
+
+/* 표의 첫 번째 칸(항목명)만 왼쪽으로 정렬하여 가독성을 높입니다 */
+#expense-table td:first-child, #expense-table th:first-child {
+    text-align: left;
+}
+
 #expense-table tbody tr { transition: background-color 0.2s; }
 #expense-table tbody tr:not(.is-settled) { cursor: pointer; }
 #expense-table tbody tr:not(.is-settled):hover { background-color: #f8fafc; }
-#expense-table th { background-color: var(--side-bg); color: var(--text-muted); font-weight: 600; text-align: left; }
+#expense-table th { background-color: var(--side-bg); color: var(--text-muted); font-weight: 600; }
 #expense-table td:last-child, #expense-table th:last-child { text-align: center; }
 
 .delete-expense-btn { 
@@ -213,8 +267,8 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 .delete-expense-btn:hover { background-color: #fee2e2; color: var(--danger); }
 
 #expense-table tbody tr.is-settled .delete-expense-btn {
-    opacity: 0.3; /* 아이콘의 투명도를 낮춰 자연스럽게 옅어지게 만듭니다 */
-    pointer-events: none; /* 클릭 이벤트 방지 (그대로 유지) */
+    opacity: 0.3; 
+    pointer-events: none; 
 }
 
 #download-excel-btn { background-color: var(--secondary); font-size: 0.85rem; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; }

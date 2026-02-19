@@ -285,7 +285,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     async function deleteSettlement(date, settlementId) {
         if (confirm(locales[currentLang]?.deleteSettlementConfirm)) {
-            // First, delete all associated expenses
             const { error: expenseError } = await supabaseClient
                 .from('expenses')
                 .delete()
@@ -293,10 +292,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (expenseError) {
                 console.error('Error deleting expenses:', expenseError);
-                // Even if deleting expenses fails, try to delete the settlement
             }
 
-            // Then, delete the settlement itself
             const { error: settlementError } = await supabaseClient
                 .from('settlements')
                 .delete()
@@ -671,9 +668,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             for (let C = range.s.c; C <= range.e.c; ++C) {
                 const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
                 if (!ws[cell_ref]) continue;
-                ws[cell_ref].s = {
-                    alignment: { horizontal: "center", vertical: "center" }
-                };
+                
+                if (R === 0) {
+                    ws[cell_ref].s = {
+                        alignment: { horizontal: "center", vertical: "center" },
+                        font: { bold: true },
+                        fill: { fgColor: { rgb: "E2E8F0" } }
+                    };
+                } else {
+                    ws[cell_ref].s = {
+                        alignment: { horizontal: "center", vertical: "center" }
+                    };
+                }
             }
         }
     
