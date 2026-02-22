@@ -6,13 +6,16 @@
     <title data-i18n="appTitle">Settle Up | Modern Settlement</title>
     <link rel="icon" href="logo.png" type="image/png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=6">
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 </head>
 <body>
     <div id="app">
         <header>
-            <h1>Settle Up</h1>
+            <div class="brand-container">
+                <img src="icon.png" alt="Settle Up Icon" id="app-icon">
+                <h1>Settle Up</h1>
+            </div>
             <div class="header-controls">
                 <div class="language-selector">
                     <i class="fas fa-globe"></i>
@@ -30,7 +33,10 @@
             <aside id="left-pane">
                 <div class="sidebar-content">
                     <h2 data-i18n="settlementHistory">정산 내역 조회</h2>
-                    <input type="date" id="main-date-picker">
+                    <div class="custom-date-wrapper">
+                        <div id="custom-date-display"></div>
+                        <input type="date" id="main-date-picker">
+                    </div>
                     <div id="settlement-list-container"></div>
                 </div>
             </aside>
@@ -44,7 +50,9 @@
                 <div id="calculator" class="hidden">
                     <div class="settlement-header">
                         <h2 id="settlement-display"></h2>
-                        <span id="settlement-date-badge" class="settlement-date-badge" style="cursor: pointer;" title="환율 정보 보기"></span>
+                        <button id="exchange-rate-info-btn" class="btn-outline">
+                            <i class="fas fa-exchange-alt"></i> <span data-i18n="viewExchangeRate">환율 정보 보기</span>
+                        </button>
                     </div>
                     
                     <div class="card" id="summary-card">
@@ -72,6 +80,27 @@
                                     </select>
                                 </div>
                             </div>
+                            
+                            <div id="add-rate-config-wrapper" class="rate-config-wrapper hidden">
+                                <div class="rate-config-inner">
+                                    <div class="rate-input-row">
+                                        <span class="rate-label" data-i18n="customRateLabel">적용 환율</span>
+                                        <div class="rate-input-box">
+                                            <span>1 <span id="add-currency-from"></span> =</span>
+                                            <input type="number" id="add-custom-rate" step="0.0001">
+                                            <span id="add-currency-to"></span>
+                                        </div>
+                                    </div>
+                                    <div class="rate-action-buttons">
+                                        <button type="button" id="add-settlement-rate-btn" class="rate-btn btn-outline-small"><i class="fas fa-calendar-check"></i> <span data-i18n="applySettlementRate">정산일 기준</span></button>
+                                        <button type="button" id="add-live-rate-btn" class="rate-btn btn-outline-small"><i class="fas fa-bolt"></i> <span data-i18n="applyLiveRate">실시간 최신</span></button>
+                                    </div>
+                                </div>
+                                <div class="converted-preview">
+                                    <span data-i18n="convertedAmount">최종 변환 금액</span>: <strong id="add-converted-total">0</strong>
+                                </div>
+                            </div>
+
                             <div class="form-grid-row">
                                 <select id="item-payer"></select>
                                 <select id="split-method" data-i18n-options="splitEqually,splitByAmount"></select>
@@ -143,6 +172,37 @@
                 </div>
                 <p id="exchange-rate-date"></p>
                 <div id="exchange-rate-info"></div>
+                <p style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted); text-align: center;">
+                    <i class="fas fa-info-circle"></i> <span data-i18n="rateNotice">입력창에서 지출 건별로 원하는 환율을 직접 수정할 수 있습니다.</span>
+                </p>
+            </div>
+        </div>
+
+        <div id="expense-rate-modal" class="hidden">
+            <div class="modal-content card" style="max-width: 400px;">
+                <span class="close-modal-btn"><i class="fas fa-times"></i></span>
+                <h2 style="margin-bottom: 1.5rem;"><i class="fas fa-calculator"></i> <span data-i18n="appliedExchangeRate">적용된 환율 상세</span></h2>
+                
+                <div class="rate-calc-box">
+                    <div class="rate-row">
+                        <span class="currency-flag" id="calc-foreign-currency"></span>
+                        <span class="currency-amount" id="calc-foreign-amount">1</span>
+                    </div>
+                    <div class="rate-divider"><i class="fas fa-equals"></i></div>
+                    <div class="rate-row base-row">
+                        <span class="currency-flag" id="calc-base-currency"></span>
+                        <span class="currency-amount" id="calc-base-amount"></span>
+                    </div>
+                </div>
+
+                <div class="calc-result-summary">
+                    <p data-i18n="totalConverted">총 변환 금액</p>
+                    <div class="calc-result-numbers">
+                        <span id="calc-total-foreign" class="text-muted"></span>
+                        <i class="fas fa-arrow-right"></i>
+                        <span id="calc-total-base" class="text-primary-bold"></span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -158,6 +218,27 @@
                         <select id="edit-item-currency"></select>
                     </div>
                 </div>
+
+                <div id="edit-rate-config-wrapper" class="rate-config-wrapper hidden">
+                    <div class="rate-config-inner">
+                        <div class="rate-input-row">
+                            <span class="rate-label" data-i18n="customRateLabel">적용 환율</span>
+                            <div class="rate-input-box">
+                                <span>1 <span id="edit-currency-from"></span> =</span>
+                                <input type="number" id="edit-custom-rate" step="0.0001">
+                                <span id="edit-currency-to"></span>
+                            </div>
+                        </div>
+                        <div class="rate-action-buttons">
+                            <button type="button" id="edit-settlement-rate-btn" class="rate-btn btn-outline-small"><i class="fas fa-calendar-check"></i> <span data-i18n="applySettlementRate">정산일 기준</span></button>
+                            <button type="button" id="edit-live-rate-btn" class="rate-btn btn-outline-small"><i class="fas fa-bolt"></i> <span data-i18n="applyLiveRate">실시간 최신</span></button>
+                        </div>
+                    </div>
+                    <div class="converted-preview">
+                        <span data-i18n="convertedAmount">최종 변환 금액</span>: <strong id="edit-converted-total">0</strong>
+                    </div>
+                </div>
+
                 <div class="form-grid-row">
                     <select id="edit-item-payer"></select>
                     <select id="edit-split-method" data-i18n-options="splitEqually,splitByAmount"></select>
@@ -174,6 +255,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="main.js?v=2"></script>
+    <script src="main.js?v=6"></script>
 </body>
 </html>

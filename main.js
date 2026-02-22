@@ -14,9 +14,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Element References ---
     const languageSwitcher = document.getElementById('language-switcher');
     const sidebar = document.getElementById('left-pane');
-    const appTitle = document.querySelector('header h1');
-    const mobileMenuBtn = document.getElementById('mobile-menu-btn'); // 이 줄을 추가하세요!
+    const appTitle = document.querySelector('.brand-container');
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
     const mainDatePicker = document.getElementById('main-date-picker');
+    const customDateDisplay = document.getElementById('custom-date-display');
     const settlementListContainer = document.getElementById('settlement-list-container');
     const addSettlementFab = document.getElementById('add-settlement-fab');
     const placeholderRightPane = document.getElementById('placeholder-right-pane');
@@ -25,6 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const addSettlementModal = document.getElementById('add-settlement-modal');
     const exchangeRateModal = document.getElementById('exchange-rate-modal');
     const editExpenseModal = document.getElementById('edit-expense-modal');
+    const expenseRateModal = document.getElementById('expense-rate-modal');
 
     const modalDateDisplay = document.getElementById('modal-date-display');
     const newSettlementTitleInput = document.getElementById('new-settlement-title');
@@ -33,6 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const baseCurrencySelect = document.getElementById('base-currency');
     const createSettlementBtn = document.getElementById('create-settlement-btn');
 
+    const exchangeRateInfoBtn = document.getElementById('exchange-rate-info-btn'); 
     const exchangeRateDate = document.getElementById('exchange-rate-date');
     const exchangeRateInfo = document.getElementById('exchange-rate-info');
     
@@ -48,7 +51,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const saveExpenseChangesBtn = document.getElementById('save-expense-changes-btn');
 
     const settlementDisplay = document.getElementById('settlement-display');
-    const settlementDateBadge = document.getElementById('settlement-date-badge');
     const expenseFormCard = document.getElementById('expense-form-card');
     const itemPayerSelect = document.getElementById('item-payer');
     const itemCurrencySelect = document.getElementById('item-currency');
@@ -69,7 +71,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const formatNumber = (num, decimals = 2) => isNaN(num) ? '0' : num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     const parseFormattedNumber = (str) => parseFloat(String(str).replace(/,/g, '')) || 0;
 
-    // --- i18n (Localization) ---
+    function updateDateDisplay() {
+        if (!mainDatePicker.value) return;
+        const [year, month, day] = mainDatePicker.value.split('-');
+        const date = new Date(year, month - 1, day); 
+        let localeString = 'ko-KR';
+        if (currentLang === 'en') localeString = 'en-US';
+        if (currentLang === 'ja') localeString = 'ja-JP';
+        const options = { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' };
+        customDateDisplay.textContent = new Intl.DateTimeFormat(localeString, options).format(date);
+    }
+
     function updateUI(lang) {
         currentLang = lang;
         const translations = locales[lang];
@@ -102,6 +114,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateParticipantNames(currentSettlement.participants);
             render();
         }
+        updateDateDisplay(); 
         renderSettlementList(mainDatePicker.value);
     }
 
@@ -111,7 +124,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateUI(lang);
     }
 
-    // --- Exchange Rate API ---
     async function getExchangeRate(date, base, target) {
         if (base === target) return 1;
         const cacheKey = `${date}_${base}_${target}`;
@@ -129,7 +141,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) { console.error('Error fetching exchange rate:', error); alert(`Failed to fetch exchange rate for ${date}.`); return null; }
     }
 
-    // --- Initialization ---
     async function initialize() {
         const preferredLang = localStorage.getItem('preferredLang');
         const browserLang = navigator.language.split('-')[0];
@@ -142,16 +153,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function loadData() {
-        const { data, error } = await supabaseClient
-            .from('settlements')
-            .select(`* , expenses (*)`)
-            .order('created_at');
-
-        if (error) {
-            console.error('Error loading data from Supabase:', error);
-            return;
-        }
-
+        const { data, error } = await supabaseClient.from('settlements').select(`* , expenses (*)`).order('created_at');
+        if (error) { console.error('Error loading data:', error); return; }
         settlements = {};
         data.forEach(s => {
             const settlementDate = s.date;
@@ -164,22 +167,92 @@ document.addEventListener('DOMContentLoaded', async () => {
     function setInitialDate() {
         const todayString = new Date().toLocaleDateString('fr-CA', { timeZone: 'Asia/Tokyo' });
         mainDatePicker.value = todayString;
+        updateDateDisplay(); 
         mainDatePicker.dispatchEvent(new Event('change'));
     }
 
-    // --- Event Listeners Setup ---
+    // 💡 환율을 불러오고 UI를 업데이트하는 공통 함수
+    async function fetchAndSetRate(fetchType, currencyFrom, currencyTo, inputEl, previewUpdater) {
+        if (!currentSettlement) return;
+        // fetchType이 'latest'면 오늘(실시간), 'settlement'면 정산일 기준
+        const fetchDate = fetchType === 'latest' ? 'latest' : currentSettlement.date;
+        const rate = await getExchangeRate(fetchDate, currencyFrom, currencyTo);
+        if (rate !== null) {
+            inputEl.value = rate.toFixed(4);
+            previewUpdater();
+        }
+    }
+
+    // 통화가 바뀔 때 기본적으로 정산일(settlement) 기준을 불러옴
+    async function handleAddCurrencyChange() {
+        if (!currentSettlement) return;
+        const currency = itemCurrencySelect.value;
+        const base = currentSettlement.base_currency;
+        const wrapper = document.getElementById('add-rate-config-wrapper');
+
+        if (currency === base) {
+            wrapper.classList.add('hidden');
+            return;
+        }
+        wrapper.classList.remove('hidden');
+        document.getElementById('add-currency-from').textContent = currency;
+        document.getElementById('add-currency-to').textContent = base;
+
+        if (!document.getElementById('add-custom-rate').value) { 
+            await fetchAndSetRate('settlement', currency, base, document.getElementById('add-custom-rate'), updateAddPreview);
+        } else {
+            updateAddPreview();
+        }
+    }
+
+    function updateAddPreview() {
+        const amount = parseFormattedNumber(itemAmountInput.value);
+        const rate = parseFloat(document.getElementById('add-custom-rate').value) || 0;
+        const base = currentSettlement ? currentSettlement.base_currency : '';
+        document.getElementById('add-converted-total').textContent = `${formatNumber(amount * rate, 2)} ${base}`;
+    }
+
+    async function handleEditCurrencyChange() {
+        if (!currentSettlement) return;
+        const currency = editItemCurrencySelect.value;
+        const base = currentSettlement.base_currency;
+        const wrapper = document.getElementById('edit-rate-config-wrapper');
+
+        if (currency === base) {
+            wrapper.classList.add('hidden');
+            return;
+        }
+        wrapper.classList.remove('hidden');
+        document.getElementById('edit-currency-from').textContent = currency;
+        document.getElementById('edit-currency-to').textContent = base;
+
+        if (!document.getElementById('edit-custom-rate').value) { 
+            await fetchAndSetRate('settlement', currency, base, document.getElementById('edit-custom-rate'), updateEditPreview);
+        } else {
+            updateEditPreview();
+        }
+    }
+
+    function updateEditPreview() {
+        const amount = parseFormattedNumber(editItemAmountInput.value);
+        const rate = parseFloat(document.getElementById('edit-custom-rate').value) || 0;
+        const base = currentSettlement ? currentSettlement.base_currency : '';
+        document.getElementById('edit-converted-total').textContent = `${formatNumber(amount * rate, 2)} ${base}`;
+    }
+
     function setupEventListeners() {
         languageSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
         appTitle.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
         mobileMenuBtn.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
-        mainDatePicker.addEventListener('change', () => renderSettlementList(mainDatePicker.value));
+        mainDatePicker.addEventListener('change', () => { updateDateDisplay(); renderSettlementList(mainDatePicker.value); });
+        
         addSettlementFab.addEventListener('click', () => {
             modalDateDisplay.textContent = mainDatePicker.value;
             addSettlementModal.classList.remove('hidden');
             newSettlementTitleInput.focus();
         });
         
-        [addSettlementModal, exchangeRateModal, editExpenseModal].forEach(modal => {
+        [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal].forEach(modal => {
             modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
             modal.querySelector('.close-modal-btn').addEventListener('click', () => modal.classList.add('hidden'));
         });
@@ -187,18 +260,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         createSettlementBtn.addEventListener('click', createSettlement);
         addExpenseBtn.addEventListener('click', addExpense);
         saveExpenseChangesBtn.addEventListener('click', handleSaveExpenseChanges);
-        settlementDateBadge.addEventListener('click', showExchangeRateModal);
+        exchangeRateInfoBtn.addEventListener('click', showExchangeRateModal);
+
+        // 💡 [지출 추가 폼] 통화 및 환율 버튼 이벤트
+        itemCurrencySelect.addEventListener('change', () => {
+            document.getElementById('add-custom-rate').value = ''; 
+            handleAddCurrencyChange();
+        });
+        itemAmountInput.addEventListener('input', updateAddPreview);
+        document.getElementById('add-custom-rate').addEventListener('input', updateAddPreview);
+        document.getElementById('add-settlement-rate-btn').addEventListener('click', () => {
+            fetchAndSetRate('settlement', itemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('add-custom-rate'), updateAddPreview);
+        });
+        document.getElementById('add-live-rate-btn').addEventListener('click', () => {
+            fetchAndSetRate('latest', itemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('add-custom-rate'), updateAddPreview);
+        });
+
+        // 💡 [지출 수정 폼] 통화 및 환율 버튼 이벤트
+        editItemCurrencySelect.addEventListener('change', () => {
+            document.getElementById('edit-custom-rate').value = ''; 
+            handleEditCurrencyChange();
+        });
+        editItemAmountInput.addEventListener('input', updateEditPreview);
+        document.getElementById('edit-custom-rate').addEventListener('input', updateEditPreview);
+        document.getElementById('edit-settlement-rate-btn').addEventListener('click', () => {
+            fetchAndSetRate('settlement', editItemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('edit-custom-rate'), updateEditPreview);
+        });
+        document.getElementById('edit-live-rate-btn').addEventListener('click', () => {
+            fetchAndSetRate('latest', editItemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('edit-custom-rate'), updateEditPreview);
+        });
+
 
         completeSettlementBtn.addEventListener('click', async () => {
             if (currentSettlement) {
                 currentSettlement.is_settled = !currentSettlement.is_settled;
-                const { error } = await supabaseClient
-                    .from('settlements')
-                    .update({ is_settled: currentSettlement.is_settled })
-                    .eq('id', currentSettlement.id);
-                if (error) console.error('Error updating settlement state:', error);
-                render();
-                renderSettlementList(mainDatePicker.value);
+                const { error } = await supabaseClient.from('settlements').update({ is_settled: currentSettlement.is_settled }).eq('id', currentSettlement.id);
+                if (error) console.error('Error:', error);
+                render(); renderSettlementList(mainDatePicker.value);
             }
         });
         
@@ -224,6 +322,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const amountA = parseFormattedNumber(splitAmountAInput.value);
                     const amountB = parseFormattedNumber(splitAmountBInput.value);
                     itemAmountInput.value = formatNumber(amountA + amountB, 0);
+                    updateAddPreview();
                  }
             });
         });
@@ -234,6 +333,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const amountA = parseFormattedNumber(editSplitAmountAInput.value);
                     const amountB = parseFormattedNumber(editSplitAmountBInput.value);
                     editItemAmountInput.value = formatNumber(amountA + amountB, 0);
+                    updateEditPreview();
                  }
             });
         });
@@ -252,66 +352,41 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             amountEl.value = amountEl.dataset.originalValue || '';
         }
+        if (selectEl === splitMethodSelect) updateAddPreview();
+        else updateEditPreview();
     }
 
-    // --- Settlement Management (Supabase Integrated) ---
     async function createSettlement() {
         const title = newSettlementTitleInput.value.trim();
         const date = mainDatePicker.value;
         const participantA = newParticipantAInput.value.trim() || 'A';
         const participantB = newParticipantBInput.value.trim() || 'B';
         const baseCurrency = baseCurrencySelect.value;
-
         if (!title || !date) return;
 
-        const { data, error } = await supabaseClient
-            .from('settlements')
-            .insert([{ title, date, participants: [participantA, participantB], base_currency: baseCurrency, is_settled: false }])
-            .select('*, expenses (*)');
+        const { data, error } = await supabaseClient.from('settlements')
+            .insert([{ title, date, participants: [participantA, participantB], base_currency: baseCurrency, is_settled: false }]).select('*, expenses (*)');
 
-        if (error) {
-            console.error('Error creating settlement:', error);
-            return;
-        }
+        if (error) { console.error('Error creating settlement:', error); return; }
         
         const newSettlement = data[0];
         if (!settlements[date]) settlements[date] = [];
         settlements[date].push(newSettlement);
         
-        renderSettlementList(date);
-        selectSettlement(newSettlement);
+        renderSettlementList(date); selectSettlement(newSettlement);
         addSettlementModal.classList.add('hidden');
-        newSettlementTitleInput.value = '';
-        newParticipantAInput.value = 'A'; newParticipantBInput.value = 'B';
+        newSettlementTitleInput.value = ''; newParticipantAInput.value = 'A'; newParticipantBInput.value = 'B';
     }
     
     async function deleteSettlement(date, settlementId) {
         if (confirm(locales[currentLang]?.deleteSettlementConfirm)) {
-            const { error: expenseError } = await supabaseClient
-                .from('expenses')
-                .delete()
-                .eq('settlement_id', settlementId);
-
-            if (expenseError) {
-                console.error('Error deleting expenses:', expenseError);
-            }
-
-            const { error: settlementError } = await supabaseClient
-                .from('settlements')
-                .delete()
-                .eq('id', settlementId);
-            
-            if (settlementError) {
-                console.error('Error deleting settlement:', settlementError);
-                alert('Error: ' + settlementError.message);
-                return;
-            }
+            await supabaseClient.from('expenses').delete().eq('settlement_id', settlementId);
+            const { error: settlementError } = await supabaseClient.from('settlements').delete().eq('id', settlementId);
+            if (settlementError) { alert('Error: ' + settlementError.message); return; }
             
             settlements[date] = settlements[date].filter(s => s.id !== settlementId);
             if (currentSettlement && currentSettlement.id === settlementId) {
-                currentSettlement = null;
-                calculatorView.classList.add('hidden');
-                placeholderRightPane.classList.remove('hidden');
+                currentSettlement = null; calculatorView.classList.add('hidden'); placeholderRightPane.classList.remove('hidden');
             }
             renderSettlementList(date);
         }
@@ -322,8 +397,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         placeholderRightPane.classList.add('hidden');
         calculatorView.classList.remove('hidden');
         settlementDisplay.textContent = settlement.title;
-        settlementDateBadge.textContent = settlement.date;
         itemCurrencySelect.value = settlement.base_currency;
+        document.getElementById('add-rate-config-wrapper').classList.add('hidden'); 
         updateParticipantNames(settlement.participants);
         document.querySelectorAll('.settlement-item').forEach(item => item.classList.toggle('active', item.dataset.id == settlement.id));
         if (window.innerWidth <= 768) sidebar.classList.add('collapsed');
@@ -354,8 +429,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         document.querySelectorAll('.delete-settlement-btn').forEach(btn => btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            deleteSettlement(e.currentTarget.dataset.date, parseInt(e.currentTarget.dataset.id))
+            e.stopPropagation(); deleteSettlement(e.currentTarget.dataset.date, parseInt(e.currentTarget.dataset.id))
         }));
         
         if(currentSettlement) {
@@ -380,7 +454,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         [splitAmountBInput, editSplitAmountBInput].forEach(input => input.placeholder = shareOfString.replace('{name}', userB));
     }
 
-    // --- Expense Management (Supabase Integrated) ---
     async function addExpense() {
         if (!currentSettlement) return;
         const name = itemNameInput.value.trim();
@@ -388,8 +461,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const currency = itemCurrencySelect.value;
         if (!name || originalAmount <= 0) { alert(locales[currentLang]?.invalidInput); return; }
 
-        const rate = await getExchangeRate(currentSettlement.date, currency, currentSettlement.base_currency);
-        if (rate === null) return;
+        let rate = 1;
+        if (currency !== currentSettlement.base_currency) {
+            rate = parseFloat(document.getElementById('add-custom-rate').value);
+            if (!rate || rate <= 0) { alert(locales[currentLang]?.invalidInput); return; }
+        }
 
         const convertedAmount = originalAmount * rate;
         const [userA, userB] = currentSettlement.participants;
@@ -407,25 +483,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             shares[userB] = shareB_original * rate;
         }
 
-        const { data, error } = await supabaseClient
-            .from('expenses')
-            .insert([{ settlement_id: currentSettlement.id, name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares }])
-            .select();
+        const { data, error } = await supabaseClient.from('expenses')
+            .insert([{ settlement_id: currentSettlement.id, name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares }]).select();
 
         if (error) { console.error('Error adding expense:', error); return; }
         
-        const newExpense = data[0];
-        currentSettlement.expenses.push(newExpense);
+        currentSettlement.expenses.push(data[0]);
 
         if (currentSettlement.is_settled) {
             currentSettlement.is_settled = false;
-            const { error } = await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
-            if (error) console.error('Error updating settlement state:', error);
+            await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
         }
         
-        render();
-        renderSettlementList(mainDatePicker.value);
-        clearInputs();
+        render(); renderSettlementList(mainDatePicker.value); clearInputs();
     }
 
     function openEditExpenseModal(expenseId) {
@@ -442,6 +512,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         editItemCurrencySelect.innerHTML = SUPPORTED_CURRENCIES.map(c => `<option value="${c}" ${c === expense.currency ? 'selected' : ''}>${c}</option>`).join('');
         editItemPayerSelect.value = expense.payer;
         editSplitMethodSelect.value = expense.split;
+
+        if (expense.currency !== currentSettlement.base_currency) {
+            const appliedRate = expense.amount / expense.original_amount;
+            document.getElementById('edit-custom-rate').value = appliedRate.toFixed(4);
+            handleEditCurrencyChange(); 
+        } else {
+            document.getElementById('edit-rate-config-wrapper').classList.add('hidden');
+        }
 
         if (expense.split === 'amount') {
             const rate = expense.amount / expense.original_amount;
@@ -464,8 +542,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         const currency = editItemCurrencySelect.value;
         if (!name || originalAmount <= 0) { alert(locales[currentLang]?.invalidInput); return; }
 
-        const rate = await getExchangeRate(currentSettlement.date, currency, currentSettlement.base_currency);
-        if (rate === null) return;
+        let rate = 1;
+        if (currency !== currentSettlement.base_currency) {
+            rate = parseFloat(document.getElementById('edit-custom-rate').value);
+            if (!rate || rate <= 0) { alert(locales[currentLang]?.invalidInput); return; }
+        }
 
         const convertedAmount = originalAmount * rate;
         const [userA, userB] = currentSettlement.participants;
@@ -483,51 +564,72 @@ document.addEventListener('DOMContentLoaded', async () => {
             shares[userB] = shareB_original * rate;
         }
         
-        const { data, error } = await supabaseClient
-            .from('expenses')
+        const { data, error } = await supabaseClient.from('expenses')
             .update({ name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares })
-            .eq('id', currentEditingExpenseId)
-            .select();
+            .eq('id', currentEditingExpenseId).select();
 
-        if (error) { console.error('Error saving expense changes:', error); return; }
+        if (error) { console.error('Error saving:', error); return; }
         
-        const updatedExpense = data[0];
         const expenseIndex = currentSettlement.expenses.findIndex(e => e.id === currentEditingExpenseId);
-        if (expenseIndex > -1) currentSettlement.expenses[expenseIndex] = updatedExpense;
+        if (expenseIndex > -1) currentSettlement.expenses[expenseIndex] = data[0];
 
         if (currentSettlement.is_settled) {
             currentSettlement.is_settled = false;
-            const { error } = await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
-            if (error) console.error('Error updating settlement state:', error);
+            await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
         }
 
-        render();
-        renderSettlementList(mainDatePicker.value);
-        editExpenseModal.classList.add('hidden');
-        currentEditingExpenseId = null;
+        render(); renderSettlementList(mainDatePicker.value);
+        editExpenseModal.classList.add('hidden'); currentEditingExpenseId = null;
     }
     
     async function deleteExpense(expenseId) {
         if (confirm(locales[currentLang]?.deleteConfirm)) {
              const { error } = await supabaseClient.from('expenses').delete().eq('id', expenseId);
-            if (error) { console.error('Error deleting expense:', error); return; }
-
+            if (error) { console.error('Error:', error); return; }
             currentSettlement.expenses = currentSettlement.expenses.filter(exp => exp.id !== expenseId);
-
             if (currentSettlement.is_settled) {
                 currentSettlement.is_settled = false;
-                const { error: updateError } = await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
-                if (updateError) console.error('Error updating settlement state:', updateError);
+                await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
             }
-            render();
-            renderSettlementList(mainDatePicker.value);
+            render(); renderSettlementList(mainDatePicker.value);
         }
+    }
+
+    function showExpenseExchangeRate(expenseId) {
+        if (!currentSettlement) return;
+        const expense = currentSettlement.expenses.find(e => e.id === expenseId);
+        if (!expense) return;
+
+        const appliedRate = expense.amount / expense.original_amount;
+
+        document.getElementById('calc-foreign-currency').textContent = expense.currency;
+        document.getElementById('calc-base-currency').textContent = currentSettlement.base_currency;
+        document.getElementById('calc-base-amount').textContent = formatNumber(appliedRate, 4);
+
+        document.getElementById('calc-total-foreign').textContent = `${formatNumber(expense.original_amount, 2)} ${expense.currency}`;
+        document.getElementById('calc-total-base').textContent = `${formatNumber(expense.amount, 2)} ${currentSettlement.base_currency}`;
+
+        expenseRateModal.classList.remove('hidden');
     }
 
     async function showExchangeRateModal() {
         if (!currentSettlement) return;
         const { date, base_currency } = currentSettlement;
+        
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const settlementDate = new Date(date);
+        const isFuture = settlementDate > today;
+        
         exchangeRateDate.textContent = `${date} ${locales[currentLang].baseDate}`;
+        if (isFuture) {
+            let futureNotice = "미래 날짜이므로 현재(최신) 환율이 적용되었습니다.";
+            if (currentLang === 'en') futureNotice = "Future date: using current latest rates.";
+            if (currentLang === 'ja') futureNotice = "未来の日付のため、現在の最新レートが適用されています。";
+            
+            exchangeRateDate.innerHTML += `<br><span style="color: var(--danger); font-size: 0.85rem; display: inline-block; margin-top: 0.5rem;"><i class="fas fa-exclamation-triangle"></i> ${futureNotice}</span>`;
+        }
+
         let ratesInfoHTML = `<div class="rate-item"><span class="base">1 ${base_currency}</span> =</div>`;
         const targetCurrencies = SUPPORTED_CURRENCIES.filter(c => c !== base_currency);
 
@@ -541,9 +643,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function render() { 
         if (currentSettlement) { 
-            renderExpenses(); 
-            updateSummary(); 
-            toggleExpenseForm(currentSettlement.is_settled);
+            renderExpenses(); updateSummary(); toggleExpenseForm(currentSettlement.is_settled);
         }
     }
 
@@ -558,27 +658,37 @@ document.addEventListener('DOMContentLoaded', async () => {
             row.dataset.id = exp.id;
             row.classList.toggle('is-settled', isLocked);
 
+            let amountHtml = `${formatNumber(exp.original_amount, 2)} ${exp.currency}`;
+            if (exp.currency !== currentSettlement.base_currency) {
+                amountHtml = `<span class="clickable-amount" data-id="${exp.id}" title="적용 환율 보기"><i class="fas fa-info-circle"></i> ${amountHtml}</span>`;
+            }
+
             row.innerHTML = `
                 <td>${exp.name}</td>
-                <td>${formatNumber(exp.original_amount, 2)} ${exp.currency}</td>
+                <td>${amountHtml}</td>
                 <td>${exp.payer}</td>
-                <td>${formatNumber(exp.shares[userA] || 0, 2)}</td>
-                <td>${formatNumber(exp.shares[userB] || 0, 2)}</td>
+                <td>${formatNumber(exp.shares[userA] || 0, 2)} ${currentSettlement.base_currency}</td>
+                <td>${formatNumber(exp.shares[userB] || 0, 2)} ${currentSettlement.base_currency}</td>
                 <td><button class="delete-expense-btn" data-id="${exp.id}"><i class="fas fa-trash-alt"></i></button></td>
             `;
             
+            const clickableAmountSpan = row.querySelector('.clickable-amount');
+            if (clickableAmountSpan) {
+                clickableAmountSpan.addEventListener('click', (e) => {
+                    e.stopPropagation(); showExpenseExchangeRate(exp.id);
+                });
+            }
+
             if (!isLocked) {
                 row.addEventListener('click', (e) => {
-                    if (e.target.closest('.delete-expense-btn')) return;
+                    if (e.target.closest('.delete-expense-btn') || e.target.closest('.clickable-amount')) return;
                     openEditExpenseModal(exp.id);
                 });
             }
         });
+
         expenseTableBody.querySelectorAll('.delete-expense-btn').forEach(btn => 
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteExpense(parseInt(e.currentTarget.dataset.id))
-            })
+            btn.addEventListener('click', (e) => { e.stopPropagation(); deleteExpense(parseInt(e.currentTarget.dataset.id)) })
         );
     }
     
@@ -588,8 +698,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         totalExpenseP.textContent = `${locales[currentLang]?.totalExpense || 'Total Expense'}: ${formatNumber(totalAmount, 2)} ${base_currency}`;
 
-        finalSettlementP.textContent = '';
-        completeSettlementBtn.classList.add('hidden');
+        finalSettlementP.textContent = ''; completeSettlementBtn.classList.add('hidden');
 
         if (is_settled) {
             const [userA, userB] = participants;
@@ -603,28 +712,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             finalSettlementP.textContent = settlementText;
             completeSettlementBtn.textContent = locales[currentLang]?.editSettlement || 'Reopen Settlement';
-            completeSettlementBtn.classList.add('edit-mode');
-            completeSettlementBtn.classList.remove('hidden');
+            completeSettlementBtn.classList.add('edit-mode'); completeSettlementBtn.classList.remove('hidden');
         } else {
             finalSettlementP.textContent = locales[currentLang]?.settlementInProgress || 'Settlement in progress...';
             if (expenses.length > 0) {
                 completeSettlementBtn.textContent = locales[currentLang]?.completeSettlement || 'Complete Settlement';
-                completeSettlementBtn.classList.remove('edit-mode');
-                completeSettlementBtn.classList.remove('hidden');
+                completeSettlementBtn.classList.remove('edit-mode'); completeSettlementBtn.classList.remove('hidden');
             }
         }
     }
     
     function toggleExpenseForm(isLocked) {
         expenseFormCard.classList.toggle('is-settled', isLocked);
-        expenseFormCard.querySelectorAll('input, select, button').forEach(el => { 
-            el.disabled = isLocked; 
-        });
+        expenseFormCard.querySelectorAll('input, select, button').forEach(el => { el.disabled = isLocked; });
     }
 
     function clearInputs() {
         itemNameInput.value = ''; itemAmountInput.value = '';
         splitAmountAInput.value = ''; splitAmountBInput.value = '';
+        document.getElementById('add-custom-rate').value = '';
+        document.getElementById('add-rate-config-wrapper').classList.add('hidden');
         splitMethodSelect.value = 'equal';
         if(currentSettlement) itemCurrencySelect.value = currentSettlement.base_currency;
         handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs, splitAmountAInput, splitAmountBInput);
@@ -632,17 +739,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function downloadExcel() {
-        if (!currentSettlement || currentSettlement.expenses.length === 0) {
-            alert(locales[currentLang]?.noDataToExport || 'No expense data to export.');
-            return;
-        }
-    
+        if (!currentSettlement || currentSettlement.expenses.length === 0) { alert(locales[currentLang]?.noDataToExport || 'No expense data to export.'); return; }
         const { title, participants, expenses, base_currency } = currentSettlement;
         const [userA, userB] = participants;
-    
-        const dataForExport = [];
         const translations = locales[currentLang] || {};
-    
+        const dataForExport = [];
+        
         const header = [
             translations.tableHeaderItem || 'Item',
             translations.tableHeaderTotal || 'Total Amount',
@@ -653,14 +755,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         dataForExport.push(header);
     
         expenses.forEach(exp => {
+            let excelAmountStr = `${formatNumber(exp.original_amount, 2)} ${exp.currency}`;
+            if (exp.currency !== base_currency) {
+                const appliedRate = exp.amount / exp.original_amount;
+                excelAmountStr += ` (적용환율: ${formatNumber(appliedRate, 4)})`;
+            }
             dataForExport.push([
-                exp.name,
-                `${formatNumber(exp.original_amount, 2)} ${exp.currency}`,
-                exp.payer,
-                formatNumber(exp.shares[userA] || 0, 2),
-                formatNumber(exp.shares[userB] || 0, 2),
+                exp.name, excelAmountStr, exp.payer,
+                `${formatNumber(exp.shares[userA] || 0, 2)} ${base_currency}`,
+                `${formatNumber(exp.shares[userB] || 0, 2)} ${base_currency}`,
             ]);
         });
+
+        const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+        const amountPaidByA = expenses.filter(exp => exp.payer === userA).reduce((sum, exp) => sum + (exp.amount || 0), 0);
+        const totalOwedByA = expenses.reduce((sum, exp) => sum + (exp.shares[userA] || 0), 0);
+        const balanceA = amountPaidByA - totalOwedByA;
+
+        let resultString = translations.settlementDone || 'Settlement complete';
+        if (balanceA > 0.01) resultString = `${userB} → ${userA}: ${formatNumber(balanceA, 2)} ${base_currency}`;
+        else if (balanceA < -0.01) resultString = `${userA} → ${userB}: ${formatNumber(Math.abs(balanceA), 2)} ${base_currency}`;
+
+        dataForExport.push([]); 
+        dataForExport.push([translations.totalExpense || 'Total Expense', `${formatNumber(totalAmount, 2)} ${base_currency}`]);
+        dataForExport.push([translations.settlementResult || 'Settlement Result', resultString]);
+
+        const now = new Date();
+        const year = now.getFullYear(); const month = String(now.getMonth() + 1).padStart(2, '0'); const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0'); const minutes = String(now.getMinutes()).padStart(2, '0'); const seconds = String(now.getSeconds()).padStart(2, '0');
+        const timestamp = `${year}${month}${day}_${hours}${minutes}${seconds}`;
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(dataForExport);
@@ -670,26 +793,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             for (let C = range.s.c; C <= range.e.c; ++C) {
                 const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
                 if (!ws[cell_ref]) continue;
-                
-                if (R === 0) {
-                    ws[cell_ref].s = {
-                        alignment: { horizontal: "center", vertical: "center" },
-                        font: { bold: true },
-                        fill: { fgColor: { rgb: "E2E8F0" } }
-                    };
-                } else {
-                    ws[cell_ref].s = {
-                        alignment: { horizontal: "center", vertical: "center" }
-                    };
-                }
+                if (R === 0) ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true }, fill: { fgColor: { rgb: "E2E8F0" } } };
+                else ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" } };
             }
         }
     
         XLSX.utils.book_append_sheet(wb, ws, 'Expenses');
-        const fileName = `${translations.expenseReport || 'Expense_Report'}_${title}.xlsx`;
+        const fileName = `${translations.expenseReport || 'Expense_Report'}_${title}_${timestamp}.xlsx`;
         XLSX.writeFile(wb, fileName, { cellStyles: true });
     }
 
-    // --- Start the App ---
     initialize();
 });

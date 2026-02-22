@@ -23,146 +23,52 @@
 
 /* --- General & Utility Styles --- */
 * { margin: 0; padding: 0; box-sizing: border-box; }
-
 body { font-family: var(--font-family); background-color: var(--app-bg); color: var(--text-main); overflow: hidden; }
 .hidden { display: none !important; }
 #app { display: flex; flex-direction: column; height: 100vh; }
 
-header {
-    height: 60px; background: white; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between; 
-    padding: 0 2rem; z-index: 10;
-}
-header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-spacing: -0.5px; cursor: pointer; transition: color 0.2s; }
-header h1:hover { color: var(--primary-hover); }
+header { height: 60px; background: white; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; z-index: 10; }
+.brand-container { display: flex; align-items: center; gap: 0.75rem; cursor: pointer; transition: opacity 0.2s; }
+.brand-container:hover { opacity: 0.8; }
+#app-icon { width: 28px; height: 28px; object-fit: contain; }
+header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-spacing: -0.5px; margin: 0; }
 
-/* --- Header Controls & Mobile Menu Button --- */
 .header-controls { display: flex; align-items: center; gap: 1rem; }
-#mobile-menu-btn { 
-    display: none; /* PC에서는 숨김 */
-    background: transparent; 
-    border: none; 
-    color: var(--text-main); 
-    font-size: 1.4rem; 
-    cursor: pointer; 
-    padding: 0; 
-    transition: color 0.2s; 
-}
+#mobile-menu-btn { display: none; background: transparent; border: none; color: var(--text-main); font-size: 1.4rem; cursor: pointer; padding: 0; transition: color 0.2s; }
 #mobile-menu-btn:hover { color: var(--primary); }
 
-/* --- Language Selector --- */
 .language-selector { display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); }
 .language-selector i { font-size: 0.9rem; }
-#language-switcher { 
-    border: none; background: transparent; color: var(--text-main); font-size: 0.9rem; 
-    padding: 0.25rem; border-radius: 4px; cursor: pointer;
-}
+#language-switcher { border: none; background: transparent; color: var(--text-main); font-size: 0.9rem; padding: 0.25rem; border-radius: 4px; cursor: pointer; }
 #language-switcher:focus { outline: 1px solid var(--primary); }
 
-/* --- Layout & Sidebar --- */
 #main-container { display: flex; flex: 1; overflow: hidden; }
-#left-pane {
-    width: var(--sidebar-width); background-color: var(--side-bg); border-right: 1px solid var(--border);
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s; overflow: hidden;
-    flex-shrink: 0; opacity: 1;
-}
+#left-pane { width: var(--sidebar-width); background-color: var(--side-bg); border-right: 1px solid var(--border); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s; overflow: hidden; flex-shrink: 0; opacity: 1; }
 #left-pane.collapsed { width: 0; opacity: 0; border-right-color: transparent; }
 .sidebar-content { padding: 1.5rem; width: var(--sidebar-width); }
 #left-pane h2 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 1rem; }
 
-/* --- 세련된 날짜 선택 창 스타일 --- */
-#main-date-picker { 
-    width: 100%; 
-    margin-bottom: 1.5rem; 
-    padding: 0.75rem 1rem; 
-    background-color: #f8fafc; 
-    border: 1px solid #e2e8f0; 
-    border-radius: 10px; 
-    font-size: 0.95rem; 
-    font-weight: 500;
-    font-family: var(--font-family); 
-    color: var(--text-main);
-    cursor: pointer;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); 
-    transition: all 0.2s ease-in-out; 
-}
-#main-date-picker:hover {
-    background-color: #ffffff;
-    border-color: #cbd5e1;
-}
-#main-date-picker:focus {
-    outline: none;
-    background-color: #ffffff;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); 
-}
-#main-date-picker::-webkit-calendar-picker-indicator {
-    cursor: pointer;
-    opacity: 0.5; 
-    transition: opacity 0.2s;
-}
-#main-date-picker::-webkit-calendar-picker-indicator:hover {
-    opacity: 1; 
-}
+.custom-date-wrapper { position: relative; width: 100%; margin-bottom: 1.5rem; }
+#custom-date-display { width: 100%; padding: 0.75rem 1rem; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.95rem; font-weight: 500; font-family: var(--font-family); color: var(--text-main); display: flex; justify-content: space-between; align-items: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s ease-in-out; }
+#custom-date-display::after { content: '\f133'; font-family: 'Font Awesome 6 Free'; font-weight: 400; color: #94a3b8; font-size: 1.1rem; }
+.custom-date-wrapper:hover #custom-date-display { background-color: #ffffff; border-color: #cbd5e1; }
+.custom-date-wrapper:focus-within #custom-date-display { background-color: #ffffff; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
+#main-date-picker { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; box-sizing: border-box; }
 
 .settlement-item-wrapper { display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-bottom: 0.5rem; }
-.settlement-item { 
-    flex-grow: 1; padding: 0.75rem 1rem; 
-    border-radius: 8px; background: white; border: 1px solid var(--border);
-    cursor: pointer; display: flex; justify-content: space-between; align-items: center; 
-    transition: all 0.2s; font-size: 0.9rem; color: var(--text-main); 
-    box-shadow: var(--shadow-sm); overflow: hidden;
-}
-
-.settlement-item .item-content { 
-    display: flex; 
-    flex-wrap: wrap; 
-    align-items: center; 
-    flex: 1; 
-    min-width: 0; 
-}
-
-.settlement-item .item-title { 
-    flex: 1; 
-    min-width: 50px;
-    font-weight: 600; 
-    text-overflow: ellipsis; 
-    overflow: hidden; 
-    white-space: nowrap; 
-    text-align: left;
-}
-
+.settlement-item { flex-grow: 1; padding: 0.75rem 1rem; border-radius: 8px; background: white; border: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; font-size: 0.9rem; color: var(--text-main); box-shadow: var(--shadow-sm); overflow: hidden; }
+.settlement-item .item-content { display: flex; flex-wrap: wrap; align-items: center; flex: 1; min-width: 0; }
+.settlement-item .item-title { flex: 1; min-width: 50px; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; text-align: left; }
 .settlement-item:hover { background: #f9fafb; border-color: #d1d5db; }
 .settlement-item.active { background: var(--primary); color: white; border-color: var(--primary); }
 .settlement-item.active .item-participants { color: white; opacity: 0.8; }
-
-/* Settled Item Styles */
 .settlement-item.is-settled { opacity: 0.7; }
 .settlement-item.is-settled .item-title { text-decoration: line-through; }
-.settled-icon { 
-    color: var(--secondary); 
-    margin-right: 0.5rem; 
-    flex-shrink: 0; 
-}
+.settled-icon { color: var(--secondary); margin-right: 0.5rem; flex-shrink: 0; }
 .settlement-item.active.is-settled { background: #5a67d8; }
+.item-participants { width: 100%; font-size: 0.8rem; color: var(--text-muted); margin-left: 0; margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
 
-.item-participants { 
-    width: 100%; 
-    font-size: 0.8rem; 
-    color: var(--text-muted); 
-    margin-left: 0; 
-    margin-top: 0.25rem; 
-    white-space: nowrap; 
-    overflow: hidden; 
-    text-overflow: ellipsis; 
-    text-align: left;
-}
-
-.delete-settlement-btn {
-    background: #fee2e2; color: var(--danger); border: 1px solid #fecaca;
-    width: 36px; height: 36px; border-radius: 8px; cursor: pointer; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
-}
+.delete-settlement-btn { background: #fee2e2; color: var(--danger); border: 1px solid #fecaca; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
 .delete-settlement-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
 
 /* --- Main Content --- */
@@ -171,84 +77,38 @@ header h1:hover { color: var(--primary-hover); }
 #placeholder-right-pane { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-muted); }
 #placeholder-right-pane i { font-size: 4rem; margin-bottom: 1.5rem; color: var(--border); }
 
-/* --- UI Components --- */
 #calculator { animation: fadeIn 0.5s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-.settlement-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid var(--app-bg); }
-#settlement-display { font-size: 1.75rem; font-weight: 800; }
+.settlement-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid var(--app-bg); justify-content: space-between;}
+#settlement-display { font-size: 1.75rem; font-weight: 800; margin-bottom: 0; }
 .settlement-date-badge { background-color: #eef2ff; color: var(--primary); padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.9rem; font-weight: 600; }
+
+.btn-outline { background: transparent; color: var(--text-main); border: 1px solid var(--border); padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.4rem; }
+.btn-outline:hover { background: #f8fafc; border-color: #cbd5e1; }
+.btn-outline i { color: var(--primary); }
 
 .card { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm); }
 .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
 .card h2 { font-size: 1.1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0; }
 
-#summary-card { 
-    background: linear-gradient(to right, #6366f1, #818cf8); color: white; border: none;
-    display: flex; justify-content: space-between; align-items: center;
-}
+#summary-card { background: linear-gradient(to right, #6366f1, #818cf8); color: white; border: none; display: flex; justify-content: space-between; align-items: center; }
 #summary-card h2 { color: white; opacity: 0.9; margin-bottom: 0.5rem;}
 .summary-left { flex-grow: 1; }
 .summary-right { text-align: right; }
 #total-expense { font-size: 1rem; opacity: 0.9; }
 #final-settlement { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
 
-#expense-form-card.is-settled,
-.is-settled .delete-settlement-btn {
-    opacity: 0.6;
-    pointer-events: none;
-    user-select: none;
-}
+#expense-form-card.is-settled, .is-settled .delete-settlement-btn { opacity: 0.6; pointer-events: none; user-select: none; }
 
-.form-grid-row { 
-    display: grid; 
-    grid-template-columns: 1fr 1fr; 
-    gap: 1rem; 
-    margin-bottom: 1rem; 
-}
-
+.form-grid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
 #expense-form { margin-top: 1.25rem; }
 #expense-form button { width: 100%; margin-top: 0.5rem; }
 
-/* --- 세련된 입력창 및 셀렉트 박스 스타일 --- */
-input, select { 
-    width: 100%; 
-    padding: 0.75rem 1rem; 
-    border: 1px solid #e2e8f0; 
-    border-radius: 10px; 
-    font-size: 0.95rem; 
-    font-family: var(--font-family);
-    color: var(--text-main);
-    background-color: #f8fafc; 
-    -webkit-appearance: none;
-    appearance: none;
-    text-overflow: ellipsis;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); 
-    transition: all 0.2s ease-in-out;
-}
-
-input:hover, select:hover {
-    background-color: #ffffff;
-    border-color: #cbd5e1;
-}
-
-input:focus, select:focus {
-    outline: none;
-    background-color: #ffffff;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); 
-    position: relative;
-    z-index: 1; 
-}
-
-select { 
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 1rem center;
-    background-repeat: no-repeat;
-    background-size: 1.2em 1.2em;
-    padding-right: 2.5rem;
-    cursor: pointer;
-}
+input, select { width: 100%; padding: 0.75rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.95rem; font-family: var(--font-family); color: var(--text-main); background-color: #f8fafc; -webkit-appearance: none; appearance: none; text-overflow: ellipsis; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s ease-in-out; }
+input:hover, select:hover { background-color: #ffffff; border-color: #cbd5e1; }
+input:focus, select:focus { outline: none; background-color: #ffffff; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); position: relative; z-index: 1; }
+select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 1rem center; background-repeat: no-repeat; background-size: 1.2em 1.2em; padding-right: 2.5rem; cursor: pointer; }
 
 .amount-input-wrapper { display: flex; }
 .amount-input-wrapper input { flex-grow: 1; border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none; }
@@ -257,145 +117,110 @@ select {
 button { background: var(--primary); color: white; padding: 0.75rem 1.25rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; font-size: 0.95rem; }
 button:hover { background: var(--primary-hover); }
 button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
-
 #complete-settlement-btn.edit-mode { background-color: var(--secondary); }
 #complete-settlement-btn.edit-mode:hover { background-color: var(--secondary-hover); }
+
+/* --- 🚀 개선된 커스텀 환율 및 날짜 선택 버튼 스타일 --- */
+.rate-config-wrapper { background-color: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.9rem; animation: fadeIn 0.3s ease; }
+.rate-config-inner { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px dashed #a5b4fc; }
+.rate-input-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+.rate-label { color: var(--primary); font-weight: 600; }
+.rate-input-box { display: flex; align-items: center; gap: 0.4rem; font-weight: 600; color: var(--text-main); }
+.rate-input-box input { width: 90px; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.95rem; text-align: right; border: 1px solid #c7d2fe; background: white; }
+.rate-input-box input:focus { border-color: var(--primary); outline: none; box-shadow: none; }
+
+.rate-action-buttons { display: flex; gap: 0.5rem; width: 100%; }
+.rate-btn.btn-outline-small { 
+    flex: 1; padding: 0.5rem; font-size: 0.85rem; background: white; color: var(--primary); 
+    border: 1px solid #c7d2fe; border-radius: 6px; cursor: pointer; transition: all 0.2s; 
+    display: flex; justify-content: center; align-items: center; gap: 0.4rem; font-weight: 600; margin-top: 0;
+}
+.rate-btn.btn-outline-small:hover { background: var(--primary); color: white; border-color: var(--primary); }
+
+.converted-preview { text-align: right; color: var(--text-main); font-weight: 500; font-size: 0.95rem; }
+.converted-preview strong { color: var(--primary); font-size: 1.05rem; margin-left: 0.3rem;}
+
 
 /* --- Expense Table --- */
 #expense-table-container { overflow-x: auto; }
 #expense-table { width: 100%; border-collapse: collapse; }
-#expense-table th, #expense-table td {
-    padding: 0.75rem 1rem; 
-    text-align: center; 
-    border-bottom: 1px solid var(--border); 
-    font-size: 0.9rem; 
-    vertical-align: middle;
-    white-space: nowrap; 
-}
-
-/* 표의 첫 번째 칸(항목명)만 왼쪽으로 정렬하여 가독성을 높입니다 */
-#expense-table td:first-child, #expense-table th:first-child {
-    text-align: left;
-}
-
+#expense-table th, #expense-table td { padding: 0.75rem 1rem; text-align: center; border-bottom: 1px solid var(--border); font-size: 0.9rem; vertical-align: middle; white-space: nowrap; }
+#expense-table td:first-child, #expense-table th:first-child { text-align: left; }
 #expense-table tbody tr { transition: background-color 0.2s; }
 #expense-table tbody tr:not(.is-settled) { cursor: pointer; }
 #expense-table tbody tr:not(.is-settled):hover { background-color: #f8fafc; }
 #expense-table th { background-color: var(--side-bg); color: var(--text-muted); font-weight: 600; }
 #expense-table td:last-child, #expense-table th:last-child { text-align: center; }
 
-.delete-expense-btn { 
-    background: transparent; border: none; color: var(--text-muted); cursor: pointer;
-    padding: 0.5rem; border-radius: 50%; width: 32px; height: 32px;
-    display: inline-flex; align-items: center; justify-content: center;
-    transition: background-color 0.2s, color 0.2s;
-}
+.clickable-amount { color: var(--primary); border-bottom: 1px dashed var(--primary); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding-bottom: 2px; }
+.clickable-amount:hover { color: var(--primary-hover); border-bottom-color: var(--primary-hover); }
+
+.delete-expense-btn { background: transparent; border: none; color: var(--text-muted); cursor: pointer; padding: 0.5rem; border-radius: 50%; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; transition: background-color 0.2s, color 0.2s; }
 .delete-expense-btn:hover { background-color: #fee2e2; color: var(--danger); }
-
-#expense-table tbody tr.is-settled .delete-expense-btn {
-    opacity: 0.3; 
-    pointer-events: none; 
-}
-
+#expense-table tbody tr.is-settled .delete-expense-btn { opacity: 0.3; pointer-events: none; }
 #download-excel-btn { background-color: var(--secondary); font-size: 0.85rem; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; }
 #download-excel-btn:hover { background-color: var(--secondary-hover); }
 
 /* --- Modals & FAB --- */
-#add-settlement-fab {
-    display: flex; justify-content: center; align-items: center; padding: 0; 
-    position: fixed; bottom: 2rem; left: 20px; 
-    width: 48px; height: 48px; border-radius: 50%;
-    box-shadow: var(--shadow-md); z-index: 5; transition: transform 0.3s;
-    font-size: 1.2rem; 
-}
+#add-settlement-fab { display: flex; justify-content: center; align-items: center; padding: 0; position: fixed; bottom: 2rem; left: 20px; width: 48px; height: 48px; border-radius: 50%; box-shadow: var(--shadow-md); z-index: 5; transition: transform 0.3s; font-size: 1.2rem; }
 
-#add-settlement-modal, #exchange-rate-modal, #edit-expense-modal {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-    background: rgba(15, 23, 42, 0.6); 
-    display: flex; justify-content: center; align-items: center; 
-    z-index: 1000; backdrop-filter: blur(4px);
-    animation: fadeIn 0.2s ease;
-}
+#add-settlement-modal, #exchange-rate-modal, #expense-rate-modal, #edit-expense-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); animation: fadeIn 0.2s ease; }
 
-.modal-content { max-width: 500px; width: 90%; position: relative; animation: slideInUp 0.3s ease-out;}
-.modal-content.card { max-width: 700px; } /* Wider modal for editing */
+.modal-content { max-width: 500px; width: 90%; position: relative; animation: slideInUp 0.3s ease-out; }
+.modal-content.card { max-width: 700px; } 
+
 .modal-content .form-grid-row { margin-bottom: 1rem; }
-.modal-content #save-expense-changes-btn { width: 100%; margin-top: 0.5rem; }
+.modal-content #new-settlement-title { margin-bottom: 1rem; }
+.modal-content #save-expense-changes-btn, .modal-content #create-settlement-btn { width: 100%; margin-top: 0.5rem; padding: 0.85rem; font-size: 1rem; }
 
-.modal-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+.modal-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
 .modal-header h2 { margin-bottom: 0; font-size: 1.4rem; }
-.participant-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+.participant-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
 .close-modal-btn { position: absolute; top: 1rem; right: 1rem; cursor: pointer; color: var(--text-muted); font-size: 1.2rem; transition: color 0.2s; }
 .close-modal-btn:hover { color: var(--text-main); }
-
-.currency-select-wrapper { margin-bottom: 1rem; }
+.currency-select-wrapper { margin-bottom: 1.5rem; }
 .currency-select-wrapper label { display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.9rem;}
 
-/* --- Exchange Rate Modal Specifics --- */
-#exchange-rate-date { 
-    font-size: 0.9rem; color: var(--text-muted); 
-    margin-bottom: 1.5rem; padding-bottom: 1rem; 
-    border-bottom: 1px solid var(--border);
-}
+/* --- Exchange Rate Modals Specifics --- */
+#exchange-rate-date { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
 #exchange-rate-info .rate-item { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem 0; font-size: 1rem;}
 #exchange-rate-info .rate-item:not(:last-child) { border-bottom: 1px solid var(--app-bg); }
 #exchange-rate-info .base { font-weight: 600; color: var(--primary); }
 
+.rate-calc-box { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 1.5rem; }
+.rate-row { display: flex; justify-content: space-between; padding: 1rem 1.2rem; background: #fff; align-items: center;}
+.rate-row.base-row { background: #f8fafc; }
+.rate-divider { text-align: center; background: #fff; color: var(--border); font-size: 1.2rem; margin-top: -12px; margin-bottom: -12px; position: relative; z-index: 2;}
+.rate-divider i { background: #fff; padding: 0 15px; }
+.currency-flag { font-weight: 600; font-size: 1.1rem; color: var(--text-muted); }
+.currency-amount { font-weight: 700; font-size: 1.25rem; }
+.calc-result-summary { background: #eef2ff; padding: 1rem; border-radius: 8px; text-align: center; }
+.calc-result-summary p { margin-bottom: 0.5rem; font-size: 0.9rem; font-weight: 600; color: var(--primary); }
+.calc-result-numbers { display: flex; align-items: center; justify-content: center; gap: 0.8rem; font-size: 1.1rem; }
+.calc-result-numbers .text-muted { color: var(--text-muted); text-decoration: line-through; font-size: 0.95rem; }
+.calc-result-numbers i { color: var(--border); }
+.calc-result-numbers .text-primary-bold { color: var(--text-main); font-weight: 800; }
+
 /* --- Mobile Responsiveness --- */
 @media (max-width: 768px) {
-    /* 모바일에서 햄버거 버튼 보이기 */
     #mobile-menu-btn { display: block; }
-    
-    /* 열려 있을 때 (기본) - 부드러운 애니메이션 추가 */
-    #left-pane { 
-        width: 100% !important; 
-        max-height: 500px; /* 스르륵 열리기 위한 최대 높이 설정 */
-        overflow-y: auto; /* 내역이 많아지면 내부에서 스크롤되도록 UX 개선 */
-        border-right: none; 
-        border-bottom: 1px solid var(--border); 
-        opacity: 1; 
-        transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; 
-    }
-    
-    /* 닫혔을 때 부드럽게 숨김 (display: none 대신 높이와 투명도를 0으로 조절) */
-    #left-pane.collapsed { 
-        max-height: 0; 
-        opacity: 0; 
-        border-bottom-color: transparent; 
-    }
+    #left-pane { width: 100% !important; max-height: 500px; overflow-y: auto; border-right: none; border-bottom: 1px solid var(--border); opacity: 1; transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; }
+    #left-pane.collapsed { max-height: 0; opacity: 0; border-bottom-color: transparent; }
     
     .sidebar-content { width: 100%; }    
     #main-container { flex-direction: column; }
     #right-pane { padding: 1.5rem; }
+    .settlement-header { flex-direction: column; align-items: flex-start; }
     #summary-card { flex-direction: column; align-items: flex-start; }
     .summary-right { text-align: left; margin-top: 1rem; }
     .form-grid-row { grid-template-columns: 1fr; }
     .participant-inputs { grid-template-columns: 1fr; }
     #add-settlement-fab { left: auto; right: 1.5rem; transform: none !important; }
 
-    /* Larger controls for left-pane on mobile */
-    #main-date-picker {
-        padding: 0.8rem;
-        font-size: 1rem;
-        height: 52px;
-        margin-bottom: 1rem;
-    }
-
-    .settlement-item {
-        padding: 0.8rem 1rem;
-        font-size: 0.95rem;
-        min-height: 52px;
-        align-items: center;
-    }
-    
-    .delete-settlement-btn {
-        width: 52px;
-        height: 52px;
-    }
-
-    .delete-settlement-btn i {
-        font-size: 1rem;
-    }
+    .custom-date-wrapper { margin-bottom: 1rem; }
+    #custom-date-display { padding: 0.8rem; font-size: 1rem; height: 52px; }
+    .settlement-item { padding: 0.8rem 1rem; font-size: 0.95rem; min-height: 52px; align-items: center; }
+    .delete-settlement-btn { width: 52px; height: 52px; }
+    .delete-settlement-btn i { font-size: 1rem; }
 }
-
 @keyframes slideInUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }

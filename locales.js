@@ -42,8 +42,17 @@ const locales = {
         excelNotImplemented: "다중 통화 엑셀 다운로드는 현재 준비중입니다.",
         splitEqually: "1/N 분담",
         splitByAmount: "금액 직접 입력",
-        editExpense: "지출 수정", // 새로 추가
-        saveChanges: "변경 사항 저장", // 새로 추가
+        editExpense: "지출 수정",
+        saveChanges: "변경 사항 저장",
+        viewExchangeRate: "환율 정보 보기",
+        appliedExchangeRate: "적용된 환율 상세",
+        totalConverted: "총 변환 금액",
+        customRateLabel: "적용 환율",
+        convertedAmount: "최종 변환 금액",
+        rateNotice: "입력창에서 지출 건별로 원하는 환율을 직접 수정할 수 있습니다.",
+        // 💡 새로 추가된 두 가지 환율 옵션 문구
+        applySettlementRate: "정산일 기준",
+        applyLiveRate: "실시간 최신",
     },
     en: {
         appTitle: "Settle Up | Easy Settlement Helper",
@@ -88,8 +97,17 @@ const locales = {
         excelNotImplemented: "Excel download for multi-currency is not yet implemented.",
         splitEqually: "Split Equally",
         splitByAmount: "Split by Amount",
-        editExpense: "Edit Expense", // Added
-        saveChanges: "Save Changes", // Added
+        editExpense: "Edit Expense",
+        saveChanges: "Save Changes",
+        viewExchangeRate: "Exchange Rates",
+        appliedExchangeRate: "Applied Rate Details",
+        totalConverted: "Total Converted",
+        customRateLabel: "Applied Rate",
+        convertedAmount: "Final Converted Amount",
+        rateNotice: "You can manually edit the exchange rate for each expense below.",
+        // Added
+        applySettlementRate: "Date Rate",
+        applyLiveRate: "Live Rate",
     },
     ja: {
         appTitle: "Settle Up | 簡単精算ヘルパー",
@@ -134,7 +152,16 @@ const locales = {
         excelNotImplemented: "多通貨のExcelダウンロードは現在準備中です。",
         splitEqually: "割り勘",
         splitByAmount: "金額を直接入力",
-        editExpense: "支出の修正", // 新規追加
-        saveChanges: "変更内容を保存", // 新規追加
+        editExpense: "支出の修正", 
+        saveChanges: "変更内容を保存",
+        viewExchangeRate: "為替レート情報",
+        appliedExchangeRate: "適用されたレート詳細",
+        totalConverted: "変換後の総額",
+        customRateLabel: "適用レート",
+        convertedAmount: "最終変換額",
+        rateNotice: "各支出項目に対して、手動で為替レートを変更できます。",
+        // 新規追加
+        applySettlementRate: "精算日レート",
+        applyLiveRate: "最新レート",
     }
 };
