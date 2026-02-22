@@ -1,12 +1,12 @@
-const CACHE_NAME = 'settle-up-cache-v1';
+const CACHE_NAME = 'settle-up-cache-v2';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/main.js',
-  '/locales.js',
-  '/config.js',
-  '/icon.png'
+  '/dutch_pay/',
+  '/dutch_pay/index.html',
+  '/dutch_pay/style.css',
+  '/dutch_pay/main.js',
+  '/dutch_pay/locales.js',
+  '/dutch_pay/config.js',
+  '/dutch_pay/icon.png'
 ];
 
 // 설치 시 캐싱
@@ -25,7 +25,6 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // 캐시에 있으면 캐시된 파일 반환, 없으면 네트워크 요청
         return response || fetch(event.request);
       })
   );
