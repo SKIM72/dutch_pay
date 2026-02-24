@@ -23,7 +23,7 @@ const locales = {
         tableHeaderParticipant1: "참가자 1",
         tableHeaderParticipant2: "참가자 2",
         tableHeaderActions: "관리",
-        downloadExcel: "엑셀로 다운로드",
+        downloadExcel: "엑셀 다운로드",
         noHistory: "내역이 없습니다.",
         paidBy: "{payer}님이 결제",
         shareOf: "{name}님 분담액",
@@ -50,9 +50,15 @@ const locales = {
         customRateLabel: "적용 환율",
         convertedAmount: "최종 변환 금액",
         rateNotice: "입력창에서 지출 건별로 원하는 환율을 직접 수정할 수 있습니다.",
-        // 💡 새로 추가된 두 가지 환율 옵션 문구
         applySettlementRate: "정산일 기준",
         applyLiveRate: "실시간 최신",
+        copyText: "정산 요약 텍스트로 복사하기",
+        saveImage: "정산 결과 이미지로 저장하기",
+        copySuccess: "정산 요약이 클립보드에 복사되었습니다. 카톡 등 메신저에 붙여넣기 하세요!",
+        summaryNotice: "상세 내역 확인하기: ",
+        // 💡 날짜 관련 문구 추가
+        expenseDate: "지출 일시",
+        tableHeaderDate: "일시",
     },
     en: {
         appTitle: "Settle Up | Easy Settlement Helper",
@@ -105,9 +111,15 @@ const locales = {
         customRateLabel: "Applied Rate",
         convertedAmount: "Final Converted Amount",
         rateNotice: "You can manually edit the exchange rate for each expense below.",
-        // Added
         applySettlementRate: "Date Rate",
         applyLiveRate: "Live Rate",
+        copyText: "Copy Summary as Text",
+        saveImage: "Save Summary as Image",
+        copySuccess: "Settlement summary copied to clipboard!",
+        summaryNotice: "Check details at: ",
+        // Added
+        expenseDate: "Date & Time",
+        tableHeaderDate: "Date",
     },
     ja: {
         appTitle: "Settle Up | 簡単精算ヘルパー",
@@ -133,7 +145,7 @@ const locales = {
         tableHeaderParticipant1: "参加者1",
         tableHeaderParticipant2: "参加者2",
         tableHeaderActions: "管理",
-        downloadExcel: "Excelでダウンロード",
+        downloadExcel: "ExcelDL",
         noHistory: "履歴がありません。",
         paidBy: "{payer}が支払い",
         shareOf: "{name}の分担額",
@@ -160,8 +172,14 @@ const locales = {
         customRateLabel: "適用レート",
         convertedAmount: "最終変換額",
         rateNotice: "各支出項目に対して、手動で為替レートを変更できます。",
-        // 新規追加
         applySettlementRate: "精算日レート",
         applyLiveRate: "最新レート",
+        copyText: "精算結果をテキストでコピー",
+        saveImage: "精算結果を画像として保存",
+        copySuccess: "精算の概要がクリップボードにコピーされました！",
+        summaryNotice: "詳細を確認する: ",
+        // 新規追加
+        expenseDate: "支出日時",
+        tableHeaderDate: "日時",
     }
 };

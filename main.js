@@ -35,11 +35,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const baseCurrencySelect = document.getElementById('base-currency');
     const createSettlementBtn = document.getElementById('create-settlement-btn');
 
+    const copyTextBtn = document.getElementById('copy-text-btn');
+    const saveImageBtn = document.getElementById('save-image-btn');
     const exchangeRateInfoBtn = document.getElementById('exchange-rate-info-btn'); 
     const exchangeRateDate = document.getElementById('exchange-rate-date');
     const exchangeRateInfo = document.getElementById('exchange-rate-info');
     
     const editExpenseIdInput = document.getElementById('edit-expense-id');
+    const editItemDateInput = document.getElementById('edit-item-date'); // 💡 수정 모달 날짜 입력창
     const editItemNameInput = document.getElementById('edit-item-name');
     const editItemAmountInput = document.getElementById('edit-item-amount');
     const editItemCurrencySelect = document.getElementById('edit-item-currency');
@@ -52,6 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const settlementDisplay = document.getElementById('settlement-display');
     const expenseFormCard = document.getElementById('expense-form-card');
+    const itemDateInput = document.getElementById('item-date'); // 💡 추가 폼 날짜 입력창
     const itemPayerSelect = document.getElementById('item-payer');
     const itemCurrencySelect = document.getElementById('item-currency');
     const splitMethodSelect = document.getElementById('split-method');
@@ -67,9 +71,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const itemAmountInput = document.getElementById('item-amount');
     const splitAmountInputs = document.getElementById('split-amount-inputs');
 
-    // --- Utility Functions ---
     const formatNumber = (num, decimals = 2) => isNaN(num) ? '0' : num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     const parseFormattedNumber = (str) => parseFloat(String(str).replace(/,/g, '')) || 0;
+    
+    // 💡 날짜를 input[type="datetime-local"] 형식(YYYY-MM-DDThh:mm)으로 변환하는 함수
+    const getLocalISOString = (date) => {
+        const offset = date.getTimezoneOffset() * 60000;
+        return (new Date(date - offset)).toISOString().slice(0, 16);
+    };
 
     function updateDateDisplay() {
         if (!mainDatePicker.value) return;
@@ -95,6 +104,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
             const key = el.getAttribute('data-i18n-placeholder');
              if (translations[key]) el.placeholder = translations[key];
+        });
+
+        document.querySelectorAll('[data-i18n-title]').forEach(el => {
+            const key = el.getAttribute('data-i18n-title');
+             if (translations[key]) el.title = translations[key];
         });
         
         document.querySelectorAll('[data-i18n-options]').forEach(el => {
@@ -138,7 +152,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(!rate) throw new Error(`Rate not found for ${target}`);
             exchangeRatesCache[cacheKey] = rate;
             return rate;
-        } catch (error) { console.error('Error fetching exchange rate:', error); alert(`Failed to fetch exchange rate for ${date}.`); return null; }
+        } catch (error) { console.error('Error fetching exchange rate:', error); return null; }
     }
 
     async function initialize() {
@@ -150,6 +164,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         setInitialDate();
         await loadData();
         setLanguage(initialLang);
+        
+        // 💡 앱 초기화 시 날짜 입력창에 현재 시간 세팅
+        itemDateInput.value = getLocalISOString(new Date());
     }
 
     async function loadData() {
@@ -171,10 +188,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         mainDatePicker.dispatchEvent(new Event('change'));
     }
 
-    // 💡 환율을 불러오고 UI를 업데이트하는 공통 함수
     async function fetchAndSetRate(fetchType, currencyFrom, currencyTo, inputEl, previewUpdater) {
         if (!currentSettlement) return;
-        // fetchType이 'latest'면 오늘(실시간), 'settlement'면 정산일 기준
         const fetchDate = fetchType === 'latest' ? 'latest' : currentSettlement.date;
         const rate = await getExchangeRate(fetchDate, currencyFrom, currencyTo);
         if (rate !== null) {
@@ -183,26 +198,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 통화가 바뀔 때 기본적으로 정산일(settlement) 기준을 불러옴
     async function handleAddCurrencyChange() {
         if (!currentSettlement) return;
         const currency = itemCurrencySelect.value;
         const base = currentSettlement.base_currency;
         const wrapper = document.getElementById('add-rate-config-wrapper');
 
-        if (currency === base) {
-            wrapper.classList.add('hidden');
-            return;
-        }
+        if (currency === base) { wrapper.classList.add('hidden'); return; }
         wrapper.classList.remove('hidden');
         document.getElementById('add-currency-from').textContent = currency;
         document.getElementById('add-currency-to').textContent = base;
 
         if (!document.getElementById('add-custom-rate').value) { 
             await fetchAndSetRate('settlement', currency, base, document.getElementById('add-custom-rate'), updateAddPreview);
-        } else {
-            updateAddPreview();
-        }
+        } else { updateAddPreview(); }
     }
 
     function updateAddPreview() {
@@ -218,19 +227,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const base = currentSettlement.base_currency;
         const wrapper = document.getElementById('edit-rate-config-wrapper');
 
-        if (currency === base) {
-            wrapper.classList.add('hidden');
-            return;
-        }
+        if (currency === base) { wrapper.classList.add('hidden'); return; }
         wrapper.classList.remove('hidden');
         document.getElementById('edit-currency-from').textContent = currency;
         document.getElementById('edit-currency-to').textContent = base;
 
         if (!document.getElementById('edit-custom-rate').value) { 
             await fetchAndSetRate('settlement', currency, base, document.getElementById('edit-custom-rate'), updateEditPreview);
-        } else {
-            updateEditPreview();
-        }
+        } else { updateEditPreview(); }
     }
 
     function updateEditPreview() {
@@ -238,6 +242,107 @@ document.addEventListener('DOMContentLoaded', async () => {
         const rate = parseFloat(document.getElementById('edit-custom-rate').value) || 0;
         const base = currentSettlement ? currentSettlement.base_currency : '';
         document.getElementById('edit-converted-total').textContent = `${formatNumber(amount * rate, 2)} ${base}`;
+    }
+
+    async function copySummaryText() {
+        if (!currentSettlement) return;
+        const { title, base_currency, expenses, participants } = currentSettlement;
+        
+        const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+        const [userA, userB] = participants;
+        const amountPaidByA = expenses.filter(exp => exp.payer === userA).reduce((sum, exp) => sum + (exp.amount || 0), 0);
+        const totalOwedByA = expenses.reduce((sum, exp) => sum + (exp.shares[userA] || 0), 0);
+        const balanceA = amountPaidByA - totalOwedByA;
+
+        // 💡 언어별 복사 텍스트 템플릿 정의
+        const copyTexts = {
+            ko: {
+                summary: "정산 요약",
+                total: "총 지출",
+                result: "정산 결과",
+                sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}에게 ${amount} ${currency} 송금 부탁할게! 💸`,
+                notice: "상세 내역 확인하기: "
+            },
+            en: {
+                summary: "Settlement Summary",
+                total: "Total Expense",
+                result: "Settlement Result",
+                sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}: Please send ${amount} ${currency}! 💸`,
+                notice: "Check details at: "
+            },
+            ja: {
+                summary: "精算の概要",
+                total: "総支出",
+                result: "精算結果",
+                sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}へ ${amount} ${currency} の送金をお願い！ 💸`,
+                notice: "詳細を確認する: "
+            }
+        };
+
+        // 현재 선택된 언어에 맞는 텍스트 객체 불러오기 (기본값: 한국어)
+        const t = copyTexts[currentLang] || copyTexts['ko'];
+        let resultString = locales[currentLang]?.settlementDone || 'Settlement complete';
+        
+        if (balanceA > 0.01) {
+            resultString = t.sendFormat(userB, userA, formatNumber(balanceA, 0), base_currency);
+        } else if (balanceA < -0.01) {
+            resultString = t.sendFormat(userA, userB, formatNumber(Math.abs(balanceA), 0), base_currency);
+        }
+
+        const link = "https://skim72.github.io/dutch_pay/";
+        
+        // undefined 방지를 위해 locales.js 대신 위에서 정의한 t.notice 사용
+        const text = `🧾 [${title}] ${t.summary}\n\n💰 ${t.total}: ${formatNumber(totalAmount, 0)} ${base_currency}\n🔔 ${t.result}: ${resultString}\n\n${t.notice}${link}`;
+        
+        try {
+            await navigator.clipboard.writeText(text);
+            alert(locales[currentLang]?.copySuccess || "Copied!");
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+            alert('복사에 실패했습니다.');
+        }
+    }
+
+    async function saveAsImage() {
+        if (!currentSettlement) return;
+        const targetView = document.getElementById('calculator');
+        const rightPane = document.getElementById('right-pane');
+        
+        const oldOverflow = rightPane.style.overflowY;
+        rightPane.style.overflowY = 'visible';
+
+        targetView.classList.add('capture-mode');
+
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        try {
+            const dataUrl = await htmlToImage.toPng(targetView, { 
+                backgroundColor: '#ffffff', 
+                pixelRatio: window.devicePixelRatio > 1 ? window.devicePixelRatio + 1 : 3,
+            });
+
+            // 💡 날짜 및 시간(타임스탬프) 생성
+            const now = new Date();
+            const year = now.getFullYear(); 
+            const month = String(now.getMonth() + 1).padStart(2, '0'); 
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0'); 
+            const minutes = String(now.getMinutes()).padStart(2, '0'); 
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const timestamp = `${year}${month}${day}_${hours}${minutes}${seconds}`;
+
+            const link = document.createElement('a');
+            // 💡 파일명에 타임스탬프 결합
+            link.download = `SettleUp_${currentSettlement.title}_${timestamp}.png`;
+            link.href = dataUrl;
+            link.click();
+        } catch(err) {
+            console.error("Capture failed", err);
+            alert("이미지 저장에 오류가 발생했습니다.");
+        } finally {
+            targetView.classList.remove('capture-mode');
+            rightPane.style.overflowY = oldOverflow;
+        }
     }
 
     function setupEventListeners() {
@@ -262,7 +367,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         saveExpenseChangesBtn.addEventListener('click', handleSaveExpenseChanges);
         exchangeRateInfoBtn.addEventListener('click', showExchangeRateModal);
 
-        // 💡 [지출 추가 폼] 통화 및 환율 버튼 이벤트
+        copyTextBtn.addEventListener('click', copySummaryText);
+        saveImageBtn.addEventListener('click', saveAsImage);
+
         itemCurrencySelect.addEventListener('change', () => {
             document.getElementById('add-custom-rate').value = ''; 
             handleAddCurrencyChange();
@@ -276,7 +383,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             fetchAndSetRate('latest', itemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('add-custom-rate'), updateAddPreview);
         });
 
-        // 💡 [지출 수정 폼] 통화 및 환율 버튼 이벤트
         editItemCurrencySelect.addEventListener('change', () => {
             document.getElementById('edit-custom-rate').value = ''; 
             handleEditCurrencyChange();
@@ -402,6 +508,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateParticipantNames(settlement.participants);
         document.querySelectorAll('.settlement-item').forEach(item => item.classList.toggle('active', item.dataset.id == settlement.id));
         if (window.innerWidth <= 768) sidebar.classList.add('collapsed');
+        
+        // 💡 정산 선택 시 날짜 입력창 갱신
+        itemDateInput.value = getLocalISOString(new Date());
+        
         render();
     }
 
@@ -454,12 +564,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         [splitAmountBInput, editSplitAmountBInput].forEach(input => input.placeholder = shareOfString.replace('{name}', userB));
     }
 
+    // 💡 날짜 정보를 포함하여 데이터베이스에 저장
     async function addExpense() {
         if (!currentSettlement) return;
         const name = itemNameInput.value.trim();
         const originalAmount = parseFormattedNumber(itemAmountInput.value);
         const currency = itemCurrencySelect.value;
-        if (!name || originalAmount <= 0) { alert(locales[currentLang]?.invalidInput); return; }
+        const expenseDate = itemDateInput.value; // 날짜 값 가져오기
+        
+        if (!name || originalAmount <= 0 || !expenseDate) { alert(locales[currentLang]?.invalidInput); return; }
 
         let rate = 1;
         if (currency !== currentSettlement.base_currency) {
@@ -484,7 +597,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const { data, error } = await supabaseClient.from('expenses')
-            .insert([{ settlement_id: currentSettlement.id, name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares }]).select();
+            .insert([{ 
+                settlement_id: currentSettlement.id, 
+                expense_date: expenseDate, // 💡 DB에 저장
+                name, 
+                original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
+            }]).select();
 
         if (error) { console.error('Error adding expense:', error); return; }
         
@@ -508,6 +626,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         editItemNameInput.value = expense.name;
         editItemAmountInput.value = formatNumber(expense.original_amount, 0);
         editItemAmountInput.dataset.originalValue = formatNumber(expense.original_amount, 0);
+        
+        // 💡 수정 모달에 기존에 입력된 날짜 세팅 (없으면 현재 시간)
+        if (expense.expense_date) {
+            const d = new Date(expense.expense_date);
+            d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+            editItemDateInput.value = d.toISOString().slice(0, 16);
+        } else {
+            editItemDateInput.value = getLocalISOString(new Date());
+        }
         
         editItemCurrencySelect.innerHTML = SUPPORTED_CURRENCIES.map(c => `<option value="${c}" ${c === expense.currency ? 'selected' : ''}>${c}</option>`).join('');
         editItemPayerSelect.value = expense.payer;
@@ -534,13 +661,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         editExpenseModal.classList.remove('hidden');
     }
 
+    // 💡 날짜 정보를 포함하여 데이터베이스 수정
     async function handleSaveExpenseChanges() {
         if (!currentSettlement || currentEditingExpenseId === null) return;
 
         const name = editItemNameInput.value.trim();
         const originalAmount = parseFormattedNumber(editItemAmountInput.value);
         const currency = editItemCurrencySelect.value;
-        if (!name || originalAmount <= 0) { alert(locales[currentLang]?.invalidInput); return; }
+        const expenseDate = editItemDateInput.value; // 💡 날짜 값 가져오기
+        
+        if (!name || originalAmount <= 0 || !expenseDate) { alert(locales[currentLang]?.invalidInput); return; }
 
         let rate = 1;
         if (currency !== currentSettlement.base_currency) {
@@ -565,7 +695,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         const { data, error } = await supabaseClient.from('expenses')
-            .update({ name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares })
+            .update({ 
+                expense_date: expenseDate, // 💡 DB 업데이트
+                name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
+            })
             .eq('id', currentEditingExpenseId).select();
 
         if (error) { console.error('Error saving:', error); return; }
@@ -643,6 +776,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function render() { 
         if (currentSettlement) { 
+            // 지출 내역 날짜순 정렬 (최신이 아래로 가도록)
+            currentSettlement.expenses.sort((a, b) => new Date(a.expense_date || a.created_at) - new Date(b.expense_date || b.created_at));
             renderExpenses(); updateSummary(); toggleExpenseForm(currentSettlement.is_settled);
         }
     }
@@ -658,13 +793,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             row.dataset.id = exp.id;
             row.classList.toggle('is-settled', isLocked);
 
+            // 💡 날짜 표시 로직 추가 (좁은 화면을 고려해 항목 이름 위에 작게 표시)
+            let dateHtml = '';
+            if (exp.expense_date) {
+                const d = new Date(exp.expense_date);
+                let localeCode = currentLang === 'en' ? 'en-US' : (currentLang === 'ja' ? 'ja-JP' : 'ko-KR');
+                const dateStr = d.toLocaleDateString(localeCode, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                dateHtml = `<div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">${dateStr}</div>`;
+            }
+
             let amountHtml = `${formatNumber(exp.original_amount, 2)} ${exp.currency}`;
             if (exp.currency !== currentSettlement.base_currency) {
                 amountHtml = `<span class="clickable-amount" data-id="${exp.id}" title="적용 환율 보기"><i class="fas fa-info-circle"></i> ${amountHtml}</span>`;
             }
 
             row.innerHTML = `
-                <td>${exp.name}</td>
+                <td>${dateHtml}<div>${exp.name}</div></td>
                 <td>${amountHtml}</td>
                 <td>${exp.payer}</td>
                 <td>${formatNumber(exp.shares[userA] || 0, 2)} ${currentSettlement.base_currency}</td>
@@ -707,8 +851,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const balanceA = amountPaidByA - totalOwedByA;
 
             let settlementText = locales[currentLang]?.settlementDone || 'Settlement complete';
-            if (balanceA > 0.01) settlementText = `${userB} → ${userA}: ${formatNumber(balanceA, 2)} ${base_currency}`;
-            else if (balanceA < -0.01) settlementText = `${userA} → ${userB}: ${formatNumber(Math.abs(balanceA), 2)} ${base_currency}`;
+            if (balanceA > 0.01) settlementText = `${userB} ➡️ ${userA} (${formatNumber(balanceA, 2)} ${base_currency})`;
+            else if (balanceA < -0.01) settlementText = `${userA} ➡️ ${userB} (${formatNumber(Math.abs(balanceA), 2)} ${base_currency})`;
             
             finalSettlementP.textContent = settlementText;
             completeSettlementBtn.textContent = locales[currentLang]?.editSettlement || 'Reopen Settlement';
@@ -733,6 +877,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('add-custom-rate').value = '';
         document.getElementById('add-rate-config-wrapper').classList.add('hidden');
         splitMethodSelect.value = 'equal';
+        // 💡 날짜 초기화 (현재 시간)
+        itemDateInput.value = getLocalISOString(new Date());
+        
         if(currentSettlement) itemCurrencySelect.value = currentSettlement.base_currency;
         handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs, splitAmountAInput, splitAmountBInput);
         itemNameInput.focus();
@@ -745,7 +892,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const translations = locales[currentLang] || {};
         const dataForExport = [];
         
+        // 💡 엑셀 헤더에 일시 컬럼 추가
         const header = [
+            translations.tableHeaderDate || 'Date',
             translations.tableHeaderItem || 'Item',
             translations.tableHeaderTotal || 'Total Amount',
             translations.tableHeaderPayer || 'Payer',
@@ -760,8 +909,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const appliedRate = exp.amount / exp.original_amount;
                 excelAmountStr += ` (적용환율: ${formatNumber(appliedRate, 4)})`;
             }
+            
+            // 💡 날짜 형식 변환
+            let dateStr = '';
+            if (exp.expense_date) {
+                const d = new Date(exp.expense_date);
+                dateStr = d.toLocaleString(); // 로컬 시간 형식에 맞게 출력
+            }
+
             dataForExport.push([
-                exp.name, excelAmountStr, exp.payer,
+                dateStr, // 💡 일시
+                exp.name, 
+                excelAmountStr, 
+                exp.payer,
                 `${formatNumber(exp.shares[userA] || 0, 2)} ${base_currency}`,
                 `${formatNumber(exp.shares[userB] || 0, 2)} ${base_currency}`,
             ]);
@@ -777,8 +937,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         else if (balanceA < -0.01) resultString = `${userA} → ${userB}: ${formatNumber(Math.abs(balanceA), 2)} ${base_currency}`;
 
         dataForExport.push([]); 
-        dataForExport.push([translations.totalExpense || 'Total Expense', `${formatNumber(totalAmount, 2)} ${base_currency}`]);
-        dataForExport.push([translations.settlementResult || 'Settlement Result', resultString]);
+        dataForExport.push(['', translations.totalExpense || 'Total Expense', `${formatNumber(totalAmount, 2)} ${base_currency}`]);
+        dataForExport.push(['', translations.settlementResult || 'Settlement Result', resultString]);
 
         const now = new Date();
         const year = now.getFullYear(); const month = String(now.getMonth() + 1).padStart(2, '0'); const day = String(now.getDate()).padStart(2, '0');

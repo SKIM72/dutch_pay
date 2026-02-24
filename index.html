@@ -8,11 +8,13 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#6366f1">
     <link rel="apple-touch-icon" href="icon.png">
-    
     <link rel="icon" href="icon.png" type="image/png">
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=7">
+    <link rel="stylesheet" href="style.css?v=10">
+    
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -54,10 +56,20 @@
                 
                 <div id="calculator" class="hidden">
                     <div class="settlement-header">
-                        <h2 id="settlement-display"></h2>
-                        <button id="exchange-rate-info-btn" class="btn-outline">
-                            <i class="fas fa-exchange-alt"></i> <span data-i18n="viewExchangeRate">환율 정보 보기</span>
-                        </button>
+                        <div class="header-title-group">
+                            <h2 id="settlement-display"></h2>
+                            <button id="exchange-rate-info-btn" class="btn-outline">
+                                <i class="fas fa-exchange-alt"></i>
+                            </button>
+                        </div>
+                        <div class="header-action-group">
+                            <button id="copy-text-btn" class="btn-outline">
+                                <i class="fas fa-copy"></i> <span data-i18n="copyText">정산 결과 텍스트로 복사하기</span>
+                            </button>
+                            <button id="save-image-btn" class="btn-outline">
+                                <i class="fas fa-camera"></i> <span data-i18n="saveImage">정산 결과 이미지로 저장하기</span>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="card" id="summary-card">
@@ -75,15 +87,16 @@
                         <h2><i class="fas fa-plus-circle"></i><span data-i18n="addExpense"></span></h2>
                         <div id="expense-form">
                             <div class="form-grid-row">
+                                <input type="datetime-local" id="item-date" title="지출 일시">
                                 <input type="text" id="item-name" data-i18n-placeholder="expenseItem">
-                                <div class="amount-input-wrapper">
-                                    <input type="text" id="item-amount" data-i18n-placeholder="amount" inputmode="decimal">
-                                    <select id="item-currency">
-                                        <option value="JPY">JPY</option>
-                                        <option value="KRW">KRW</option>
-                                        <option value="USD">USD</option>
-                                    </select>
-                                </div>
+                            </div>
+                            <div class="amount-input-wrapper" style="margin-bottom: 1rem;">
+                                <input type="text" id="item-amount" data-i18n-placeholder="amount" inputmode="decimal">
+                                <select id="item-currency">
+                                    <option value="JPY">JPY</option>
+                                    <option value="KRW">KRW</option>
+                                    <option value="USD">USD</option>
+                                </select>
                             </div>
                             
                             <div id="add-rate-config-wrapper" class="rate-config-wrapper hidden">
@@ -121,7 +134,7 @@
                     <div class="card" id="expense-list-card">
                         <div class="card-header">
                             <h2><i class="fas fa-list"></i><span data-i18n="detailedExpenseList"></span></h2>
-                            <button id="download-excel-btn"><i class="fas fa-download"></i><span data-i18n="downloadExcel"></span></button>
+                            <button id="download-excel-btn"><i class="fas fa-download"></i> <span data-i18n="downloadExcel">엑셀로 다운로드</span></button>
                         </div>
                         <div id="expense-table-container">
                             <table id="expense-table">
@@ -217,11 +230,12 @@
                 <input type="hidden" id="edit-expense-id">
                 <h2 data-i18n="editExpense">지출 수정</h2>
                 <div class="form-grid-row" style="margin-top: 1rem;">
+                    <input type="datetime-local" id="edit-item-date" title="지출 일시">
                     <input type="text" id="edit-item-name" data-i18n-placeholder="expenseItem">
-                    <div class="amount-input-wrapper">
-                        <input type="text" id="edit-item-amount" data-i18n-placeholder="amount" inputmode="decimal">
-                        <select id="edit-item-currency"></select>
-                    </div>
+                </div>
+                <div class="amount-input-wrapper" style="margin-bottom: 1rem;">
+                    <input type="text" id="edit-item-amount" data-i18n-placeholder="amount" inputmode="decimal">
+                    <select id="edit-item-currency"></select>
                 </div>
 
                 <div id="edit-rate-config-wrapper" class="rate-config-wrapper hidden">
@@ -261,17 +275,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="main.js?v=7"></script>
+    <script src="main.js?v=10"></script>
     
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                .then(registration => {
-                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                }, err => {
-                    console.log('ServiceWorker registration failed: ', err);
-                });
+                navigator.serviceWorker.register('sw.js').then(r => console.log('SW registered')).catch(e => console.log('SW error', e));
             });
         }
     </script>
