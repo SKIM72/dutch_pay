@@ -34,28 +34,32 @@ header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-
 #main-container { display: flex; flex: 1; overflow: hidden; }
 #left-pane { width: var(--sidebar-width); background-color: var(--side-bg); border-right: 1px solid var(--border); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s; overflow: hidden; flex-shrink: 0; opacity: 1; }
 #left-pane.collapsed { width: 0; opacity: 0; border-right-color: transparent; }
-.sidebar-content { padding: 1.5rem; width: var(--sidebar-width); }
+.sidebar-content { padding: 1.5rem; width: var(--sidebar-width); height: 100%; display: flex; flex-direction: column; }
 #left-pane h2 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 1rem; }
+#settlement-list-container { overflow-y: auto; flex: 1; padding-bottom: 2rem; }
 
-.custom-date-wrapper { position: relative; width: 100%; margin-bottom: 1.5rem; }
-#custom-date-display { width: 100%; padding: 0.75rem 1rem; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.95rem; font-weight: 500; font-family: var(--font-family); color: var(--text-main); display: flex; justify-content: space-between; align-items: center; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s ease-in-out; }
-#custom-date-display::after { content: '\f133'; font-family: 'Font Awesome 6 Free'; font-weight: 400; color: #94a3b8; font-size: 1.1rem; }
-.custom-date-wrapper:hover #custom-date-display { background-color: #ffffff; border-color: #cbd5e1; }
-.custom-date-wrapper:focus-within #custom-date-display { background-color: #ffffff; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
-#main-date-picker { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; box-sizing: border-box; }
+.settlement-item-wrapper { display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-bottom: 0.6rem; }
+.settlement-item { flex-grow: 1; padding: 0.85rem 1rem; border-radius: 8px; background: white; border: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; font-size: 0.9rem; color: var(--text-main); box-shadow: var(--shadow-sm); overflow: hidden; }
+.settlement-item .item-content { display: flex; align-items: flex-start; flex: 1; min-width: 0; }
+.item-text-group { display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; width: 100%; }
 
-.settlement-item-wrapper { display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-bottom: 0.5rem; }
-.settlement-item { flex-grow: 1; padding: 0.75rem 1rem; border-radius: 8px; background: white; border: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; font-size: 0.9rem; color: var(--text-main); box-shadow: var(--shadow-sm); overflow: hidden; }
-.settlement-item .item-content { display: flex; flex-wrap: wrap; align-items: center; flex: 1; min-width: 0; }
-.settlement-item .item-title { flex: 1; min-width: 50px; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; text-align: left; }
+/* 💡 날짜 뱃지와 체크 아이콘을 같은 줄에 묶어주는 래퍼 추가 */
+.date-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 4px; }
+.item-date-badge { font-size: 0.75rem; color: var(--primary); font-weight: 600; background: #eef2ff; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; }
+.settled-icon { color: var(--secondary); flex-shrink: 0; font-size: 1.1rem; }
+.settlement-item.active .settled-icon { color: #34d399; } /* 활성화 상태일 때 좀 더 밝은 초록색 */
+
+.settlement-item .item-title { font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; text-align: left; width: 100%; }
 .settlement-item:hover { background: #f9fafb; border-color: #d1d5db; }
+.item-participants { width: 100%; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+
 .settlement-item.active { background: var(--primary); color: white; border-color: var(--primary); }
-.settlement-item.active .item-participants { color: white; opacity: 0.8; }
-.settlement-item.is-settled { opacity: 0.7; }
-.settlement-item.is-settled .item-title { text-decoration: line-through; }
-.settled-icon { color: var(--secondary); margin-right: 0.5rem; flex-shrink: 0; }
+.settlement-item.active .item-date-badge { color: white; background: rgba(255,255,255,0.2); }
+.settlement-item.active .item-participants { color: rgba(255, 255, 255, 0.7); background: transparent; }
+
+.settlement-item.is-settled { opacity: 0.9; } /* 💡 정산 완료 시 너무 흐려지지 않게 조절, 취소선 삭제 */
 .settlement-item.active.is-settled { background: #5a67d8; }
-.item-participants { width: 100%; font-size: 0.8rem; color: var(--text-muted); margin-left: 0; margin-top: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+
 .delete-settlement-btn { background: #fee2e2; color: var(--danger); border: 1px solid #fecaca; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
 .delete-settlement-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
 
@@ -82,15 +86,17 @@ header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-
 
 #summary-card { background: linear-gradient(to right, #6366f1, #818cf8); color: white; border: none; display: flex; justify-content: space-between; align-items: center; }
 #summary-card h2 { color: white; opacity: 0.9; margin-bottom: 0.5rem;}
-.summary-left { flex-grow: 1; }
-.summary-right { text-align: right; }
+.summary-left { flex-grow: 1; min-width: 200px; }
+.summary-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
 #total-expense { font-size: 1rem; opacity: 0.9; }
-#final-settlement { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
+
+#final-settlement-container { margin-bottom: 0rem; text-align: right; }
+.transfer-item { font-size: 1.3rem; font-weight: 700; margin-bottom: 0.3rem; }
 
 #expense-form-card.is-settled, .is-settled .delete-settlement-btn { opacity: 0.6; pointer-events: none; user-select: none; }
 .form-grid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
 #expense-form { margin-top: 1.25rem; }
-#expense-form button { width: 100%; margin-top: 0.5rem; }
+#expense-form > button { width: 100%; margin-top: 0.5rem; }
 
 input, select { width: 100%; padding: 0.75rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 0.95rem; font-family: var(--font-family); color: var(--text-main); background-color: #f8fafc; -webkit-appearance: none; appearance: none; text-overflow: ellipsis; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s ease-in-out; }
 input:hover, select:hover { background-color: #ffffff; border-color: #cbd5e1; }
@@ -103,8 +109,23 @@ select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.o
 button { background: var(--primary); color: white; padding: 0.75rem 1.25rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: background 0.2s; font-size: 0.95rem; }
 button:hover { background: var(--primary-hover); }
 button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
+
+/* 👇 고정된 width 값을 부여하여 버튼 크기가 동일하게 유지되도록 수정 */
+#complete-settlement-btn { width: 220px; margin-top: 0.2rem; text-align: center;}
 #complete-settlement-btn.edit-mode { background-color: var(--secondary); }
 #complete-settlement-btn.edit-mode:hover { background-color: var(--secondary-hover); }
+
+.participant-input-group { display: flex; align-items: center; gap: 0.5rem; width: 100%; }
+.remove-participant-btn { background: #fee2e2; color: var(--danger); border: 1px solid #fecaca; width: 44px; height: 44px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; padding: 0;}
+.remove-participant-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
+.remove-participant-btn:disabled { background: #f1f5f9; color: #94a3b8; border-color: #e2e8f0; cursor: not-allowed; }
+
+#add-participant-btn { background-color: transparent; color: var(--primary); border: 1px dashed var(--primary); padding: 0.75rem; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s; }
+#add-participant-btn:hover { background-color: #eef2ff; }
+
+.dynamic-split-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.dynamic-split-item { display: flex; flex-direction: column; gap: 0.4rem; }
+.dynamic-split-item label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 0.2rem; }
 
 .rate-config-wrapper { background-color: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.9rem; animation: fadeIn 0.3s ease; }
 .rate-config-inner { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 0.5rem; padding-bottom: 0.75rem; border-bottom: 1px dashed #a5b4fc; }
@@ -119,8 +140,8 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 .converted-preview { text-align: right; color: var(--text-main); font-weight: 500; font-size: 0.95rem; }
 .converted-preview strong { color: var(--primary); font-size: 1.05rem; margin-left: 0.3rem;}
 
-#expense-table-container { overflow-x: auto; }
-#expense-table { width: 100%; border-collapse: collapse; }
+#expense-table-container { overflow-x: auto; width: 100%; }
+#expense-table { width: 100%; border-collapse: collapse; min-width: max-content; }
 #expense-table th, #expense-table td { padding: 0.75rem 1rem; text-align: center; border-bottom: 1px solid var(--border); font-size: 0.9rem; vertical-align: middle; white-space: nowrap; }
 #expense-table td:first-child, #expense-table th:first-child { text-align: left; }
 #expense-table tbody tr { transition: background-color 0.2s; }
@@ -139,16 +160,46 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 
 #add-settlement-fab { display: flex; justify-content: center; align-items: center; padding: 0; position: fixed; bottom: 2rem; left: 20px; width: 48px; height: 48px; border-radius: 50%; box-shadow: var(--shadow-md); z-index: 5; transition: transform 0.3s; font-size: 1.2rem; }
 #add-settlement-modal, #exchange-rate-modal, #expense-rate-modal, #edit-expense-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); animation: fadeIn 0.2s ease; }
-.modal-content { max-width: 500px; width: 90%; position: relative; animation: slideInUp 0.3s ease-out; }
+.modal-content { max-width: 500px; width: 90%; position: relative; animation: slideInUp 0.3s ease-out; max-height: 90vh; overflow-y: auto; }
 .modal-content.card { max-width: 700px; } 
 .modal-content .form-grid-row { margin-bottom: 1rem; }
-.modal-content #new-settlement-title { margin-bottom: 1rem; }
 .modal-content #save-expense-changes-btn, .modal-content #create-settlement-btn { width: 100%; margin-top: 0.5rem; padding: 0.85rem; font-size: 1rem; }
-.modal-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
-.modal-header h2 { margin-bottom: 0; font-size: 1.4rem; }
-.participant-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
-.close-modal-btn { position: absolute; top: 1rem; right: 1rem; cursor: pointer; color: var(--text-muted); font-size: 1.2rem; transition: color 0.2s; }
-.close-modal-btn:hover { color: var(--text-main); }
+
+.modal-header { 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    gap: 1rem; 
+    margin-bottom: 1.5rem; 
+    padding-right: 2rem; 
+}
+.modal-header h2 { 
+    margin-bottom: 0; 
+    font-size: 1.35rem; 
+    white-space: nowrap; 
+}
+.modal-date-picker { 
+    padding: 0.5rem 0.8rem; 
+    border: 1px solid var(--border); 
+    border-radius: 8px; 
+    font-family: var(--font-family); 
+    color: var(--text-main); 
+    font-size: 0.95rem; 
+    background: var(--side-bg); 
+    outline: none; 
+    transition: border-color 0.2s;
+    width: 100%;
+    max-width: 160px; 
+    cursor: pointer;
+}
+.modal-date-picker:focus { 
+    border-color: var(--primary); 
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); 
+}
+
+.close-modal-btn { position: absolute; top: 1rem; right: 1rem; cursor: pointer; color: var(--text-muted); font-size: 1.2rem; transition: color 0.2s; z-index: 10; background: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;}
+.close-modal-btn:hover { color: var(--text-main); background: var(--app-bg); }
 .currency-select-wrapper { margin-bottom: 1.5rem; }
 .currency-select-wrapper label { display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.9rem;}
 
@@ -171,27 +222,23 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 .calc-result-numbers i { color: var(--border); }
 .calc-result-numbers .text-primary-bold { color: var(--text-main); font-weight: 800; }
 
-
-/* --- 📸 영수증 캡처 모드 전용 스타일 --- */
 .capture-mode {
-    width: 800px !important; /* 강제로 데스크탑 너비로 고정 */
-    max-width: 800px !important;
+    min-width: 800px !important;
+    width: max-content !important; 
     background: #ffffff !important;
     padding: 40px !important;
     box-sizing: border-box !important;
 }
 
-/* 1. 불필요한 캡처 밖의 UI 요소 숨김 */
 .capture-mode .header-action-group,
 .capture-mode #exchange-rate-info-btn,
 .capture-mode #expense-form-card,
 .capture-mode .card-header button,
-.capture-mode th:last-child, /* 관리열 숨김 */
+.capture-mode th:last-child, 
 .capture-mode td:last-child {
     display: none !important;
 }
 
-/* 2. 외부 폰트(엑스박스) 오류 방지를 위해 아이콘 숨김 */
 .capture-mode i, 
 .capture-mode .fas, 
 .capture-mode .far, 
@@ -199,7 +246,6 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
     display: none !important;
 }
 
-/* 3. 모바일 레이아웃 강제 해제 (예쁘게 정렬) */
 .capture-mode .settlement-header {
     flex-direction: row !important; 
     align-items: center !important;
@@ -209,7 +255,7 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 }
 .capture-mode #settlement-display {
     font-size: 2.2rem !important;
-    white-space: nowrap !important; /* 제목 줄바꿈 금지 */
+    white-space: nowrap !important;
 }
 .capture-mode .card {
     border: none !important;
@@ -228,14 +274,13 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
     margin-top: 0 !important;
 }
 .capture-mode #expense-table-container {
-    overflow: visible !important; /* 스크롤바 생성 금지 */
+    overflow: visible !important; 
 }
 .capture-mode #expense-table {
     width: 100% !important;
     table-layout: auto !important; 
 }
 
-/* 환율 정보 안내 파란색 밑줄 제거 */
 .capture-mode .clickable-amount {
     border-bottom: none !important;
     color: var(--text-main) !important;
@@ -251,21 +296,21 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
     #main-container { flex-direction: column; }
     #right-pane { padding: 1.5rem; }
     
-    /* 캡처 모드가 아닐 때만 모바일 레이아웃 적용 */
     #calculator:not(.capture-mode) .settlement-header { flex-direction: column; align-items: flex-start; gap: 1rem;}
     #calculator:not(.capture-mode) .header-title-group { width: 100%; justify-content: space-between; }
     #calculator:not(.capture-mode) .header-action-group { width: 100%; display: grid; grid-template-columns: 1fr 1fr;}
     #calculator:not(.capture-mode) .header-action-group button { justify-content: center; }
     #calculator:not(.capture-mode) #summary-card { flex-direction: column; align-items: flex-start; }
-    #calculator:not(.capture-mode) .summary-right { text-align: left; margin-top: 1rem; }
+    #calculator:not(.capture-mode) .summary-right { text-align: left; align-items: flex-start; margin-top: 1rem; }
+    #calculator:not(.capture-mode) #final-settlement-container { text-align: left; }
     
     .form-grid-row { grid-template-columns: 1fr; }
-    .participant-inputs { grid-template-columns: 1fr; }
     #add-settlement-fab { left: auto; right: 1.5rem; transform: none !important; }
-    .custom-date-wrapper { margin-bottom: 1rem; }
-    #custom-date-display { padding: 0.8rem; font-size: 1rem; height: 52px; }
     .settlement-item { padding: 0.8rem 1rem; font-size: 0.95rem; min-height: 52px; align-items: center; }
     .delete-settlement-btn { width: 52px; height: 52px; }
     .delete-settlement-btn i { font-size: 1rem; }
+    
+    .modal-header { flex-direction: column; align-items: flex-start; gap: 0.8rem; }
+    .modal-date-picker { max-width: 100%; width: 100%; }
 }
 @keyframes slideInUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }

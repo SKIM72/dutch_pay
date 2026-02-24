@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
     // --- Global State ---
-    let settlements = {};
+    let settlements = [];
     let currentSettlement = null;
     let currentLang = 'ko';
     let currentEditingExpenseId = null;
@@ -16,8 +16,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const sidebar = document.getElementById('left-pane');
     const appTitle = document.querySelector('.brand-container');
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-    const mainDatePicker = document.getElementById('main-date-picker');
-    const customDateDisplay = document.getElementById('custom-date-display');
     const settlementListContainer = document.getElementById('settlement-list-container');
     const addSettlementFab = document.getElementById('add-settlement-fab');
     const placeholderRightPane = document.getElementById('placeholder-right-pane');
@@ -28,12 +26,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const editExpenseModal = document.getElementById('edit-expense-modal');
     const expenseRateModal = document.getElementById('expense-rate-modal');
 
-    const modalDateDisplay = document.getElementById('modal-date-display');
+    const newSettlementDateInput = document.getElementById('new-settlement-date');
     const newSettlementTitleInput = document.getElementById('new-settlement-title');
-    const newParticipantAInput = document.getElementById('new-participant-a');
-    const newParticipantBInput = document.getElementById('new-participant-b');
     const baseCurrencySelect = document.getElementById('base-currency');
     const createSettlementBtn = document.getElementById('create-settlement-btn');
+    
+    const participantListContainer = document.getElementById('participant-list-container');
+    const addParticipantBtn = document.getElementById('add-participant-btn');
 
     const copyTextBtn = document.getElementById('copy-text-btn');
     const saveImageBtn = document.getElementById('save-image-btn');
@@ -42,54 +41,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     const exchangeRateInfo = document.getElementById('exchange-rate-info');
     
     const editExpenseIdInput = document.getElementById('edit-expense-id');
-    const editItemDateInput = document.getElementById('edit-item-date'); // 💡 수정 모달 날짜 입력창
+    const editItemDateInput = document.getElementById('edit-item-date'); 
     const editItemNameInput = document.getElementById('edit-item-name');
     const editItemAmountInput = document.getElementById('edit-item-amount');
     const editItemCurrencySelect = document.getElementById('edit-item-currency');
     const editItemPayerSelect = document.getElementById('edit-item-payer');
     const editSplitMethodSelect = document.getElementById('edit-split-method');
     const editSplitAmountInputs = document.getElementById('edit-split-amount-inputs');
-    const editSplitAmountAInput = document.getElementById('edit-split-amount-a');
-    const editSplitAmountBInput = document.getElementById('edit-split-amount-b');
     const saveExpenseChangesBtn = document.getElementById('save-expense-changes-btn');
 
     const settlementDisplay = document.getElementById('settlement-display');
     const expenseFormCard = document.getElementById('expense-form-card');
-    const itemDateInput = document.getElementById('item-date'); // 💡 추가 폼 날짜 입력창
+    const itemDateInput = document.getElementById('item-date');
     const itemPayerSelect = document.getElementById('item-payer');
     const itemCurrencySelect = document.getElementById('item-currency');
     const splitMethodSelect = document.getElementById('split-method');
-    const splitAmountAInput = document.getElementById('split-amount-a');
-    const splitAmountBInput = document.getElementById('split-amount-b');
+    const splitAmountInputs = document.getElementById('split-amount-inputs');
+    
     const expenseTableBody = document.querySelector('#expense-table tbody');
+    const expenseTableHeaderRow = document.getElementById('expense-table-header-row');
     const totalExpenseP = document.getElementById('total-expense');
-    const finalSettlementP = document.getElementById('final-settlement');
+    const finalSettlementContainer = document.getElementById('final-settlement-container');
     const completeSettlementBtn = document.getElementById('complete-settlement-btn');
     const downloadExcelBtn = document.getElementById('download-excel-btn');
     const addExpenseBtn = document.getElementById('add-expense-btn');
     const itemNameInput = document.getElementById('item-name');
     const itemAmountInput = document.getElementById('item-amount');
-    const splitAmountInputs = document.getElementById('split-amount-inputs');
 
     const formatNumber = (num, decimals = 2) => isNaN(num) ? '0' : num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     const parseFormattedNumber = (str) => parseFloat(String(str).replace(/,/g, '')) || 0;
-    
-    // 💡 날짜를 input[type="datetime-local"] 형식(YYYY-MM-DDThh:mm)으로 변환하는 함수
     const getLocalISOString = (date) => {
         const offset = date.getTimezoneOffset() * 60000;
         return (new Date(date - offset)).toISOString().slice(0, 16);
     };
-
-    function updateDateDisplay() {
-        if (!mainDatePicker.value) return;
-        const [year, month, day] = mainDatePicker.value.split('-');
-        const date = new Date(year, month - 1, day); 
-        let localeString = 'ko-KR';
-        if (currentLang === 'en') localeString = 'en-US';
-        if (currentLang === 'ja') localeString = 'ja-JP';
-        const options = { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' };
-        customDateDisplay.textContent = new Intl.DateTimeFormat(localeString, options).format(date);
-    }
 
     function updateUI(lang) {
         currentLang = lang;
@@ -128,8 +112,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateParticipantNames(currentSettlement.participants);
             render();
         }
-        updateDateDisplay(); 
-        renderSettlementList(mainDatePicker.value);
+        renderSettlementList();
     }
 
     function setLanguage(lang) {
@@ -161,31 +144,68 @@ document.addEventListener('DOMContentLoaded', async () => {
         const initialLang = preferredLang || (['ko', 'en', 'ja'].includes(browserLang) ? browserLang : 'en');
         
         setupEventListeners();
-        setInitialDate();
         await loadData();
         setLanguage(initialLang);
         
-        // 💡 앱 초기화 시 날짜 입력창에 현재 시간 세팅
         itemDateInput.value = getLocalISOString(new Date());
     }
 
     async function loadData() {
-        const { data, error } = await supabaseClient.from('settlements').select(`* , expenses (*)`).order('created_at');
+        const { data, error } = await supabaseClient.from('settlements').select(`* , expenses (*)`).order('date', { ascending: false }).order('created_at', { ascending: false });
         if (error) { console.error('Error loading data:', error); return; }
-        settlements = {};
-        data.forEach(s => {
-            const settlementDate = s.date;
-            if (!settlements[settlementDate]) settlements[settlementDate] = [];
-            settlements[settlementDate].push(s);
-        });
-        renderSettlementList(mainDatePicker.value);
+        settlements = data || [];
+        renderSettlementList();
     }
 
-    function setInitialDate() {
-        const todayString = new Date().toLocaleDateString('fr-CA', { timeZone: 'Asia/Tokyo' });
-        mainDatePicker.value = todayString;
-        updateDateDisplay(); 
-        mainDatePicker.dispatchEvent(new Event('change'));
+    function renderParticipantInputs(initialCount = 2) {
+        participantListContainer.innerHTML = '';
+        for (let i = 0; i < initialCount; i++) {
+            addParticipantInputUI();
+        }
+        updateRemoveButtons();
+    }
+
+    function addParticipantInputUI(value = '') {
+        const div = document.createElement('div');
+        div.className = 'participant-input-group';
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'participant-name-input';
+        
+        const placeholderTemplate = locales[currentLang]?.participantPlaceholder || `참가자 이름 (예: 친구 {n})`;
+        input.placeholder = placeholderTemplate.replace('{n}', participantListContainer.children.length + 1);
+        
+        input.value = value;
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'remove-participant-btn';
+        removeBtn.innerHTML = '<i class="fas fa-minus"></i>';
+        removeBtn.onclick = () => {
+            div.remove();
+            updateRemoveButtons();
+        };
+
+        div.appendChild(input);
+        div.appendChild(removeBtn);
+        participantListContainer.appendChild(div);
+        updateRemoveButtons();
+    }
+
+    function updateRemoveButtons() {
+        const btns = participantListContainer.querySelectorAll('.remove-participant-btn');
+        if (btns.length <= 2) {
+            btns.forEach(btn => btn.disabled = true);
+        } else {
+            btns.forEach(btn => btn.disabled = false);
+        }
+    }
+
+    function getParticipantNamesFromModal() {
+        const inputs = participantListContainer.querySelectorAll('.participant-name-input');
+        const names = Array.from(inputs).map(input => input.value.trim()).filter(val => val !== '');
+        return names.length >= 2 ? names : ['A', 'B']; 
     }
 
     async function fetchAndSetRate(fetchType, currencyFrom, currencyTo, inputEl, previewUpdater) {
@@ -249,50 +269,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { title, base_currency, expenses, participants } = currentSettlement;
         
         const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
-        const [userA, userB] = participants;
-        const amountPaidByA = expenses.filter(exp => exp.payer === userA).reduce((sum, exp) => sum + (exp.amount || 0), 0);
-        const totalOwedByA = expenses.reduce((sum, exp) => sum + (exp.shares[userA] || 0), 0);
-        const balanceA = amountPaidByA - totalOwedByA;
+        const transfers = calculateMinimumTransfers(expenses, participants);
 
-        // 💡 언어별 복사 텍스트 템플릿 정의
         const copyTexts = {
-            ko: {
-                summary: "정산 요약",
-                total: "총 지출",
-                result: "정산 결과",
-                sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}에게 ${amount} ${currency} 송금 부탁할게! 💸`,
-                notice: "상세 내역 확인하기: "
-            },
-            en: {
-                summary: "Settlement Summary",
-                total: "Total Expense",
-                result: "Settlement Result",
-                sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}: Please send ${amount} ${currency}! 💸`,
-                notice: "Check details at: "
-            },
-            ja: {
-                summary: "精算の概要",
-                total: "総支出",
-                result: "精算結果",
-                sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}へ ${amount} ${currency} の送金をお願い！ 💸`,
-                notice: "詳細を確認する: "
-            }
+            ko: { summary: "정산 요약", total: "총 지출", result: "정산 결과", sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}에게 ${amount} ${currency} 송금 부탁할게! 💸`, notice: "상세 내역 확인하기: " },
+            en: { summary: "Settlement Summary", total: "Total Expense", result: "Settlement Result", sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}: Please send ${amount} ${currency}! 💸`, notice: "Check details at: " },
+            ja: { summary: "精算の概要", total: "総支出", result: "精算結果", sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}へ ${amount} ${currency} の送金をお願い！ 💸`, notice: "詳細を確認する: " }
         };
 
-        // 현재 선택된 언어에 맞는 텍스트 객체 불러오기 (기본값: 한국어)
         const t = copyTexts[currentLang] || copyTexts['ko'];
-        let resultString = locales[currentLang]?.settlementDone || 'Settlement complete';
+        let resultString = '';
         
-        if (balanceA > 0.01) {
-            resultString = t.sendFormat(userB, userA, formatNumber(balanceA, 0), base_currency);
-        } else if (balanceA < -0.01) {
-            resultString = t.sendFormat(userA, userB, formatNumber(Math.abs(balanceA), 0), base_currency);
+        if (transfers.length === 0) {
+            resultString = locales[currentLang]?.settlementDone || 'Settlement complete (No transfers needed)';
+        } else {
+            resultString = transfers.map(tr => t.sendFormat(tr.from, tr.to, formatNumber(tr.amount, 0), base_currency)).join('\n');
         }
 
         const link = "https://skim72.github.io/dutch_pay/";
-        
-        // undefined 방지를 위해 locales.js 대신 위에서 정의한 t.notice 사용
-        const text = `🧾 [${title}] ${t.summary}\n\n💰 ${t.total}: ${formatNumber(totalAmount, 0)} ${base_currency}\n🔔 ${t.result}: ${resultString}\n\n${t.notice}${link}`;
+        const text = `🧾 [${title}] ${t.summary}\n\n💰 ${t.total}: ${formatNumber(totalAmount, 0)} ${base_currency}\n🔔 ${t.result}:\n${resultString}\n\n${t.notice}${link}`;
         
         try {
             await navigator.clipboard.writeText(text);
@@ -312,7 +307,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         rightPane.style.overflowY = 'visible';
 
         targetView.classList.add('capture-mode');
-
         await new Promise(resolve => setTimeout(resolve, 300));
 
         try {
@@ -321,18 +315,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 pixelRatio: window.devicePixelRatio > 1 ? window.devicePixelRatio + 1 : 3,
             });
 
-            // 💡 날짜 및 시간(타임스탬프) 생성
             const now = new Date();
-            const year = now.getFullYear(); 
-            const month = String(now.getMonth() + 1).padStart(2, '0'); 
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0'); 
-            const minutes = String(now.getMinutes()).padStart(2, '0'); 
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            const timestamp = `${year}${month}${day}_${hours}${minutes}${seconds}`;
+            const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
 
             const link = document.createElement('a');
-            // 💡 파일명에 타임스탬프 결합
             link.download = `SettleUp_${currentSettlement.title}_${timestamp}.png`;
             link.href = dataUrl;
             link.click();
@@ -349,13 +335,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         languageSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
         appTitle.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
         mobileMenuBtn.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
-        mainDatePicker.addEventListener('change', () => { updateDateDisplay(); renderSettlementList(mainDatePicker.value); });
         
         addSettlementFab.addEventListener('click', () => {
-            modalDateDisplay.textContent = mainDatePicker.value;
+            newSettlementDateInput.value = new Date().toLocaleDateString('fr-CA', { timeZone: 'Asia/Tokyo' });
+            renderParticipantInputs(2);
             addSettlementModal.classList.remove('hidden');
             newSettlementTitleInput.focus();
         });
+
+        addParticipantBtn.addEventListener('click', () => addParticipantInputUI());
         
         [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal].forEach(modal => {
             modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
@@ -374,7 +362,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('add-custom-rate').value = ''; 
             handleAddCurrencyChange();
         });
-        itemAmountInput.addEventListener('input', updateAddPreview);
+        itemAmountInput.addEventListener('input', () => {
+            handleAmountInput(itemAmountInput);
+            updateAddPreview();
+        });
         document.getElementById('add-custom-rate').addEventListener('input', updateAddPreview);
         document.getElementById('add-settlement-rate-btn').addEventListener('click', () => {
             fetchAndSetRate('settlement', itemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('add-custom-rate'), updateAddPreview);
@@ -387,7 +378,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('edit-custom-rate').value = ''; 
             handleEditCurrencyChange();
         });
-        editItemAmountInput.addEventListener('input', updateEditPreview);
+        editItemAmountInput.addEventListener('input', () => {
+            handleAmountInput(editItemAmountInput);
+            updateEditPreview();
+        });
         document.getElementById('edit-custom-rate').addEventListener('input', updateEditPreview);
         document.getElementById('edit-settlement-rate-btn').addEventListener('click', () => {
             fetchAndSetRate('settlement', editItemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('edit-custom-rate'), updateEditPreview);
@@ -396,65 +390,53 @@ document.addEventListener('DOMContentLoaded', async () => {
             fetchAndSetRate('latest', editItemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('edit-custom-rate'), updateEditPreview);
         });
 
-
         completeSettlementBtn.addEventListener('click', async () => {
             if (currentSettlement) {
                 currentSettlement.is_settled = !currentSettlement.is_settled;
                 const { error } = await supabaseClient.from('settlements').update({ is_settled: currentSettlement.is_settled }).eq('id', currentSettlement.id);
                 if (error) console.error('Error:', error);
-                render(); renderSettlementList(mainDatePicker.value);
+                render(); 
+                renderSettlementList(); 
             }
         });
         
-        splitMethodSelect.addEventListener('change', () => handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs, splitAmountAInput, splitAmountBInput));
-        editSplitMethodSelect.addEventListener('change', () => handleSplitMethodChange(editSplitMethodSelect, editItemAmountInput, editSplitAmountInputs, editSplitAmountAInput, editSplitAmountBInput));
-
-        const allAmountInputs = [itemAmountInput, splitAmountAInput, splitAmountBInput, editItemAmountInput, editSplitAmountAInput, editSplitAmountBInput];
-        allAmountInputs.forEach(input => {
-            input.addEventListener('input', (e) => {
-                const value = e.target.value;
-                const hasDecimal = value.includes('.');
-                let numericValue = parseFormattedNumber(value);
-                if (hasDecimal) {
-                    const parts = value.split('.');
-                    e.target.value = formatNumber(parseFloat(parts[0]), 0) + '.' + (parts[1] || '');
-                } else { e.target.value = formatNumber(numericValue, 0); }
-            });
-        });
-
-        [splitAmountAInput, splitAmountBInput].forEach(input => {
-            input.addEventListener('input', () => {
-                 if (splitMethodSelect.value === 'amount') {
-                    const amountA = parseFormattedNumber(splitAmountAInput.value);
-                    const amountB = parseFormattedNumber(splitAmountBInput.value);
-                    itemAmountInput.value = formatNumber(amountA + amountB, 0);
-                    updateAddPreview();
-                 }
-            });
-        });
-
-        [editSplitAmountAInput, editSplitAmountBInput].forEach(input => {
-            input.addEventListener('input', () => {
-                 if (editSplitMethodSelect.value === 'amount') {
-                    const amountA = parseFormattedNumber(editSplitAmountAInput.value);
-                    const amountB = parseFormattedNumber(editSplitAmountBInput.value);
-                    editItemAmountInput.value = formatNumber(amountA + amountB, 0);
-                    updateEditPreview();
-                 }
-            });
-        });
+        splitMethodSelect.addEventListener('change', () => handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs));
+        editSplitMethodSelect.addEventListener('change', () => handleSplitMethodChange(editSplitMethodSelect, editItemAmountInput, editSplitAmountInputs));
 
         downloadExcelBtn.addEventListener('click', downloadExcel);
     }
 
-    function handleSplitMethodChange(selectEl, amountEl, splitInputsEl, splitAEl, splitBEl) {
+    function handleAmountInput(inputEl) {
+        const value = inputEl.value;
+        const hasDecimal = value.includes('.');
+        let numericValue = parseFormattedNumber(value);
+        if (hasDecimal) {
+            const parts = value.split('.');
+            inputEl.value = formatNumber(parseFloat(parts[0]), 0) + '.' + (parts[1] || '');
+        } else { inputEl.value = formatNumber(numericValue, 0); }
+    }
+
+    function attachDynamicSplitInputListeners(container, totalAmountInput, previewUpdater) {
+        const inputs = container.querySelectorAll('input');
+        inputs.forEach(input => {
+            input.addEventListener('input', (e) => {
+                handleAmountInput(e.target);
+                let sum = 0;
+                inputs.forEach(inp => sum += parseFormattedNumber(inp.value));
+                totalAmountInput.value = formatNumber(sum, 0);
+                if(previewUpdater) previewUpdater();
+            });
+        });
+    }
+
+    function handleSplitMethodChange(selectEl, amountEl, splitInputsEl) {
         const isManualAmount = selectEl.value === 'amount';
         splitInputsEl.classList.toggle('hidden', !isManualAmount);
         amountEl.readOnly = isManualAmount;
         if (isManualAmount) {
-            const amountA = parseFormattedNumber(splitAEl.value);
-            const amountB = parseFormattedNumber(splitBEl.value);
-            amountEl.value = formatNumber(amountA + amountB, 0);
+            let sum = 0;
+            splitInputsEl.querySelectorAll('input').forEach(inp => sum += parseFormattedNumber(inp.value));
+            amountEl.value = formatNumber(sum, 0);
         } else {
             amountEl.value = amountEl.dataset.originalValue || '';
         }
@@ -464,37 +446,76 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function createSettlement() {
         const title = newSettlementTitleInput.value.trim();
-        const date = mainDatePicker.value;
-        const participantA = newParticipantAInput.value.trim() || 'A';
-        const participantB = newParticipantBInput.value.trim() || 'B';
+        const date = newSettlementDateInput.value;
+        const participants = getParticipantNamesFromModal();
         const baseCurrency = baseCurrencySelect.value;
-        if (!title || !date) return;
+        if (!title || !date || participants.length < 2) {
+             alert("참가자는 최소 2명 이상이어야 하며 제목을 입력해야 합니다."); return;
+        }
 
         const { data, error } = await supabaseClient.from('settlements')
-            .insert([{ title, date, participants: [participantA, participantB], base_currency: baseCurrency, is_settled: false }]).select('*, expenses (*)');
+            .insert([{ title, date, participants: participants, base_currency: baseCurrency, is_settled: false }]).select('*, expenses (*)');
 
         if (error) { console.error('Error creating settlement:', error); return; }
         
         const newSettlement = data[0];
-        if (!settlements[date]) settlements[date] = [];
-        settlements[date].push(newSettlement);
+        settlements.push(newSettlement);
+        settlements.sort((a, b) => new Date(b.date) - new Date(a.date));
         
-        renderSettlementList(date); selectSettlement(newSettlement);
+        renderSettlementList(); 
+        selectSettlement(newSettlement);
         addSettlementModal.classList.add('hidden');
-        newSettlementTitleInput.value = ''; newParticipantAInput.value = 'A'; newParticipantBInput.value = 'B';
+        newSettlementTitleInput.value = ''; 
     }
     
-    async function deleteSettlement(date, settlementId) {
+    async function deleteSettlement(settlementId) {
         if (confirm(locales[currentLang]?.deleteSettlementConfirm)) {
             await supabaseClient.from('expenses').delete().eq('settlement_id', settlementId);
             const { error: settlementError } = await supabaseClient.from('settlements').delete().eq('id', settlementId);
             if (settlementError) { alert('Error: ' + settlementError.message); return; }
             
-            settlements[date] = settlements[date].filter(s => s.id !== settlementId);
+            settlements = settlements.filter(s => s.id !== settlementId);
             if (currentSettlement && currentSettlement.id === settlementId) {
                 currentSettlement = null; calculatorView.classList.add('hidden'); placeholderRightPane.classList.remove('hidden');
             }
-            renderSettlementList(date);
+            renderSettlementList();
+        }
+    }
+
+    function renderSettlementList() {
+        settlementListContainer.innerHTML = settlements.length === 0 
+            ? `<p class="subtitle">${locales[currentLang]?.noHistory || 'History does not exist.'}</p>`
+            : settlements.map(s => `
+                <div class="settlement-item-wrapper">
+                    <button class="settlement-item ${s.is_settled ? 'is-settled' : ''}" data-id="${s.id}">
+                        <div class="item-content">
+                            <div class="item-text-group">
+                                <div class="date-row">
+                                    ${s.is_settled ? '<i class="fas fa-check-circle settled-icon"></i>' : ''}
+                                    <span class="item-date-badge"><i class="far fa-calendar-alt"></i> ${s.date}</span>
+                                </div>
+                                <span class="item-title">${s.title}</span>
+                                <span class="item-participants">(${(s.participants || []).join(', ')}) - ${s.base_currency}</span>
+                            </div>
+                        </div>
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <button class="delete-settlement-btn" data-id="${s.id}"><i class="fas fa-trash-alt"></i></button>
+                </div>`).join('');
+        
+        document.querySelectorAll('.settlement-item').forEach(btn => {
+            const settlementId = parseInt(btn.dataset.id);
+            const settlement = settlements.find(s => s.id === settlementId);
+            if(settlement) btn.addEventListener('click', () => selectSettlement(settlement));
+        });
+
+        document.querySelectorAll('.delete-settlement-btn').forEach(btn => btn.addEventListener('click', (e) => {
+            e.stopPropagation(); deleteSettlement(parseInt(e.currentTarget.dataset.id))
+        }));
+        
+        if(currentSettlement) {
+            const currentItem = document.querySelector(`.settlement-item[data-id='${currentSettlement.id}']`);
+            if (currentItem) currentItem.classList.add('active');
         }
     }
 
@@ -505,72 +526,70 @@ document.addEventListener('DOMContentLoaded', async () => {
         settlementDisplay.textContent = settlement.title;
         itemCurrencySelect.value = settlement.base_currency;
         document.getElementById('add-rate-config-wrapper').classList.add('hidden'); 
+        
         updateParticipantNames(settlement.participants);
+        renderTableHeader(settlement.participants);
+
         document.querySelectorAll('.settlement-item').forEach(item => item.classList.toggle('active', item.dataset.id == settlement.id));
         if (window.innerWidth <= 768) sidebar.classList.add('collapsed');
         
-        // 💡 정산 선택 시 날짜 입력창 갱신
         itemDateInput.value = getLocalISOString(new Date());
-        
         render();
     }
 
-    function renderSettlementList(date) {
-        const list = settlements[date] || [];
-        settlementListContainer.innerHTML = list.length === 0 
-            ? `<p class="subtitle">${locales[currentLang]?.noHistory || 'History does not exist.'}</p>`
-            : list.map(s => `
-                <div class="settlement-item-wrapper">
-                    <button class="settlement-item ${s.is_settled ? 'is-settled' : ''}" data-id="${s.id}">
-                        <div class="item-content">
-                            ${s.is_settled ? '<i class="fas fa-check-circle settled-icon"></i>' : ''}
-                            <span class="item-title">${s.title}</span>
-                            <span class="item-participants">(${(s.participants || []).join(', ')}) - ${s.base_currency}</span>
-                        </div>
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
-                    <button class="delete-settlement-btn" data-date="${date}" data-id="${s.id}"><i class="fas fa-trash-alt"></i></button>
-                </div>`).join('');
-        
-        document.querySelectorAll('.settlement-item').forEach(btn => {
-            const settlementId = parseInt(btn.dataset.id);
-            const settlement = list.find(s => s.id === settlementId);
-            if(settlement) btn.addEventListener('click', () => selectSettlement(settlement));
+    function renderTableHeader(participants) {
+        const children = Array.from(expenseTableHeaderRow.children);
+        while (expenseTableHeaderRow.children.length > 3) {
+            expenseTableHeaderRow.removeChild(expenseTableHeaderRow.lastChild);
+        }
+
+        const shareOfString = locales[currentLang]?.shareOf || "{name}님 분담액";
+
+        participants.forEach(p => {
+            const th = document.createElement('th');
+            th.textContent = shareOfString.replace('{name}', p);
+            expenseTableHeaderRow.appendChild(th);
         });
 
-        document.querySelectorAll('.delete-settlement-btn').forEach(btn => btn.addEventListener('click', (e) => {
-            e.stopPropagation(); deleteSettlement(e.currentTarget.dataset.date, parseInt(e.currentTarget.dataset.id))
-        }));
-        
-        if(currentSettlement) {
-            const currentItem = document.querySelector(`.settlement-item[data-id='${currentSettlement.id}']`);
-            if (currentItem) currentItem.classList.add('active');
-        }
+        const actionTh = document.createElement('th');
+        actionTh.setAttribute('data-i18n', 'tableHeaderActions');
+        actionTh.textContent = locales[currentLang]?.tableHeaderActions || '관리';
+        expenseTableHeaderRow.appendChild(actionTh);
     }
 
     function updateParticipantNames(participants) {
-        const [userA, userB] = participants || ['A', 'B'];
         const paidByString = locales[currentLang]?.paidBy || 'Paid by {payer}';
-        const shareOfString = locales[currentLang]?.shareOf || "{name}'s share";
+        const shareOfString = locales[currentLang]?.shareOf || "{name}님 분담액";
 
         [itemPayerSelect, editItemPayerSelect].forEach(select => {
-            select.innerHTML = `<option value="${userA}">${paidByString.replace('{payer}', userA)}</option><option value="${userB}">${paidByString.replace('{payer}', userB)}</option>`;
+            select.innerHTML = participants.map(p => `<option value="${p}">${paidByString.replace('{payer}', p)}</option>`).join('');
         });
-        
-        document.getElementById('table-header-user-a').textContent = shareOfString.replace('{name}', userA);
-        document.getElementById('table-header-user-b').textContent = shareOfString.replace('{name}', userB);
 
-        [splitAmountAInput, editSplitAmountAInput].forEach(input => input.placeholder = shareOfString.replace('{name}', userA));
-        [splitAmountBInput, editSplitAmountBInput].forEach(input => input.placeholder = shareOfString.replace('{name}', userB));
+        splitAmountInputs.innerHTML = '';
+        editSplitAmountInputs.innerHTML = '';
+
+        participants.forEach(p => {
+            const addDiv = document.createElement('div');
+            addDiv.className = 'dynamic-split-item';
+            addDiv.innerHTML = `<label>${p}</label><input type="text" data-participant="${p}" placeholder="${shareOfString.replace('{name}', p)}" inputmode="decimal">`;
+            splitAmountInputs.appendChild(addDiv);
+
+            const editDiv = document.createElement('div');
+            editDiv.className = 'dynamic-split-item';
+            editDiv.innerHTML = `<label>${p}</label><input type="text" data-participant="${p}" inputmode="decimal">`;
+            editSplitAmountInputs.appendChild(editDiv);
+        });
+
+        attachDynamicSplitInputListeners(splitAmountInputs, itemAmountInput, updateAddPreview);
+        attachDynamicSplitInputListeners(editSplitAmountInputs, editItemAmountInput, updateEditPreview);
     }
 
-    // 💡 날짜 정보를 포함하여 데이터베이스에 저장
     async function addExpense() {
         if (!currentSettlement) return;
         const name = itemNameInput.value.trim();
         const originalAmount = parseFormattedNumber(itemAmountInput.value);
         const currency = itemCurrencySelect.value;
-        const expenseDate = itemDateInput.value; // 날짜 값 가져오기
+        const expenseDate = itemDateInput.value; 
         
         if (!name || originalAmount <= 0 || !expenseDate) { alert(locales[currentLang]?.invalidInput); return; }
 
@@ -581,27 +600,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const convertedAmount = originalAmount * rate;
-        const [userA, userB] = currentSettlement.participants;
+        const participants = currentSettlement.participants;
         const payer = itemPayerSelect.value;
         const splitMethod = splitMethodSelect.value;
-        let shares = { [userA]: 0, [userB]: 0 };
+        let shares = {};
 
         if (splitMethod === 'equal') {
-            shares[userA] = shares[userB] = convertedAmount / 2;
+            const equalShare = convertedAmount / participants.length;
+            participants.forEach(p => shares[p] = equalShare);
         } else if (splitMethod === 'amount') {
-            const shareA_original = parseFormattedNumber(splitAmountAInput.value);
-            const shareB_original = parseFormattedNumber(splitAmountBInput.value);
-            if (Math.abs(shareA_original + shareB_original - originalAmount) > 0.01) { alert(locales[currentLang]?.amountMismatch); return; }
-            shares[userA] = shareA_original * rate;
-            shares[userB] = shareB_original * rate;
+            let sumCheck = 0;
+            const inputs = splitAmountInputs.querySelectorAll('input');
+            inputs.forEach(inp => {
+                const p = inp.dataset.participant;
+                const pAmount = parseFormattedNumber(inp.value);
+                sumCheck += pAmount;
+                shares[p] = pAmount * rate;
+            });
+            if (Math.abs(sumCheck - originalAmount) > 0.01) { alert(locales[currentLang]?.amountMismatch); return; }
         }
 
         const { data, error } = await supabaseClient.from('expenses')
             .insert([{ 
-                settlement_id: currentSettlement.id, 
-                expense_date: expenseDate, // 💡 DB에 저장
-                name, 
-                original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
+                settlement_id: currentSettlement.id, expense_date: expenseDate,
+                name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
             }]).select();
 
         if (error) { console.error('Error adding expense:', error); return; }
@@ -613,7 +635,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
         }
         
-        render(); renderSettlementList(mainDatePicker.value); clearInputs();
+        render(); 
+        renderSettlementList(); 
+        clearInputs();
     }
 
     function openEditExpenseModal(expenseId) {
@@ -627,7 +651,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         editItemAmountInput.value = formatNumber(expense.original_amount, 0);
         editItemAmountInput.dataset.originalValue = formatNumber(expense.original_amount, 0);
         
-        // 💡 수정 모달에 기존에 입력된 날짜 세팅 (없으면 현재 시간)
         if (expense.expense_date) {
             const d = new Date(expense.expense_date);
             d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -640,35 +663,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         editItemPayerSelect.value = expense.payer;
         editSplitMethodSelect.value = expense.split;
 
+        const rate = (expense.currency !== currentSettlement.base_currency) ? (expense.amount / expense.original_amount) : 1;
+
         if (expense.currency !== currentSettlement.base_currency) {
-            const appliedRate = expense.amount / expense.original_amount;
-            document.getElementById('edit-custom-rate').value = appliedRate.toFixed(4);
+            document.getElementById('edit-custom-rate').value = rate.toFixed(4);
             handleEditCurrencyChange(); 
         } else {
             document.getElementById('edit-rate-config-wrapper').classList.add('hidden');
         }
 
         if (expense.split === 'amount') {
-            const rate = expense.amount / expense.original_amount;
-            const [userA, userB] = currentSettlement.participants;
-            const originalShareA = (expense.shares[userA] || 0) / rate;
-            const originalShareB = (expense.shares[userB] || 0) / rate;
-            editSplitAmountAInput.value = formatNumber(originalShareA, 0);
-            editSplitAmountBInput.value = formatNumber(originalShareB, 0);
+            const inputs = editSplitAmountInputs.querySelectorAll('input');
+            inputs.forEach(inp => {
+                const p = inp.dataset.participant;
+                const originalShare = (expense.shares[p] || 0) / rate;
+                inp.value = formatNumber(originalShare, 0);
+            });
+        } else {
+            editSplitAmountInputs.querySelectorAll('input').forEach(inp => inp.value = '');
         }
 
-        handleSplitMethodChange(editSplitMethodSelect, editItemAmountInput, editSplitAmountInputs, editSplitAmountAInput, editSplitAmountBInput);
+        handleSplitMethodChange(editSplitMethodSelect, editItemAmountInput, editSplitAmountInputs);
         editExpenseModal.classList.remove('hidden');
     }
 
-    // 💡 날짜 정보를 포함하여 데이터베이스 수정
     async function handleSaveExpenseChanges() {
         if (!currentSettlement || currentEditingExpenseId === null) return;
 
         const name = editItemNameInput.value.trim();
         const originalAmount = parseFormattedNumber(editItemAmountInput.value);
         const currency = editItemCurrencySelect.value;
-        const expenseDate = editItemDateInput.value; // 💡 날짜 값 가져오기
+        const expenseDate = editItemDateInput.value; 
         
         if (!name || originalAmount <= 0 || !expenseDate) { alert(locales[currentLang]?.invalidInput); return; }
 
@@ -679,24 +704,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const convertedAmount = originalAmount * rate;
-        const [userA, userB] = currentSettlement.participants;
+        const participants = currentSettlement.participants;
         const payer = editItemPayerSelect.value;
         const splitMethod = editSplitMethodSelect.value;
-        let shares = { [userA]: 0, [userB]: 0 };
+        let shares = {};
 
         if (splitMethod === 'equal') {
-            shares[userA] = shares[userB] = convertedAmount / 2;
+            const equalShare = convertedAmount / participants.length;
+            participants.forEach(p => shares[p] = equalShare);
         } else if (splitMethod === 'amount') {
-            const shareA_original = parseFormattedNumber(editSplitAmountAInput.value);
-            const shareB_original = parseFormattedNumber(editSplitAmountBInput.value);
-            if (Math.abs(shareA_original + shareB_original - originalAmount) > 0.01) { alert(locales[currentLang]?.amountMismatch); return; }
-            shares[userA] = shareA_original * rate;
-            shares[userB] = shareB_original * rate;
+            let sumCheck = 0;
+            const inputs = editSplitAmountInputs.querySelectorAll('input');
+            inputs.forEach(inp => {
+                const p = inp.dataset.participant;
+                const pAmount = parseFormattedNumber(inp.value);
+                sumCheck += pAmount;
+                shares[p] = pAmount * rate;
+            });
+            if (Math.abs(sumCheck - originalAmount) > 0.01) { alert(locales[currentLang]?.amountMismatch); return; }
         }
         
         const { data, error } = await supabaseClient.from('expenses')
             .update({ 
-                expense_date: expenseDate, // 💡 DB 업데이트
+                expense_date: expenseDate,
                 name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
             })
             .eq('id', currentEditingExpenseId).select();
@@ -711,7 +741,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
         }
 
-        render(); renderSettlementList(mainDatePicker.value);
+        render(); 
+        renderSettlementList(); 
         editExpenseModal.classList.add('hidden'); currentEditingExpenseId = null;
     }
     
@@ -724,7 +755,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 currentSettlement.is_settled = false;
                 await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
             }
-            render(); renderSettlementList(mainDatePicker.value);
+            render(); 
+            renderSettlementList(); 
         }
     }
 
@@ -776,7 +808,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function render() { 
         if (currentSettlement) { 
-            // 지출 내역 날짜순 정렬 (최신이 아래로 가도록)
             currentSettlement.expenses.sort((a, b) => new Date(a.expense_date || a.created_at) - new Date(b.expense_date || b.created_at));
             renderExpenses(); updateSummary(); toggleExpenseForm(currentSettlement.is_settled);
         }
@@ -785,7 +816,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderExpenses() {
         expenseTableBody.innerHTML = '';
         if (!currentSettlement || !currentSettlement.expenses) return;
-        const [userA, userB] = currentSettlement.participants;
+        const participants = currentSettlement.participants;
         const isLocked = currentSettlement.is_settled;
 
         currentSettlement.expenses.forEach(exp => {
@@ -793,7 +824,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             row.dataset.id = exp.id;
             row.classList.toggle('is-settled', isLocked);
 
-            // 💡 날짜 표시 로직 추가 (좁은 화면을 고려해 항목 이름 위에 작게 표시)
             let dateHtml = '';
             if (exp.expense_date) {
                 const d = new Date(exp.expense_date);
@@ -807,14 +837,19 @@ document.addEventListener('DOMContentLoaded', async () => {
                 amountHtml = `<span class="clickable-amount" data-id="${exp.id}" title="적용 환율 보기"><i class="fas fa-info-circle"></i> ${amountHtml}</span>`;
             }
 
-            row.innerHTML = `
+            let htmlStr = `
                 <td>${dateHtml}<div>${exp.name}</div></td>
                 <td>${amountHtml}</td>
                 <td>${exp.payer}</td>
-                <td>${formatNumber(exp.shares[userA] || 0, 2)} ${currentSettlement.base_currency}</td>
-                <td>${formatNumber(exp.shares[userB] || 0, 2)} ${currentSettlement.base_currency}</td>
-                <td><button class="delete-expense-btn" data-id="${exp.id}"><i class="fas fa-trash-alt"></i></button></td>
             `;
+
+            participants.forEach(p => {
+                htmlStr += `<td>${formatNumber(exp.shares[p] || 0, 2)} ${currentSettlement.base_currency}</td>`;
+            });
+
+            htmlStr += `<td><button class="delete-expense-btn" data-id="${exp.id}"><i class="fas fa-trash-alt"></i></button></td>`;
+            
+            row.innerHTML = htmlStr;
             
             const clickableAmountSpan = row.querySelector('.clickable-amount');
             if (clickableAmountSpan) {
@@ -836,29 +871,81 @@ document.addEventListener('DOMContentLoaded', async () => {
         );
     }
     
+    function calculateMinimumTransfers(expenses, participants) {
+        const balances = {};
+        participants.forEach(p => balances[p] = 0);
+        
+        expenses.forEach(exp => {
+            balances[exp.payer] += (exp.amount || 0);
+            participants.forEach(p => {
+                balances[p] -= (exp.shares[p] || 0);
+            });
+        });
+
+        let debtors = []; 
+        let creditors = []; 
+
+        for (const [person, balance] of Object.entries(balances)) {
+            if (balance > 0.01) creditors.push({ person, amount: balance });
+            else if (balance < -0.01) debtors.push({ person, amount: Math.abs(balance) });
+        }
+
+        debtors.sort((a, b) => b.amount - a.amount);
+        creditors.sort((a, b) => b.amount - a.amount);
+
+        const transfers = [];
+        let i = 0; 
+        let j = 0; 
+
+        while (i < debtors.length && j < creditors.length) {
+            let debtor = debtors[i];
+            let creditor = creditors[j];
+
+            let amountToTransfer = Math.min(debtor.amount, creditor.amount);
+
+            transfers.push({
+                from: debtor.person,
+                to: creditor.person,
+                amount: amountToTransfer
+            });
+
+            debtor.amount -= amountToTransfer;
+            creditor.amount -= amountToTransfer;
+
+            if (debtor.amount < 0.01) i++;
+            if (creditor.amount < 0.01) j++;
+        }
+
+        return transfers;
+    }
+
     function updateSummary() {
         if (!currentSettlement) return;
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
         const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         totalExpenseP.textContent = `${locales[currentLang]?.totalExpense || 'Total Expense'}: ${formatNumber(totalAmount, 2)} ${base_currency}`;
 
-        finalSettlementP.textContent = ''; completeSettlementBtn.classList.add('hidden');
+        finalSettlementContainer.innerHTML = '';
+        completeSettlementBtn.classList.add('hidden');
 
         if (is_settled) {
-            const [userA, userB] = participants;
-            const amountPaidByA = expenses.filter(exp => exp.payer === userA).reduce((sum, exp) => sum + (exp.amount || 0), 0);
-            const totalOwedByA = expenses.reduce((sum, exp) => sum + (exp.shares[userA] || 0), 0);
-            const balanceA = amountPaidByA - totalOwedByA;
-
-            let settlementText = locales[currentLang]?.settlementDone || 'Settlement complete';
-            if (balanceA > 0.01) settlementText = `${userB} ➡️ ${userA} (${formatNumber(balanceA, 2)} ${base_currency})`;
-            else if (balanceA < -0.01) settlementText = `${userA} ➡️ ${userB} (${formatNumber(Math.abs(balanceA), 2)} ${base_currency})`;
+            const transfers = calculateMinimumTransfers(expenses, participants);
             
-            finalSettlementP.textContent = settlementText;
+            if (transfers.length === 0) {
+                finalSettlementContainer.innerHTML = `<div class="transfer-item">${locales[currentLang]?.settlementDone || 'Settlement complete'}</div>`;
+            } else {
+                transfers.forEach(tr => {
+                    const div = document.createElement('div');
+                    div.className = 'transfer-item';
+                    div.textContent = `${tr.from} ➡️ ${tr.to} (${formatNumber(tr.amount, 2)} ${base_currency})`;
+                    finalSettlementContainer.appendChild(div);
+                });
+            }
+
             completeSettlementBtn.textContent = locales[currentLang]?.editSettlement || 'Reopen Settlement';
             completeSettlementBtn.classList.add('edit-mode'); completeSettlementBtn.classList.remove('hidden');
         } else {
-            finalSettlementP.textContent = locales[currentLang]?.settlementInProgress || 'Settlement in progress...';
+            finalSettlementContainer.innerHTML = `<div class="transfer-item text-muted">${locales[currentLang]?.settlementInProgress || 'Settlement in progress...'}</div>`;
             if (expenses.length > 0) {
                 completeSettlementBtn.textContent = locales[currentLang]?.completeSettlement || 'Complete Settlement';
                 completeSettlementBtn.classList.remove('edit-mode'); completeSettlementBtn.classList.remove('hidden');
@@ -873,34 +960,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function clearInputs() {
         itemNameInput.value = ''; itemAmountInput.value = '';
-        splitAmountAInput.value = ''; splitAmountBInput.value = '';
         document.getElementById('add-custom-rate').value = '';
         document.getElementById('add-rate-config-wrapper').classList.add('hidden');
         splitMethodSelect.value = 'equal';
-        // 💡 날짜 초기화 (현재 시간)
         itemDateInput.value = getLocalISOString(new Date());
         
+        splitAmountInputs.querySelectorAll('input').forEach(inp => inp.value = '');
+
         if(currentSettlement) itemCurrencySelect.value = currentSettlement.base_currency;
-        handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs, splitAmountAInput, splitAmountBInput);
+        handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs);
         itemNameInput.focus();
     }
 
     function downloadExcel() {
         if (!currentSettlement || currentSettlement.expenses.length === 0) { alert(locales[currentLang]?.noDataToExport || 'No expense data to export.'); return; }
         const { title, participants, expenses, base_currency } = currentSettlement;
-        const [userA, userB] = participants;
         const translations = locales[currentLang] || {};
         const dataForExport = [];
         
-        // 💡 엑셀 헤더에 일시 컬럼 추가
         const header = [
             translations.tableHeaderDate || 'Date',
             translations.tableHeaderItem || 'Item',
             translations.tableHeaderTotal || 'Total Amount',
-            translations.tableHeaderPayer || 'Payer',
-            (translations.shareOf || '{name} Share').replace('{name}', userA),
-            (translations.shareOf || '{name} Share').replace('{name}', userB),
+            translations.tableHeaderPayer || 'Payer'
         ];
+        participants.forEach(p => header.push((translations.shareOf || '{name} Share').replace('{name}', p)));
         dataForExport.push(header);
     
         expenses.forEach(exp => {
@@ -910,40 +994,34 @@ document.addEventListener('DOMContentLoaded', async () => {
                 excelAmountStr += ` (적용환율: ${formatNumber(appliedRate, 4)})`;
             }
             
-            // 💡 날짜 형식 변환
             let dateStr = '';
             if (exp.expense_date) {
                 const d = new Date(exp.expense_date);
-                dateStr = d.toLocaleString(); // 로컬 시간 형식에 맞게 출력
+                dateStr = d.toLocaleString();
             }
 
-            dataForExport.push([
-                dateStr, // 💡 일시
-                exp.name, 
-                excelAmountStr, 
-                exp.payer,
-                `${formatNumber(exp.shares[userA] || 0, 2)} ${base_currency}`,
-                `${formatNumber(exp.shares[userB] || 0, 2)} ${base_currency}`,
-            ]);
+            const rowData = [ dateStr, exp.name, excelAmountStr, exp.payer ];
+            participants.forEach(p => rowData.push(`${formatNumber(exp.shares[p] || 0, 2)} ${base_currency}`));
+            dataForExport.push(rowData);
         });
 
         const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
-        const amountPaidByA = expenses.filter(exp => exp.payer === userA).reduce((sum, exp) => sum + (exp.amount || 0), 0);
-        const totalOwedByA = expenses.reduce((sum, exp) => sum + (exp.shares[userA] || 0), 0);
-        const balanceA = amountPaidByA - totalOwedByA;
-
-        let resultString = translations.settlementDone || 'Settlement complete';
-        if (balanceA > 0.01) resultString = `${userB} → ${userA}: ${formatNumber(balanceA, 2)} ${base_currency}`;
-        else if (balanceA < -0.01) resultString = `${userA} → ${userB}: ${formatNumber(Math.abs(balanceA), 2)} ${base_currency}`;
+        const transfers = calculateMinimumTransfers(expenses, participants);
 
         dataForExport.push([]); 
         dataForExport.push(['', translations.totalExpense || 'Total Expense', `${formatNumber(totalAmount, 2)} ${base_currency}`]);
-        dataForExport.push(['', translations.settlementResult || 'Settlement Result', resultString]);
+        
+        if (transfers.length === 0) {
+            dataForExport.push(['', translations.settlementResult || 'Settlement Result', translations.settlementDone || 'Settlement complete']);
+        } else {
+            transfers.forEach((tr, index) => {
+                const prefix = index === 0 ? (translations.settlementResult || 'Settlement Result') : '';
+                dataForExport.push(['', prefix, `${tr.from} → ${tr.to}: ${formatNumber(tr.amount, 2)} ${base_currency}`]);
+            });
+        }
 
         const now = new Date();
-        const year = now.getFullYear(); const month = String(now.getMonth() + 1).padStart(2, '0'); const day = String(now.getDate()).padStart(2, '0');
-        const hours = String(now.getHours()).padStart(2, '0'); const minutes = String(now.getMinutes()).padStart(2, '0'); const seconds = String(now.getSeconds()).padStart(2, '0');
-        const timestamp = `${year}${month}${day}_${hours}${minutes}${seconds}`;
+        const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(dataForExport);

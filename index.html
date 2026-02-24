@@ -11,7 +11,7 @@
     <link rel="icon" href="icon.png" type="image/png">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=10">
+    <link rel="stylesheet" href="style.css?v=12">
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
@@ -40,10 +40,6 @@
             <aside id="left-pane">
                 <div class="sidebar-content">
                     <h2 data-i18n="settlementHistory">정산 내역 조회</h2>
-                    <div class="custom-date-wrapper">
-                        <div id="custom-date-display"></div>
-                        <input type="date" id="main-date-picker">
-                    </div>
                     <div id="settlement-list-container"></div>
                 </div>
             </aside>
@@ -78,7 +74,7 @@
                             <div id="total-expense" data-i18n="totalExpense">총 지출: 0 JPY</div>
                         </div>
                         <div class="summary-right">
-                            <p id="final-settlement"></p>
+                            <div id="final-settlement-container"></div>
                             <button id="complete-settlement-btn" class="hidden"></button>
                         </div>
                     </div>
@@ -123,10 +119,8 @@
                                 <select id="item-payer"></select>
                                 <select id="split-method" data-i18n-options="splitEqually,splitByAmount"></select>
                             </div>
-                            <div id="split-amount-inputs" class="hidden form-grid-row">
-                                <input type="text" id="split-amount-a" data-i18n-placeholder="participant1Share" inputmode="decimal">
-                                <input type="text" id="split-amount-b" data-i18n-placeholder="participant2Share" inputmode="decimal">
-                            </div>
+                            <div id="split-amount-inputs" class="hidden dynamic-split-grid"></div>
+                            
                             <button id="add-expense-btn" data-i18n="recordExpense"></button>
                         </div>
                     </div>
@@ -139,12 +133,10 @@
                         <div id="expense-table-container">
                             <table id="expense-table">
                                 <thead>
-                                    <tr>
+                                    <tr id="expense-table-header-row">
                                         <th data-i18n="tableHeaderItem">항목</th>
                                         <th data-i18n="tableHeaderTotal">총액</th>
                                         <th data-i18n="tableHeaderPayer">결제자</th>
-                                        <th id="table-header-user-a" data-i18n="tableHeaderParticipant1">참가자 1</th>
-                                        <th id="table-header-user-b" data-i18n="tableHeaderParticipant2">참가자 2</th>
                                         <th data-i18n="tableHeaderActions">관리</th>
                                     </tr>
                                 </thead>
@@ -161,15 +153,20 @@
         <div id="add-settlement-modal" class="hidden">
              <div class="modal-content card">
                 <span class="close-modal-btn"><i class="fas fa-times"></i></span>
-                <div class="modal-header">
-                    <h2 data-i18n="newSettlement"></h2>
-                    <span id="modal-date-display" class="settlement-date-badge"></span>
+                <div class="modal-header" style="justify-content: space-between;">
+                    <h2 data-i18n="newSettlement">새로운 정산</h2>
+                    <input type="date" id="new-settlement-date" class="modal-date-picker">
                 </div>
-                <input type="text" id="new-settlement-title" data-i18n-placeholder="settlementTitlePlaceholder">
-                <div class="participant-inputs">
-                    <input type="text" id="new-participant-a" value="A" data-i18n-placeholder="participant1Name">
-                    <input type="text" id="new-participant-b" value="B" data-i18n-placeholder="participant2Name">
+                <input type="text" id="new-settlement-title" data-i18n-placeholder="settlementTitlePlaceholder" style="margin-bottom: 1rem;">
+                
+                <div class="participant-section" style="margin-bottom: 1.5rem;">
+                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.9rem; font-weight: 600;">참가자 명단</label>
+                    <div id="participant-list-container" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.8rem;"></div>
+                    <button type="button" id="add-participant-btn" class="btn-outline" style="width: 100%; justify-content: center; border-style: dashed;">
+                        <i class="fas fa-plus"></i> 참가자 추가
+                    </button>
                 </div>
+
                 <div class="currency-select-wrapper">
                     <label for="base-currency" data-i18n="baseCurrency">기준 통화:</label>
                     <select id="base-currency">
@@ -262,10 +259,8 @@
                     <select id="edit-item-payer"></select>
                     <select id="edit-split-method" data-i18n-options="splitEqually,splitByAmount"></select>
                 </div>
-                <div id="edit-split-amount-inputs" class="hidden form-grid-row">
-                    <input type="text" id="edit-split-amount-a" inputmode="decimal">
-                    <input type="text" id="edit-split-amount-b" inputmode="decimal">
-                </div>
+                <div id="edit-split-amount-inputs" class="hidden dynamic-split-grid"></div>
+                
                 <button id="save-expense-changes-btn" data-i18n="saveChanges"></button>
             </div>
         </div>
@@ -275,14 +270,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="main.js?v=10"></script>
-    
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').then(r => console.log('SW registered')).catch(e => console.log('SW error', e));
-            });
-        }
-    </script>
+    <script src="main.js?v=12"></script>
 </body>
 </html>
