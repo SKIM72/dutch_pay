@@ -978,6 +978,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const translations = locales[currentLang] || {};
         const dataForExport = [];
         
+        // 1. 헤더 생성
         const header = [
             translations.tableHeaderDate || 'Date',
             translations.tableHeaderItem || 'Item',
@@ -987,6 +988,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         participants.forEach(p => header.push((translations.shareOf || '{name} Share').replace('{name}', p)));
         dataForExport.push(header);
     
+        // 각 사용자별 분담액 합계를 계산하기 위한 객체 초기화
+        const participantTotals = {};
+        participants.forEach(p => participantTotals[p] = 0);
+
+        // 2. 데이터 행 생성
         expenses.forEach(exp => {
             let excelAmountStr = `${formatNumber(exp.original_amount, 2)} ${exp.currency}`;
             if (exp.currency !== base_currency) {
@@ -1001,16 +1007,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             const rowData = [ dateStr, exp.name, excelAmountStr, exp.payer ];
-            participants.forEach(p => rowData.push(`${formatNumber(exp.shares[p] || 0, 2)} ${base_currency}`));
+            participants.forEach(p => {
+                const shareAmount = exp.shares[p] || 0;
+                rowData.push(`${formatNumber(shareAmount, 2)} ${base_currency}`);
+                // 사용자별 분담액 누적
+                participantTotals[p] += shareAmount;
+            });
             dataForExport.push(rowData);
         });
 
         const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         const transfers = calculateMinimumTransfers(expenses, participants);
 
-        dataForExport.push([]); 
-        dataForExport.push(['', translations.totalExpense || 'Total Expense', `${formatNumber(totalAmount, 2)} ${base_currency}`]);
+        // 열 구조에 맞춰진 총 지출 및 분담액 합계 행 추가
+        const totalsRow = [
+            '', // Date 컬럼 (빈칸)
+            translations.totalExpense || '총 지출', // Item 컬럼 위치에 라벨 표시
+            `${formatNumber(totalAmount, 2)} ${base_currency}`, // Total Amount 합계
+            ''  // Payer 컬럼 (빈칸)
+        ];
+        // 각 참가자의 총 분담액을 해당 열에 푸시
+        participants.forEach(p => totalsRow.push(`${formatNumber(participantTotals[p], 2)} ${base_currency}`));
+        dataForExport.push(totalsRow);
+
+        dataForExport.push([]); // 시각적 구분을 위한 빈 행
         
+        // 3. 정산 결과 행 추가
         if (transfers.length === 0) {
             dataForExport.push(['', translations.settlementResult || 'Settlement Result', translations.settlementDone || 'Settlement complete']);
         } else {
@@ -1026,13 +1048,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(dataForExport);
     
+        // 데이터 길이에 맞춰 열 너비(Column Width) 자동 계산 및 적용
+        const colWidths = [];
+        dataForExport.forEach(row => {
+            row.forEach((cell, i) => {
+                const cellValue = cell ? cell.toString() : '';
+                let length = 0;
+                // 한글, 일본어 등 다바이트 문자는 너비를 더 차지하도록 가중치 2.1 적용
+                for (let char of cellValue) {
+                    length += char.charCodeAt(0) > 255 ? 2.1 : 1.1; 
+                }
+                const cellWidth = Math.max(10, Math.ceil(length) + 2); // 최소 너비 10 설정, 양옆 여백 2 추가
+                if (!colWidths[i] || colWidths[i] < cellWidth) {
+                    colWidths[i] = cellWidth;
+                }
+            });
+        });
+        ws['!cols'] = colWidths.map(w => ({ wch: w }));
+
+        // 4. 셀 스타일 적용
         const range = XLSX.utils.decode_range(ws['!ref']);
         for (let R = range.s.r; R <= range.e.r; ++R) {
             for (let C = range.s.c; C <= range.e.c; ++C) {
                 const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
                 if (!ws[cell_ref]) continue;
-                if (R === 0) ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true }, fill: { fgColor: { rgb: "E2E8F0" } } };
-                else ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" } };
+                
+                if (R === 0) {
+                    // 헤더 (첫 번째 행) 스타일
+                    ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true }, fill: { fgColor: { rgb: "E2E8F0" } } };
+                } 
+                else if (R === expenses.length + 1) {
+                    // 합계 행 (데이터 바로 밑 행) 강조 스타일
+                    ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true }, fill: { fgColor: { rgb: "F1F5F9" } } };
+                } 
+                else {
+                    // 기본 데이터 셀 스타일
+                    ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" } };
+                }
             }
         }
     
