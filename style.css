@@ -43,11 +43,10 @@ header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-
 .settlement-item .item-content { display: flex; align-items: flex-start; flex: 1; min-width: 0; }
 .item-text-group { display: flex; flex-direction: column; align-items: flex-start; overflow: hidden; width: 100%; }
 
-/* 💡 날짜 뱃지와 체크 아이콘을 같은 줄에 묶어주는 래퍼 추가 */
 .date-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 4px; }
 .item-date-badge { font-size: 0.75rem; color: var(--primary); font-weight: 600; background: #eef2ff; padding: 2px 6px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; }
 .settled-icon { color: var(--secondary); flex-shrink: 0; font-size: 1.1rem; }
-.settlement-item.active .settled-icon { color: #34d399; } /* 활성화 상태일 때 좀 더 밝은 초록색 */
+.settlement-item.active .settled-icon { color: #34d399; } 
 
 .settlement-item .item-title { font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; text-align: left; width: 100%; }
 .settlement-item:hover { background: #f9fafb; border-color: #d1d5db; }
@@ -57,7 +56,7 @@ header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-
 .settlement-item.active .item-date-badge { color: white; background: rgba(255,255,255,0.2); }
 .settlement-item.active .item-participants { color: rgba(255, 255, 255, 0.7); background: transparent; }
 
-.settlement-item.is-settled { opacity: 0.9; } /* 💡 정산 완료 시 너무 흐려지지 않게 조절, 취소선 삭제 */
+.settlement-item.is-settled { opacity: 0.9; } 
 .settlement-item.active.is-settled { background: #5a67d8; }
 
 .delete-settlement-btn { background: #fee2e2; color: var(--danger); border: 1px solid #fecaca; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
@@ -110,7 +109,6 @@ button { background: var(--primary); color: white; padding: 0.75rem 1.25rem; bor
 button:hover { background: var(--primary-hover); }
 button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 
-/* 👇 고정된 width 값을 부여하여 버튼 크기가 동일하게 유지되도록 수정 */
 #complete-settlement-btn { width: 220px; margin-top: 0.2rem; text-align: center;}
 #complete-settlement-btn.edit-mode { background-color: var(--secondary); }
 #complete-settlement-btn.edit-mode:hover { background-color: var(--secondary-hover); }
@@ -225,6 +223,7 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 .capture-mode {
     min-width: 800px !important;
     width: max-content !important; 
+    max-width: none !important;
     background: #ffffff !important;
     padding: 40px !important;
     box-sizing: border-box !important;

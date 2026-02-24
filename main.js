@@ -313,6 +313,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const dataUrl = await htmlToImage.toPng(targetView, { 
                 backgroundColor: '#ffffff', 
                 pixelRatio: window.devicePixelRatio > 1 ? window.devicePixelRatio + 1 : 3,
+                width: targetView.scrollWidth,
+                height: targetView.scrollHeight
             });
 
             const now = new Date();
