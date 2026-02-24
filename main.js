@@ -589,9 +589,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const name = itemNameInput.value.trim();
         const originalAmount = parseFormattedNumber(itemAmountInput.value);
         const currency = itemCurrencySelect.value;
-        const expenseDate = itemDateInput.value; 
+        const expenseDateRaw = itemDateInput.value; 
         
-        if (!name || originalAmount <= 0 || !expenseDate) { alert(locales[currentLang]?.invalidInput); return; }
+        if (!name || originalAmount <= 0 || !expenseDateRaw) { alert(locales[currentLang]?.invalidInput); return; }
+
+        // 브라우저의 로컬 시간대를 반영하여 UTC 표준 시간으로 변환
+        const expenseDate = new Date(expenseDateRaw).toISOString();
 
         let rate = 1;
         if (currency !== currentSettlement.base_currency) {
@@ -693,9 +696,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const name = editItemNameInput.value.trim();
         const originalAmount = parseFormattedNumber(editItemAmountInput.value);
         const currency = editItemCurrencySelect.value;
-        const expenseDate = editItemDateInput.value; 
+        const expenseDateRaw = editItemDateInput.value; 
         
-        if (!name || originalAmount <= 0 || !expenseDate) { alert(locales[currentLang]?.invalidInput); return; }
+        if (!name || originalAmount <= 0 || !expenseDateRaw) { alert(locales[currentLang]?.invalidInput); return; }
+
+        // 브라우저의 로컬 시간대를 반영하여 UTC 표준 시간으로 변환
+        const expenseDate = new Date(expenseDateRaw).toISOString();
 
         let rate = 1;
         if (currency !== currentSettlement.base_currency) {
@@ -978,7 +984,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const translations = locales[currentLang] || {};
         const dataForExport = [];
         
-        // 1. 헤더 생성
+        // --- 1. 헤더 구조 파악 (총 열 개수 계산용) ---
         const header = [
             translations.tableHeaderDate || 'Date',
             translations.tableHeaderItem || 'Item',
@@ -986,13 +992,27 @@ document.addEventListener('DOMContentLoaded', async () => {
             translations.tableHeaderPayer || 'Payer'
         ];
         participants.forEach(p => header.push((translations.shareOf || '{name} Share').replace('{name}', p)));
+
+        // --- 2. 상단 타이틀 및 기본 정보 추가 ---
+        const appName = translations.appTitle ? translations.appTitle.split('|')[0].trim() : 'Settle Up';
+        dataForExport.push([`${title} - ${appName} 정산 내역`]);
+
+        // 참여자와 기준 통화를 양끝에 배치 (기준 통화 우측 정렬)
+        const subHeaderRow = new Array(header.length).fill('');
+        subHeaderRow[0] = `참여자: ${participants.join(', ')}`;
+        subHeaderRow[header.length - 1] = `기준 통화: ${base_currency}`;
+        dataForExport.push(subHeaderRow);
+
+        dataForExport.push([]); // 시각적 구분을 위한 빈 행
+        
+        // --- 3. 테이블 헤더 데이터 푸시 ---
         dataForExport.push(header);
     
         // 각 사용자별 분담액 합계를 계산하기 위한 객체 초기화
         const participantTotals = {};
         participants.forEach(p => participantTotals[p] = 0);
 
-        // 2. 데이터 행 생성
+        // --- 4. 데이터 행 생성 ---
         expenses.forEach(exp => {
             let excelAmountStr = `${formatNumber(exp.original_amount, 2)} ${exp.currency}`;
             if (exp.currency !== base_currency) {
@@ -1010,7 +1030,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             participants.forEach(p => {
                 const shareAmount = exp.shares[p] || 0;
                 rowData.push(`${formatNumber(shareAmount, 2)} ${base_currency}`);
-                // 사용자별 분담액 누적
                 participantTotals[p] += shareAmount;
             });
             dataForExport.push(rowData);
@@ -1019,26 +1038,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         const transfers = calculateMinimumTransfers(expenses, participants);
 
-        // 열 구조에 맞춰진 총 지출 및 분담액 합계 행 추가
+        // --- 5. 총 지출 및 분담액 합계 행 추가 ---
         const totalsRow = [
             '', // Date 컬럼 (빈칸)
             translations.totalExpense || '총 지출', // Item 컬럼 위치에 라벨 표시
             `${formatNumber(totalAmount, 2)} ${base_currency}`, // Total Amount 합계
             ''  // Payer 컬럼 (빈칸)
         ];
-        // 각 참가자의 총 분담액을 해당 열에 푸시
         participants.forEach(p => totalsRow.push(`${formatNumber(participantTotals[p], 2)} ${base_currency}`));
         dataForExport.push(totalsRow);
 
         dataForExport.push([]); // 시각적 구분을 위한 빈 행
         
-        // 3. 정산 결과 행 추가
+        // --- 6. 정산 결과 행 추가 ---
+        const resultTitleRowIndex = dataForExport.length; 
+        const resultTitleRow = new Array(header.length).fill('');
+        resultTitleRow[0] = translations.settlementResult || '정산 결과';
+        dataForExport.push(resultTitleRow);
+
         if (transfers.length === 0) {
-            dataForExport.push(['', translations.settlementResult || 'Settlement Result', translations.settlementDone || 'Settlement complete']);
+            const doneRow = new Array(header.length).fill('');
+            doneRow[0] = translations.settlementDone || '정산이 완료되었습니다. (송금 필요 없음)';
+            dataForExport.push(doneRow);
         } else {
-            transfers.forEach((tr, index) => {
-                const prefix = index === 0 ? (translations.settlementResult || 'Settlement Result') : '';
-                dataForExport.push(['', prefix, `${tr.from} → ${tr.to}: ${formatNumber(tr.amount, 2)} ${base_currency}`]);
+            transfers.forEach(tr => {
+                const trRow = new Array(header.length).fill('');
+                // 왼쪽 열(0)에 [누가 누구한테], 그 다음 열(1)에 [금액] 삽입
+                trRow[0] = `${tr.from} ➡️ ${tr.to}`; 
+                trRow[1] = `${formatNumber(tr.amount, 2)} ${base_currency}`;
+                dataForExport.push(trRow);
             });
         }
 
@@ -1048,17 +1076,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(dataForExport);
     
-        // 데이터 길이에 맞춰 열 너비(Column Width) 자동 계산 및 적용
+        // --- 7. 셀 병합 (Merges) 설정 ---
+        if(!ws['!merges']) ws['!merges'] = [];
+        // 메인 타이틀 행 병합 (A1 부터 마지막 컬럼까지)
+        ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } });
+        // 참여자 목록 셀 병합 (너무 길면 잘리지 않도록 A2 부터 n-1 열까지)
+        ws['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: header.length - 2 } });
+        // 정산 결과 제목 행 병합 (첫 번째 열부터 두 번째 열까지 두 칸)
+        ws['!merges'].push({ s: { r: resultTitleRowIndex, c: 0 }, e: { r: resultTitleRowIndex, c: 1 } });
+        
+        if (transfers.length === 0) {
+            // 송금 필요 없는 경우 안내 문구도 두 칸 병합
+            ws['!merges'].push({ s: { r: resultTitleRowIndex + 1, c: 0 }, e: { r: resultTitleRowIndex + 1, c: 1 } });
+        }
+
+        // --- 8. 데이터 길이에 맞춰 열 너비(Column Width) 자동 계산 ---
         const colWidths = [];
-        dataForExport.forEach(row => {
+        dataForExport.forEach((row, rowIndex) => {
+            // 병합된 헤더나 제목 열은 너비 계산에서 제외
+            if (rowIndex === 0 || rowIndex === 1 || rowIndex === resultTitleRowIndex) return; 
+            
             row.forEach((cell, i) => {
                 const cellValue = cell ? cell.toString() : '';
                 let length = 0;
-                // 한글, 일본어 등 다바이트 문자는 너비를 더 차지하도록 가중치 2.1 적용
                 for (let char of cellValue) {
                     length += char.charCodeAt(0) > 255 ? 2.1 : 1.1; 
                 }
-                const cellWidth = Math.max(10, Math.ceil(length) + 2); // 최소 너비 10 설정, 양옆 여백 2 추가
+                const cellWidth = Math.max(12, Math.ceil(length) + 2); 
                 if (!colWidths[i] || colWidths[i] < cellWidth) {
                     colWidths[i] = cellWidth;
                 }
@@ -1066,23 +1110,44 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         ws['!cols'] = colWidths.map(w => ({ wch: w }));
 
-        // 4. 셀 스타일 적용
+        // --- 9. 셀 스타일 적용 ---
         const range = XLSX.utils.decode_range(ws['!ref']);
+        const headerRowIdx = 3;
+        const totalRowIdx = headerRowIdx + expenses.length + 1;
+
         for (let R = range.s.r; R <= range.e.r; ++R) {
             for (let C = range.s.c; C <= range.e.c; ++C) {
                 const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
                 if (!ws[cell_ref]) continue;
                 
                 if (R === 0) {
-                    // 헤더 (첫 번째 행) 스타일
+                    // 최상단 메인 타이틀
+                    ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { sz: 16, bold: true, color: { rgb: "4F46E5" } }, fill: { fgColor: { rgb: "EEF2FF" } } };
+                } else if (R === 1) {
+                    // 서브 정보 (참여자 목록, 기준 통화)
+                    if (C === header.length - 1) {
+                        ws[cell_ref].s = { font: { bold: true, color: { rgb: "64748B" } }, alignment: { horizontal: "right", vertical: "center" } };
+                    } else {
+                        ws[cell_ref].s = { font: { bold: true, color: { rgb: "64748B" } }, alignment: { horizontal: "left", vertical: "center" } };
+                    }
+                } else if (R === headerRowIdx) {
+                    // 데이터 테이블 헤더
                     ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true }, fill: { fgColor: { rgb: "E2E8F0" } } };
-                } 
-                else if (R === expenses.length + 1) {
-                    // 합계 행 (데이터 바로 밑 행) 강조 스타일
+                } else if (R === totalRowIdx) {
+                    // 총합계 행
                     ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true }, fill: { fgColor: { rgb: "F1F5F9" } } };
-                } 
-                else {
-                    // 기본 데이터 셀 스타일
+                } else if (R === resultTitleRowIndex) {
+                    // 정산 결과 섹션 제목
+                    if (C <= 1) {
+                        ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "6366F1" } } };
+                    }
+                } else if (R > resultTitleRowIndex) {
+                    // 정산 결과 데이터 영역
+                    if (C === 0 || C === 1) {
+                        ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true, sz: 12, color: { rgb: "1E293B" } } };
+                    }
+                } else if (R > 3 && R < totalRowIdx) {
+                    // 기본 데이터 셀
                     ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" } };
                 }
             }
