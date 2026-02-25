@@ -48,7 +48,24 @@ const locales = {
         applyLiveRate: "실시간 최신",
         copyText: "정산 결과 텍스트로 복사하기",
         saveImage: "정산 결과 이미지로 저장하기",
-        copySuccess: "정산 요약이 클립보드에 복사되었습니다. 카톡 등 메신저에 붙여넣기 하세요!"
+        copySuccess: "정산 요약이 클립보드에 복사되었습니다. 카톡 등 메신저에 붙여넣기 하세요!", // <-- 쉼표 추가!
+        email: "이메일",
+        password: "비밀번호",
+        confirmPassword: "비밀번호 확인",
+        login: "로그인",
+        logout: "로그아웃",
+        loginRequired: "로그인이 필요합니다.",
+        signup: "회원가입",
+        forgotPassword: "비밀번호를 잊으셨나요?",
+        resetPassword: "비밀번호 재설정",
+        sendResetLink: "재설정 링크 보내기",
+        noAccount: "계정이 없으신가요?",
+        alreadyHaveAccount: "이미 계정이 있으신가요?",
+        passwordsDoNotMatch: "비밀번호가 일치하지 않습니다.",
+        checkEmailForLink: "이메일로 전송된 링크를 확인해 주세요!",
+        signupSuccess: "가입 성공! 이메일 인증 링크를 확인해 주세요.",
+        updatePassword: "새 비밀번호 저장",
+        passwordUpdated: "비밀번호가 성공적으로 변경되었습니다."
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -99,7 +116,24 @@ const locales = {
         applyLiveRate: "Live Latest",
         copyText: "Copy Settlement Text",
         saveImage: "Save as Image",
-        copySuccess: "Settlement summary copied to clipboard. Paste it in your messenger!"
+        copySuccess: "Settlement summary copied to clipboard. Paste it in your messenger!", // <-- 쉼표 추가!
+        email: "Email",
+        password: "Password",
+        confirmPassword: "Confirm Password",
+        login: "Login",
+        logout: "Logout",
+        loginRequired: "Login required.",
+        signup: "Sign Up",
+        forgotPassword: "Forgot Password?",
+        resetPassword: "Reset Password",
+        sendResetLink: "Send Reset Link",
+        noAccount: "Don't have an account?",
+        alreadyHaveAccount: "Already have an account?",
+        passwordsDoNotMatch: "Passwords do not match.",
+        checkEmailForLink: "Please check your email for the link!",
+        signupSuccess: "Sign up successful! Please check your email to verify.",
+        updatePassword: "Save New Password",
+        passwordUpdated: "Password updated successfully."
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -150,6 +184,23 @@ const locales = {
         applyLiveRate: "リアルタイム最新",
         copyText: "精算結果をテキストでコピー",
         saveImage: "精算結果を画像で保存",
-        copySuccess: "精算の概要がクリップボードにコピーされました。メッセンジャーなどに貼り付けてください！"
+        copySuccess: "精算の概要がクリップボードにコピーされました。メッセンジャーなどに貼り付けてください！", // <-- 쉼표 추가!
+        email: "メールアドレス",
+        password: "パスワード",
+        confirmPassword: "パスワード（確認）",
+        login: "ログイン",
+        logout: "ログアウト",
+        loginRequired: "ログインが必要です。",
+        signup: "新規登録",
+        forgotPassword: "パスワードをお忘れですか？",
+        resetPassword: "パスワードの再設定",
+        sendResetLink: "再設定リンクを送信",
+        noAccount: "アカウントをお持ちでないですか？",
+        alreadyHaveAccount: "すでにアカウントをお持ちですか？",
+        passwordsDoNotMatch: "パスワードが一致しません。",
+        checkEmailForLink: "メールに送信されたリンクを確認してください！",
+        signupSuccess: "登録成功！メールの認証リンクを確認してください。",
+        updatePassword: "新しいパスワードを保存",
+        passwordUpdated: "パスワードが正常に変更されました。"
     }
 };

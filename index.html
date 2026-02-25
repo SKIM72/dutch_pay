@@ -11,7 +11,7 @@
     <link rel="icon" href="icon.png" type="image/png">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=16">
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
@@ -32,6 +32,9 @@
                         <option value="ja">日本語</option>
                     </select>
                 </div>
+                <button id="auth-btn" class="btn-outline" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                    <i class="fas fa-sign-in-alt"></i> <span data-i18n="login">로그인</span>
+                </button>
                 <button id="mobile-menu-btn"><i class="fas fa-bars"></i></button>
             </div>
         </header>
@@ -148,7 +151,7 @@
             </main>
         </div>
 
-        <button id="add-settlement-fab"><i class="fas fa-plus"></i></button>
+        <button id="add-settlement-fab" class="hidden"><i class="fas fa-plus"></i></button>
 
         <div id="add-settlement-modal" class="hidden">
              <div class="modal-content card">
@@ -270,6 +273,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="main.js?v=12"></script>
+    <script src="main.js?v=16"></script>
 </body>
 </html>

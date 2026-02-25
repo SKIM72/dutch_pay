@@ -8,11 +8,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentSettlement = null;
     let currentLang = 'ko';
     let currentEditingExpenseId = null;
+    let currentUser = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD'];
 
     // --- Element References ---
     const languageSwitcher = document.getElementById('language-switcher');
+    const authBtn = document.getElementById('auth-btn'); // 상단 로그인/로그아웃 버튼
     const sidebar = document.getElementById('left-pane');
     const appTitle = document.querySelector('.brand-container');
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
@@ -75,6 +77,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         return (new Date(date - offset)).toISOString().slice(0, 16);
     };
 
+    // --- UI 업데이트: 로그인 상태에 따라 버튼과 권한 제어 ---
+    function updateAuthUI() {
+        if (currentUser) {
+            authBtn.innerHTML = `<i class="fas fa-sign-out-alt" style="color: var(--danger);"></i> <span data-i18n="logout" style="color: var(--danger);">${locales[currentLang]?.logout || '로그아웃'}</span>`;
+            authBtn.style.background = '#fee2e2';
+            authBtn.style.borderColor = 'transparent';
+            addSettlementFab.classList.remove('hidden'); 
+        } else {
+            authBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i> <span data-i18n="login">${locales[currentLang]?.login || '로그인'}</span>`;
+            authBtn.style.background = 'transparent';
+            authBtn.style.borderColor = 'var(--border)';
+            addSettlementFab.classList.add('hidden'); 
+        }
+    }
+
+    // --- 로그인/로그아웃 버튼 클릭 처리 ---
+    async function handleAuthClick() {
+        if (currentUser) {
+            await supabaseClient.auth.signOut();
+            window.location.replace('login.html');
+        } else {
+            window.location.href = 'login.html';
+        }
+    }
+
     function updateUI(lang) {
         currentLang = lang;
         const translations = locales[lang];
@@ -108,6 +135,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         });
         
+        updateAuthUI();
+
         if (currentSettlement) {
             updateParticipantNames(currentSettlement.participants);
             render();
@@ -144,10 +173,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         const initialLang = preferredLang || (['ko', 'en', 'ja'].includes(browserLang) ? browserLang : 'en');
         
         setupEventListeners();
-        await loadData();
-        setLanguage(initialLang);
+
+        // 1. 초기 세션 확인
+        const { data: { session } } = await supabaseClient.auth.getSession();
         
+        // 로그인 안 되어 있으면 로그인 페이지로 강제 이동!
+        if (!session) {
+            window.location.replace('login.html');
+            return; 
+        }
+        
+        currentUser = session.user;
+        updateAuthUI();
+
+        // 2. 실시간 세션 감지
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_OUT' || !session) {
+                window.location.replace('login.html');
+            } else {
+                currentUser = session.user;
+                updateAuthUI();
+            }
+        });
+
+        setLanguage(initialLang);
         itemDateInput.value = getLocalISOString(new Date());
+        
+        await loadData();
     }
 
     async function loadData() {
@@ -338,6 +390,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         appTitle.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
         mobileMenuBtn.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
         
+        authBtn.addEventListener('click', handleAuthClick); // 이벤트 연동 복구!
+
         addSettlementFab.addEventListener('click', () => {
             newSettlementDateInput.value = new Date().toLocaleDateString('fr-CA', { timeZone: 'Asia/Tokyo' });
             renderParticipantInputs(2);
@@ -485,6 +539,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function renderSettlementList() {
+        if (!currentUser) return; 
+        
         settlementListContainer.innerHTML = settlements.length === 0 
             ? `<p class="subtitle">${locales[currentLang]?.noHistory || 'History does not exist.'}</p>`
             : settlements.map(s => `
@@ -595,7 +651,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (!name || originalAmount <= 0 || !expenseDateRaw) { alert(locales[currentLang]?.invalidInput); return; }
 
-        // 브라우저의 로컬 시간대를 반영하여 UTC 표준 시간으로 변환
         const expenseDate = new Date(expenseDateRaw).toISOString();
 
         let rate = 1;
@@ -702,7 +757,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (!name || originalAmount <= 0 || !expenseDateRaw) { alert(locales[currentLang]?.invalidInput); return; }
 
-        // 브라우저의 로컬 시간대를 반영하여 UTC 표준 시간으로 변환
         const expenseDate = new Date(expenseDateRaw).toISOString();
 
         let rate = 1;
@@ -986,7 +1040,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const translations = locales[currentLang] || {};
         const dataForExport = [];
         
-        // --- 1. 헤더 구조 파악 (총 열 개수 계산용) ---
         const header = [
             translations.tableHeaderDate || 'Date',
             translations.tableHeaderItem || 'Item',
@@ -995,26 +1048,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         ];
         participants.forEach(p => header.push((translations.shareOf || '{name} Share').replace('{name}', p)));
 
-        // --- 2. 상단 타이틀 및 기본 정보 추가 ---
         const appName = translations.appTitle ? translations.appTitle.split('|')[0].trim() : 'Settle Up';
         dataForExport.push([`${title} - ${appName} 정산 내역`]);
 
-        // 참여자와 기준 통화를 양끝에 배치 (기준 통화 우측 정렬)
         const subHeaderRow = new Array(header.length).fill('');
         subHeaderRow[0] = `참여자: ${participants.join(', ')}`;
         subHeaderRow[header.length - 1] = `기준 통화: ${base_currency}`;
         dataForExport.push(subHeaderRow);
 
-        dataForExport.push([]); // 시각적 구분을 위한 빈 행
+        dataForExport.push([]); 
         
-        // --- 3. 테이블 헤더 데이터 푸시 ---
         dataForExport.push(header);
     
-        // 각 사용자별 분담액 합계를 계산하기 위한 객체 초기화
         const participantTotals = {};
         participants.forEach(p => participantTotals[p] = 0);
 
-        // --- 4. 데이터 행 생성 ---
         expenses.forEach(exp => {
             let excelAmountStr = `${formatNumber(exp.original_amount, 2)} ${exp.currency}`;
             if (exp.currency !== base_currency) {
@@ -1040,19 +1088,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         const transfers = calculateMinimumTransfers(expenses, participants);
 
-        // --- 5. 총 지출 및 분담액 합계 행 추가 ---
         const totalsRow = [
-            '', // Date 컬럼 (빈칸)
-            translations.totalExpense || '총 지출', // Item 컬럼 위치에 라벨 표시
-            `${formatNumber(totalAmount, 2)} ${base_currency}`, // Total Amount 합계
-            ''  // Payer 컬럼 (빈칸)
+            '', 
+            translations.totalExpense || '총 지출', 
+            `${formatNumber(totalAmount, 2)} ${base_currency}`, 
+            ''  
         ];
         participants.forEach(p => totalsRow.push(`${formatNumber(participantTotals[p], 2)} ${base_currency}`));
         dataForExport.push(totalsRow);
 
-        dataForExport.push([]); // 시각적 구분을 위한 빈 행
+        dataForExport.push([]); 
         
-        // --- 6. 정산 결과 행 추가 ---
         const resultTitleRowIndex = dataForExport.length; 
         const resultTitleRow = new Array(header.length).fill('');
         resultTitleRow[0] = translations.settlementResult || '정산 결과';
@@ -1065,7 +1111,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             transfers.forEach(tr => {
                 const trRow = new Array(header.length).fill('');
-                // 왼쪽 열(0)에 [누가 누구한테], 그 다음 열(1)에 [금액] 삽입
                 trRow[0] = `${tr.from} ➡️ ${tr.to}`; 
                 trRow[1] = `${formatNumber(tr.amount, 2)} ${base_currency}`;
                 dataForExport.push(trRow);
@@ -1078,24 +1123,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.aoa_to_sheet(dataForExport);
     
-        // --- 7. 셀 병합 (Merges) 설정 ---
         if(!ws['!merges']) ws['!merges'] = [];
-        // 메인 타이틀 행 병합 (A1 부터 마지막 컬럼까지)
         ws['!merges'].push({ s: { r: 0, c: 0 }, e: { r: 0, c: header.length - 1 } });
-        // 참여자 목록 셀 병합 (너무 길면 잘리지 않도록 A2 부터 n-1 열까지)
         ws['!merges'].push({ s: { r: 1, c: 0 }, e: { r: 1, c: header.length - 2 } });
-        // 정산 결과 제목 행 병합 (첫 번째 열부터 두 번째 열까지 두 칸)
         ws['!merges'].push({ s: { r: resultTitleRowIndex, c: 0 }, e: { r: resultTitleRowIndex, c: 1 } });
         
         if (transfers.length === 0) {
-            // 송금 필요 없는 경우 안내 문구도 두 칸 병합
             ws['!merges'].push({ s: { r: resultTitleRowIndex + 1, c: 0 }, e: { r: resultTitleRowIndex + 1, c: 1 } });
         }
 
-        // --- 8. 데이터 길이에 맞춰 열 너비(Column Width) 자동 계산 ---
         const colWidths = [];
         dataForExport.forEach((row, rowIndex) => {
-            // 병합된 헤더나 제목 열은 너비 계산에서 제외
             if (rowIndex === 0 || rowIndex === 1 || rowIndex === resultTitleRowIndex) return; 
             
             row.forEach((cell, i) => {
@@ -1112,7 +1150,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         ws['!cols'] = colWidths.map(w => ({ wch: w }));
 
-        // --- 9. 셀 스타일 적용 ---
         const range = XLSX.utils.decode_range(ws['!ref']);
         const headerRowIdx = 3;
         const totalRowIdx = headerRowIdx + expenses.length + 1;
@@ -1123,33 +1160,26 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!ws[cell_ref]) continue;
                 
                 if (R === 0) {
-                    // 최상단 메인 타이틀
                     ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { sz: 16, bold: true, color: { rgb: "4F46E5" } }, fill: { fgColor: { rgb: "EEF2FF" } } };
                 } else if (R === 1) {
-                    // 서브 정보 (참여자 목록, 기준 통화)
                     if (C === header.length - 1) {
                         ws[cell_ref].s = { font: { bold: true, color: { rgb: "64748B" } }, alignment: { horizontal: "right", vertical: "center" } };
                     } else {
                         ws[cell_ref].s = { font: { bold: true, color: { rgb: "64748B" } }, alignment: { horizontal: "left", vertical: "center" } };
                     }
                 } else if (R === headerRowIdx) {
-                    // 데이터 테이블 헤더
                     ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true }, fill: { fgColor: { rgb: "E2E8F0" } } };
                 } else if (R === totalRowIdx) {
-                    // 총합계 행
                     ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true }, fill: { fgColor: { rgb: "F1F5F9" } } };
                 } else if (R === resultTitleRowIndex) {
-                    // 정산 결과 섹션 제목
                     if (C <= 1) {
                         ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "6366F1" } } };
                     }
                 } else if (R > resultTitleRowIndex) {
-                    // 정산 결과 데이터 영역
                     if (C === 0 || C === 1) {
                         ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true, sz: 12, color: { rgb: "1E293B" } } };
                     }
                 } else if (R > 3 && R < totalRowIdx) {
-                    // 기본 데이터 셀
                     ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" } };
                 }
             }
