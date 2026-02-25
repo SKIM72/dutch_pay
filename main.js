@@ -14,7 +14,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Element References ---
     const languageSwitcher = document.getElementById('language-switcher');
-    const authBtn = document.getElementById('auth-btn'); // 상단 로그인/로그아웃 버튼
+    const authBtn = document.getElementById('auth-btn'); 
+    
+    const userInfoDisplay = document.getElementById('user-info-display');
+    const userEmailText = document.getElementById('user-email-text');
+
     const sidebar = document.getElementById('left-pane');
     const appTitle = document.querySelector('.brand-container');
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
@@ -70,31 +74,110 @@ document.addEventListener('DOMContentLoaded', async () => {
     const itemNameInput = document.getElementById('item-name');
     const itemAmountInput = document.getElementById('item-amount');
 
+    // 🚀 --- 완벽한 타임존(Timezone) 날짜 처리 함수들 ---
     const formatNumber = (num, decimals = 2) => isNaN(num) ? '0' : num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     const parseFormattedNumber = (str) => parseFloat(String(str).replace(/,/g, '')) || 0;
-    const getLocalISOString = (date) => {
-        const offset = date.getTimezoneOffset() * 60000;
-        return (new Date(date - offset)).toISOString().slice(0, 16);
-    };
+    
+    // 로컬 시간 기준 YYYY-MM-DD 반환 (정산 생성용)
+    function getLocalDateString() {
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000;
+        return new Date(now.getTime() - offset).toISOString().split('T')[0];
+    }
 
-    // --- UI 업데이트: 로그인 상태에 따라 버튼과 권한 제어 ---
+    // 로컬 시간 기준 YYYY-MM-DDTHH:mm 반환 (지출 추가용)
+    function getLocalISOString() {
+        const now = new Date();
+        const offset = now.getTimezoneOffset() * 60000;
+        return new Date(now.getTime() - offset).toISOString().slice(0, 16);
+    }
+
+    // DB에서 가져온 날짜(UTC)를 로컬 날짜(YYYY-MM-DD)로 강제 보정하여 화면에 표시
+    function formatDisplayDate(dateStr) {
+        if (!dateStr) return '';
+        if (dateStr.includes('T')) {
+            const d = new Date(dateStr);
+            const offset = d.getTimezoneOffset() * 60000;
+            return new Date(d.getTime() - offset).toISOString().split('T')[0];
+        }
+        return dateStr;
+    }
+
+    // --- UI/UX Enhancements (Toast, Confirm, Loader) ---
+    function showToast(message, type = 'success') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        
+        let iconClass = 'fa-check-circle';
+        if (type === 'error') iconClass = 'fa-exclamation-circle';
+        if (type === 'info') iconClass = 'fa-info-circle';
+
+        toast.innerHTML = `<i class="fas ${iconClass}"></i> <span>${message}</span>`;
+        container.appendChild(toast);
+
+        setTimeout(() => toast.classList.add('show'), 10);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    function showConfirm(message) {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('custom-confirm-modal');
+            const messageEl = document.getElementById('confirm-message');
+            const confirmBtn = document.getElementById('confirm-yes-btn');
+            const cancelBtn = document.getElementById('confirm-no-btn');
+
+            messageEl.textContent = message;
+            modal.classList.remove('hidden');
+
+            const cleanup = () => {
+                modal.classList.add('hidden');
+                confirmBtn.removeEventListener('click', handleYes);
+                cancelBtn.removeEventListener('click', handleNo);
+            };
+
+            const handleYes = () => { cleanup(); resolve(true); };
+            const handleNo = () => { cleanup(); resolve(false); };
+
+            confirmBtn.addEventListener('click', handleYes);
+            cancelBtn.addEventListener('click', handleNo);
+        });
+    }
+
+    function setLoading(isLoading) {
+        const loader = document.getElementById('global-loader');
+        if (isLoading) loader.classList.remove('hidden');
+        else loader.classList.add('hidden');
+    }
+
+    // UI 업데이트: 로그인 상태에 따라 버튼과 계정 표시 제어
     function updateAuthUI() {
         if (currentUser) {
             authBtn.innerHTML = `<i class="fas fa-sign-out-alt" style="color: var(--danger);"></i> <span data-i18n="logout" style="color: var(--danger);">${locales[currentLang]?.logout || '로그아웃'}</span>`;
             authBtn.style.background = '#fee2e2';
             authBtn.style.borderColor = 'transparent';
             addSettlementFab.classList.remove('hidden'); 
+            
+            if (userInfoDisplay && userEmailText) {
+                userEmailText.textContent = currentUser.email;
+                userInfoDisplay.classList.remove('hidden');
+            }
         } else {
             authBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i> <span data-i18n="login">${locales[currentLang]?.login || '로그인'}</span>`;
             authBtn.style.background = 'transparent';
             authBtn.style.borderColor = 'var(--border)';
             addSettlementFab.classList.add('hidden'); 
+            
+            if (userInfoDisplay) userInfoDisplay.classList.add('hidden');
         }
     }
 
-    // --- 로그인/로그아웃 버튼 클릭 처리 ---
     async function handleAuthClick() {
         if (currentUser) {
+            setLoading(true);
             await supabaseClient.auth.signOut();
             window.location.replace('login.html');
         } else {
@@ -164,7 +247,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(!rate) throw new Error(`Rate not found for ${target}`);
             exchangeRatesCache[cacheKey] = rate;
             return rate;
-        } catch (error) { console.error('Error fetching exchange rate:', error); return null; }
+        } catch (error) { 
+            showToast('환율 정보를 가져오는데 실패했습니다.', 'error');
+            return null; 
+        }
     }
 
     async function initialize() {
@@ -174,10 +260,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         setupEventListeners();
 
-        // 1. 초기 세션 확인
         const { data: { session } } = await supabaseClient.auth.getSession();
         
-        // 로그인 안 되어 있으면 로그인 페이지로 강제 이동!
         if (!session) {
             window.location.replace('login.html');
             return; 
@@ -186,7 +270,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentUser = session.user;
         updateAuthUI();
 
-        // 2. 실시간 세션 감지
         supabaseClient.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_OUT' || !session) {
                 window.location.replace('login.html');
@@ -197,14 +280,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         setLanguage(initialLang);
-        itemDateInput.value = getLocalISOString(new Date());
+        itemDateInput.value = getLocalISOString();
         
+        setLoading(true);
         await loadData();
+        setLoading(false);
     }
 
     async function loadData() {
         const { data, error } = await supabaseClient.from('settlements').select(`* , expenses (*)`).order('date', { ascending: false }).order('created_at', { ascending: false });
-        if (error) { console.error('Error loading data:', error); return; }
+        if (error) { showToast('데이터를 불러오는데 실패했습니다.', 'error'); return; }
         settlements = data || [];
         renderSettlementList();
     }
@@ -262,12 +347,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function fetchAndSetRate(fetchType, currencyFrom, currencyTo, inputEl, previewUpdater) {
         if (!currentSettlement) return;
+        setLoading(true);
         const fetchDate = fetchType === 'latest' ? 'latest' : currentSettlement.date;
         const rate = await getExchangeRate(fetchDate, currencyFrom, currencyTo);
         if (rate !== null) {
             inputEl.value = rate.toFixed(4);
             previewUpdater();
         }
+        setLoading(false);
     }
 
     async function handleAddCurrencyChange() {
@@ -343,15 +430,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         try {
             await navigator.clipboard.writeText(text);
-            alert(locales[currentLang]?.copySuccess || "Copied!");
+            showToast(locales[currentLang]?.copySuccess || "Copied!", 'success');
         } catch (err) {
-            console.error('Failed to copy text: ', err);
-            alert('복사에 실패했습니다.');
+            showToast('복사에 실패했습니다.', 'error');
         }
     }
 
     async function saveAsImage() {
         if (!currentSettlement) return;
+        setLoading(true);
         const targetView = document.getElementById('calculator');
         const rightPane = document.getElementById('right-pane');
         
@@ -376,12 +463,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             link.download = `SettleUp_${currentSettlement.title}_${timestamp}.png`;
             link.href = dataUrl;
             link.click();
+            showToast('이미지가 성공적으로 저장되었습니다!', 'success');
         } catch(err) {
-            console.error("Capture failed", err);
-            alert("이미지 저장에 오류가 발생했습니다.");
+            showToast("이미지 저장에 실패했습니다.", 'error');
         } finally {
             targetView.classList.remove('capture-mode');
             rightPane.style.overflowY = oldOverflow;
+            setLoading(false);
         }
     }
 
@@ -390,10 +478,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         appTitle.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
         mobileMenuBtn.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
         
-        authBtn.addEventListener('click', handleAuthClick); // 이벤트 연동 복구!
+        if(authBtn) authBtn.addEventListener('click', handleAuthClick); 
 
         addSettlementFab.addEventListener('click', () => {
-            newSettlementDateInput.value = new Date().toLocaleDateString('fr-CA', { timeZone: 'Asia/Tokyo' });
+            // 🚀 완벽한 로컬 날짜(오늘) 가져오기 적용
+            newSettlementDateInput.value = getLocalDateString();
             renderParticipantInputs(2);
             addSettlementModal.classList.remove('hidden');
             newSettlementTitleInput.focus();
@@ -448,11 +537,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         completeSettlementBtn.addEventListener('click', async () => {
             if (currentSettlement) {
+                setLoading(true);
                 currentSettlement.is_settled = !currentSettlement.is_settled;
                 const { error } = await supabaseClient.from('settlements').update({ is_settled: currentSettlement.is_settled }).eq('id', currentSettlement.id);
-                if (error) console.error('Error:', error);
+                if (error) {
+                    showToast('상태 업데이트 실패', 'error');
+                } else {
+                    showToast(currentSettlement.is_settled ? '정산이 완료되었습니다.' : '정산이 다시 열렸습니다.', 'info');
+                }
                 render(); 
                 renderSettlementList(); 
+                setLoading(false);
             }
         });
         
@@ -505,15 +600,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         const date = newSettlementDateInput.value;
         const participants = getParticipantNamesFromModal();
         const baseCurrency = baseCurrencySelect.value;
+        
         if (!title || !date || participants.length < 2) {
-             alert("참가자는 최소 2명 이상이어야 하며 제목을 입력해야 합니다."); return;
+             showToast("참가자는 최소 2명 이상이어야 하며 제목을 입력해야 합니다.", "error"); 
+             return;
         }
 
+        setLoading(true);
         const { data, error } = await supabaseClient.from('settlements')
             .insert([{ title, date, participants: participants, base_currency: baseCurrency, is_settled: false }]).select('*, expenses (*)');
 
-        if (error) { console.error('Error creating settlement:', error); return; }
+        setLoading(false);
+
+        if (error) { showToast('정산 생성에 실패했습니다.', 'error'); return; }
         
+        showToast('새로운 정산이 생성되었습니다.', 'success');
         const newSettlement = data[0];
         settlements.push(newSettlement);
         settlements.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -525,11 +626,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     async function deleteSettlement(settlementId) {
-        if (confirm(locales[currentLang]?.deleteSettlementConfirm)) {
+        if (await showConfirm(locales[currentLang]?.deleteSettlementConfirm)) {
+            setLoading(true);
             await supabaseClient.from('expenses').delete().eq('settlement_id', settlementId);
             const { error: settlementError } = await supabaseClient.from('settlements').delete().eq('id', settlementId);
-            if (settlementError) { alert('Error: ' + settlementError.message); return; }
+            setLoading(false);
+
+            if (settlementError) { showToast('삭제에 실패했습니다.', 'error'); return; }
             
+            showToast('성공적으로 삭제되었습니다.', 'success');
             settlements = settlements.filter(s => s.id !== settlementId);
             if (currentSettlement && currentSettlement.id === settlementId) {
                 currentSettlement = null; calculatorView.classList.add('hidden'); placeholderRightPane.classList.remove('hidden');
@@ -550,7 +655,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             <div class="item-text-group">
                                 <div class="date-row">
                                     ${s.is_settled ? '<i class="fas fa-check-circle settled-icon"></i>' : ''}
-                                    <span class="item-date-badge"><i class="far fa-calendar-alt"></i> ${s.date}</span>
+                                    <span class="item-date-badge"><i class="far fa-calendar-alt"></i> ${formatDisplayDate(s.date)}</span>
                                 </div>
                                 <span class="item-title">${s.title}</span>
                                 <span class="item-participants">(${(s.participants || []).join(', ')}) - ${s.base_currency}</span>
@@ -591,7 +696,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.settlement-item').forEach(item => item.classList.toggle('active', item.dataset.id == settlement.id));
         if (window.innerWidth <= 768) sidebar.classList.add('collapsed');
         
-        itemDateInput.value = getLocalISOString(new Date());
+        itemDateInput.value = getLocalISOString();
         render();
     }
 
@@ -649,14 +754,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const currency = itemCurrencySelect.value;
         const expenseDateRaw = itemDateInput.value; 
         
-        if (!name || originalAmount <= 0 || !expenseDateRaw) { alert(locales[currentLang]?.invalidInput); return; }
+        if (!name || originalAmount <= 0 || !expenseDateRaw) { showToast(locales[currentLang]?.invalidInput, "error"); return; }
 
         const expenseDate = new Date(expenseDateRaw).toISOString();
 
         let rate = 1;
         if (currency !== currentSettlement.base_currency) {
             rate = parseFloat(document.getElementById('add-custom-rate').value);
-            if (!rate || rate <= 0) { alert(locales[currentLang]?.invalidInput); return; }
+            if (!rate || rate <= 0) { showToast(locales[currentLang]?.invalidInput, "error"); return; }
         }
 
         const convertedAmount = originalAmount * rate;
@@ -677,17 +782,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 sumCheck += pAmount;
                 shares[p] = pAmount * rate;
             });
-            if (Math.abs(sumCheck - originalAmount) > 0.01) { alert(locales[currentLang]?.amountMismatch); return; }
+            if (Math.abs(sumCheck - originalAmount) > 0.01) { showToast(locales[currentLang]?.amountMismatch, "error"); return; }
         }
 
+        setLoading(true);
         const { data, error } = await supabaseClient.from('expenses')
             .insert([{ 
                 settlement_id: currentSettlement.id, expense_date: expenseDate,
                 name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
             }]).select();
 
-        if (error) { console.error('Error adding expense:', error); return; }
+        setLoading(false);
+
+        if (error) { showToast('기록에 실패했습니다.', 'error'); return; }
         
+        showToast('지출이 기록되었습니다.', 'success');
         currentSettlement.expenses.push(data[0]);
 
         if (currentSettlement.is_settled) {
@@ -716,7 +825,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
             editItemDateInput.value = d.toISOString().slice(0, 16);
         } else {
-            editItemDateInput.value = getLocalISOString(new Date());
+            editItemDateInput.value = getLocalISOString();
         }
         
         editItemCurrencySelect.innerHTML = SUPPORTED_CURRENCIES.map(c => `<option value="${c}" ${c === expense.currency ? 'selected' : ''}>${c}</option>`).join('');
@@ -755,14 +864,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const currency = editItemCurrencySelect.value;
         const expenseDateRaw = editItemDateInput.value; 
         
-        if (!name || originalAmount <= 0 || !expenseDateRaw) { alert(locales[currentLang]?.invalidInput); return; }
+        if (!name || originalAmount <= 0 || !expenseDateRaw) { showToast(locales[currentLang]?.invalidInput, 'error'); return; }
 
         const expenseDate = new Date(expenseDateRaw).toISOString();
 
         let rate = 1;
         if (currency !== currentSettlement.base_currency) {
             rate = parseFloat(document.getElementById('edit-custom-rate').value);
-            if (!rate || rate <= 0) { alert(locales[currentLang]?.invalidInput); return; }
+            if (!rate || rate <= 0) { showToast(locales[currentLang]?.invalidInput, 'error'); return; }
         }
 
         const convertedAmount = originalAmount * rate;
@@ -783,9 +892,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 sumCheck += pAmount;
                 shares[p] = pAmount * rate;
             });
-            if (Math.abs(sumCheck - originalAmount) > 0.01) { alert(locales[currentLang]?.amountMismatch); return; }
+            if (Math.abs(sumCheck - originalAmount) > 0.01) { showToast(locales[currentLang]?.amountMismatch, 'error'); return; }
         }
         
+        setLoading(true);
         const { data, error } = await supabaseClient.from('expenses')
             .update({ 
                 expense_date: expenseDate,
@@ -793,8 +903,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             })
             .eq('id', currentEditingExpenseId).select();
 
-        if (error) { console.error('Error saving:', error); return; }
+        setLoading(false);
+
+        if (error) { showToast('저장에 실패했습니다.', 'error'); return; }
         
+        showToast('성공적으로 수정되었습니다.', 'success');
         const expenseIndex = currentSettlement.expenses.findIndex(e => e.id === currentEditingExpenseId);
         if (expenseIndex > -1) currentSettlement.expenses[expenseIndex] = data[0];
 
@@ -809,9 +922,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     async function deleteExpense(expenseId) {
-        if (confirm(locales[currentLang]?.deleteConfirm)) {
-             const { error } = await supabaseClient.from('expenses').delete().eq('id', expenseId);
-            if (error) { console.error('Error:', error); return; }
+        if (await showConfirm(locales[currentLang]?.deleteConfirm)) {
+            setLoading(true);
+            const { error } = await supabaseClient.from('expenses').delete().eq('id', expenseId);
+            setLoading(false);
+
+            if (error) { showToast('삭제에 실패했습니다.', 'error'); return; }
+            
+            showToast('삭제되었습니다.', 'success');
             currentSettlement.expenses = currentSettlement.expenses.filter(exp => exp.id !== expenseId);
             if (currentSettlement.is_settled) {
                 currentSettlement.is_settled = false;
@@ -843,12 +961,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentSettlement) return;
         const { date, base_currency } = currentSettlement;
         
+        const formattedDate = formatDisplayDate(date); // 🚀 보정된 날짜 사용
+        
         const today = new Date();
         today.setHours(0,0,0,0);
-        const settlementDate = new Date(date);
+        const settlementDate = new Date(formattedDate);
         const isFuture = settlementDate > today;
         
-        exchangeRateDate.textContent = `${date} ${locales[currentLang].baseDate}`;
+        exchangeRateDate.textContent = `${formattedDate} ${locales[currentLang].baseDate}`;
         if (isFuture) {
             let futureNotice = "미래 날짜이므로 현재(최신) 환율이 적용되었습니다.";
             if (currentLang === 'en') futureNotice = "Future date: using current latest rates.";
@@ -857,6 +977,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             exchangeRateDate.innerHTML += `<br><span style="color: var(--danger); font-size: 0.85rem; display: inline-block; margin-top: 0.5rem;"><i class="fas fa-exclamation-triangle"></i> ${futureNotice}</span>`;
         }
 
+        setLoading(true);
         let ratesInfoHTML = `<div class="rate-item"><span class="base">1 ${base_currency}</span> =</div>`;
         const targetCurrencies = SUPPORTED_CURRENCIES.filter(c => c !== base_currency);
 
@@ -864,6 +985,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const rate = await getExchangeRate(date, base_currency, target);
             if (rate !== null) ratesInfoHTML += `<div class="rate-item"><span>${formatNumber(rate, 4)}</span><span>${target}</span></div>`;
         }
+        setLoading(false);
+
         exchangeRateInfo.innerHTML = ratesInfoHTML;
         exchangeRateModal.classList.remove('hidden');
     }
@@ -1025,7 +1148,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('add-custom-rate').value = '';
         document.getElementById('add-rate-config-wrapper').classList.add('hidden');
         splitMethodSelect.value = 'equal';
-        itemDateInput.value = getLocalISOString(new Date());
+        itemDateInput.value = getLocalISOString();
         
         splitAmountInputs.querySelectorAll('input').forEach(inp => inp.value = '');
 
@@ -1035,7 +1158,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function downloadExcel() {
-        if (!currentSettlement || currentSettlement.expenses.length === 0) { alert(locales[currentLang]?.noDataToExport || 'No expense data to export.'); return; }
+        if (!currentSettlement || currentSettlement.expenses.length === 0) { showToast(locales[currentLang]?.noDataToExport || 'No expense data to export.', 'error'); return; }
         const { title, participants, expenses, base_currency } = currentSettlement;
         const translations = locales[currentLang] || {};
         const dataForExport = [];
@@ -1188,6 +1311,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         XLSX.utils.book_append_sheet(wb, ws, 'Expenses');
         const fileName = `${translations.expenseReport || 'Expense_Report'}_${title}_${timestamp}.xlsx`;
         XLSX.writeFile(wb, fileName, { cellStyles: true });
+        showToast('엑셀 파일이 다운로드되었습니다.', 'success');
     }
 
     initialize();

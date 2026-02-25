@@ -157,7 +157,10 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 #download-excel-btn:hover { background-color: var(--secondary-hover); }
 
 #add-settlement-fab { display: flex; justify-content: center; align-items: center; padding: 0; position: fixed; bottom: 2rem; left: 20px; width: 48px; height: 48px; border-radius: 50%; box-shadow: var(--shadow-md); z-index: 5; transition: transform 0.3s; font-size: 1.2rem; }
-#add-settlement-modal, #exchange-rate-modal, #expense-rate-modal, #edit-expense-modal, #auth-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); animation: fadeIn 0.2s ease; }
+
+/* 🚀 해결 핵심: #custom-confirm-modal 아이디 추가 완료! */
+#add-settlement-modal, #exchange-rate-modal, #expense-rate-modal, #edit-expense-modal, #custom-confirm-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); animation: fadeIn 0.2s ease; }
+
 .modal-content { max-width: 500px; width: 90%; position: relative; animation: slideInUp 0.3s ease-out; max-height: 90vh; overflow-y: auto; }
 .modal-content.card { max-width: 700px; } 
 .modal-content .form-grid-row { margin-bottom: 1rem; }
@@ -323,3 +326,46 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 .auth-logo h1 { font-size: 1.5rem; color: var(--primary); font-weight: 700; letter-spacing: -0.5px; margin: 0; }
 .auth-card a { transition: opacity 0.2s; }
 .auth-card a:hover { opacity: 0.7; }
+
+/* --- UI Enhancements (Toast, Loader, Confirm Modal) --- */
+
+/* 1. Global Loader (로딩 스피너) */
+#global-loader {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(2px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 99999;
+}
+.spinner {
+    border: 4px solid rgba(99, 102, 241, 0.2);
+    border-top: 4px solid var(--primary);
+    border-radius: 50%;
+    width: 48px; height: 48px;
+    animation: spin 1s linear infinite;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* 2. Toast Notifications (토스트 알림창) */
+#toast-container {
+    position: fixed;
+    bottom: 30px; left: 50%; transform: translateX(-50%);
+    display: flex; flex-direction: column; gap: 10px;
+    z-index: 100000; pointer-events: none;
+}
+.toast {
+    background: #333; color: white;
+    padding: 12px 24px; border-radius: 50px;
+    font-size: 0.95rem; font-weight: 500;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast-success { background-color: #10b981; }
+.toast-error { background-color: #ef4444; }
+.toast-info { background-color: #3b82f6; }
