@@ -1209,6 +1209,57 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(editSetCurrentTimeBtn) editSetCurrentTimeBtn.addEventListener('click', () => {
             if(editItemDateInput) editItemDateInput.value = getLocalISOString();
         });
+
+        // 🚀 마이페이지 모달 열기 연결
+        const userInfoDisplay = document.getElementById('user-info-display');
+        if(userInfoDisplay) {
+            userInfoDisplay.title = getLocale('myPage', '마이페이지');
+            userInfoDisplay.addEventListener('click', () => {
+                const profileModal = document.getElementById('profile-modal');
+                if(profileModal) profileModal.classList.remove('hidden');
+            });
+        }
+        
+        // 🚀 비밀번호 변경 (Supabase 내장 로직 활용)
+        const submitChangePasswordBtn = document.getElementById('submit-change-password-btn');
+        if(submitChangePasswordBtn) submitChangePasswordBtn.addEventListener('click', async () => {
+            const profileNewPassword = document.getElementById('profile-new-password');
+            const newPassword = profileNewPassword ? profileNewPassword.value : '';
+            if (!newPassword || newPassword.length < 6) {
+                showToast(getLocale('invalidInput', '비밀번호는 6자리 이상이어야 합니다.'), 'error');
+                return;
+            }
+            setLoading(true);
+            const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+            setLoading(false);
+            if (error) {
+                showToast(error.message, 'error');
+            } else {
+                showToast(getLocale('passwordUpdated', '비밀번호가 성공적으로 변경되었습니다.'), 'success');
+                if(profileNewPassword) profileNewPassword.value = '';
+                const profileModal = document.getElementById('profile-modal');
+                if(profileModal) profileModal.classList.add('hidden');
+            }
+        });
+
+        // 🚀 회원 탈퇴 (Supabase RPC 호출)
+        const deleteAccountBtn = document.getElementById('delete-account-btn');
+        if(deleteAccountBtn) deleteAccountBtn.addEventListener('click', async () => {
+            if (await showConfirm(getLocale('deleteAccountConfirm', '정말로 탈퇴하시겠습니까? 복구할 수 없습니다.'))) {
+                setLoading(true);
+                const { error } = await supabaseClient.rpc('delete_user');
+                setLoading(false);
+                
+                if (error) {
+                    showToast('회원 탈퇴 실패 (관리자가 SQL 설정을 했는지 확인해주세요)', 'error');
+                    console.error("delete_user RPC error:", error);
+                } else {
+                    showToast(getLocale('accountDeletedSuccess', '회원 탈퇴가 완료되었습니다.'), 'success');
+                    await supabaseClient.auth.signOut();
+                    window.location.replace('login.html');
+                }
+            }
+        });
         // 🚀 추가된 부분 끝
 
         if(languageSwitcher) languageSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
@@ -1232,7 +1283,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             loadData(); 
         });
 
-        // 🚀 공유 모달 이벤트 연결
+        // 공유 모달 이벤트 연결
         const openShareModalBtn = document.getElementById('open-share-modal-btn');
         if(openShareModalBtn) openShareModalBtn.addEventListener('click', openShareModal);
         
@@ -1251,7 +1302,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const shareEmailBtn = document.getElementById('share-email-btn');
         if(shareEmailBtn) shareEmailBtn.addEventListener('click', sendEmailInvite);
 
-        // 🚀 코드로 참가 모달 이벤트 연결
+        // 코드로 참가 모달 이벤트 연결
         const openJoinModalBtn = document.getElementById('open-join-modal-btn');
         if(openJoinModalBtn) openJoinModalBtn.addEventListener('click', () => {
             const joinModal = document.getElementById('join-modal');
@@ -1271,7 +1322,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if(addParticipantBtn) addParticipantBtn.addEventListener('click', () => addParticipantInputUI());
         
-        [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal, document.getElementById('share-modal'), document.getElementById('join-modal')].forEach(modal => {
+        // 🚀 프로필 모달까지 클릭 외부 닫기 및 x버튼 이벤트에 연결
+        [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal, document.getElementById('share-modal'), document.getElementById('join-modal'), document.getElementById('profile-modal')].forEach(modal => {
             if(modal) {
                 modal.addEventListener('click', (e) => { 
                     if (e.target === modal) modal.classList.add('hidden'); 

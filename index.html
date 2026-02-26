@@ -11,7 +11,7 @@
     <link rel="icon" href="icon.png" type="image/png">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=25">
+    <link rel="stylesheet" href="style.css?v=26">
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
@@ -24,7 +24,7 @@
                 <h1>Settle Up</h1>
             </div>
             <div class="header-controls">
-                <div id="user-info-display" class="hidden" style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-muted); margin-right: 0.5rem; background: var(--side-bg); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid var(--border);">
+                <div id="user-info-display" class="hidden" style="cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-muted); margin-right: 0.5rem; background: var(--side-bg); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid var(--border);" title="마이페이지 열기">
                     <i class="fas fa-user-circle"></i> <span id="user-email-text"></span>
                 </div>
                 <div class="language-selector">
@@ -302,6 +302,25 @@
                 <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">친구에게 받은 6자리 코드를 입력하세요.</p>
                 <input type="text" id="join-code-input" placeholder="예: A1B2C3" style="text-align: center; font-size: 1.5rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 1rem;">
                 <button id="submit-join-code-btn" style="width: 100%;">참가하기</button>
+            </div>
+        </div>
+
+        <div id="profile-modal" class="hidden">
+            <div class="modal-content card" style="max-width: 400px;">
+                <span class="close-modal-btn"><i class="fas fa-times"></i></span>
+                <h2 style="margin-bottom: 1.5rem;"><i class="fas fa-user-cog" style="color: var(--primary);"></i> <span data-i18n="myPage">마이페이지</span></h2>
+                
+                <div class="form-grid-row" style="grid-template-columns: 1fr; margin-bottom: 1.5rem;">
+                    <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 600;" data-i18n="changePassword">비밀번호 변경</label>
+                    <input type="password" id="profile-new-password" data-i18n-placeholder="newPassword" style="margin-bottom: 0.5rem;">
+                    <button id="submit-change-password-btn" data-i18n="changePassword">비밀번호 변경</button>
+                </div>
+
+                <div style="border-top: 1px solid var(--border); padding-top: 1.5rem; text-align: right;">
+                    <button id="delete-account-btn" style="background-color: #fee2e2; color: var(--danger); border: 1px solid #fecaca; padding: 0.5rem 1rem;">
+                        <i class="fas fa-user-times"></i> <span data-i18n="deleteAccount">회원 탈퇴</span>
+                    </button>
+                </div>
             </div>
         </div>
         
