@@ -11,7 +11,7 @@
     <link rel="icon" href="icon.png" type="image/png">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="style.css?v=25">
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
@@ -19,7 +19,7 @@
 <body>
     <div id="app">
         <header>
-            <div class="brand-container">
+            <div class="brand-container" onclick="window.location.href='index.html'">
                 <img src="icon.png" alt="Settle Up Icon" id="app-icon">
                 <h1>Settle Up</h1>
             </div>
@@ -27,7 +27,6 @@
                 <div id="user-info-display" class="hidden" style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-muted); margin-right: 0.5rem; background: var(--side-bg); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid var(--border);">
                     <i class="fas fa-user-circle"></i> <span id="user-email-text"></span>
                 </div>
-
                 <div class="language-selector">
                     <i class="fas fa-globe"></i>
                     <select id="language-switcher">
@@ -49,6 +48,9 @@
                     <h2 data-i18n="settlementHistory">정산 내역 조회</h2>
                     <div id="settlement-list-container"></div>
                 </div>
+                <div class="join-by-code-container">
+                    <button id="open-join-modal-btn"><i class="fas fa-keyboard"></i> 초대 코드로 참가</button>
+                </div>
             </aside>
 
             <main id="right-pane">
@@ -61,16 +63,22 @@
                     <div class="settlement-header">
                         <div class="header-title-group">
                             <h2 id="settlement-display"></h2>
-                            <button id="exchange-rate-info-btn" class="btn-outline">
+                            <button id="exchange-rate-info-btn" class="btn-outline" title="환율 정보">
                                 <i class="fas fa-exchange-alt"></i>
                             </button>
                         </div>
                         <div class="header-action-group">
+                            <button id="join-room-btn" class="btn-outline hidden">
+                                <i class="fas fa-star"></i> <span>내 목록에 저장</span>
+                            </button>
+                            <button id="open-share-modal-btn" class="btn-outline">
+                                <i class="fas fa-share-alt"></i> <span>초대 & 공유</span>
+                            </button>
                             <button id="copy-text-btn" class="btn-outline">
-                                <i class="fas fa-copy"></i> <span data-i18n="copyText">정산 결과 텍스트로 복사하기</span>
+                                <i class="fas fa-copy"></i> <span data-i18n="copyText">텍스트 복사</span>
                             </button>
                             <button id="save-image-btn" class="btn-outline">
-                                <i class="fas fa-camera"></i> <span data-i18n="saveImage">정산 결과 이미지로 저장하기</span>
+                                <i class="fas fa-camera"></i> <span data-i18n="saveImage">이미지 저장</span>
                             </button>
                         </div>
                     </div>
@@ -165,7 +173,6 @@
                     <input type="date" id="new-settlement-date" class="modal-date-picker">
                 </div>
                 <input type="text" id="new-settlement-title" data-i18n-placeholder="settlementTitlePlaceholder" style="margin-bottom: 1rem;">
-                
                 <div class="participant-section" style="margin-bottom: 1.5rem;">
                     <label style="display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.9rem; font-weight: 600;">참가자 명단</label>
                     <div id="participant-list-container" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.8rem;"></div>
@@ -173,7 +180,6 @@
                         <i class="fas fa-plus"></i> 참가자 추가
                     </button>
                 </div>
-
                 <div class="currency-select-wrapper">
                     <label for="base-currency" data-i18n="baseCurrency">기준 통화:</label>
                     <select id="base-currency">
@@ -189,14 +195,10 @@
         <div id="exchange-rate-modal" class="hidden">
             <div class="modal-content card">
                 <span class="close-modal-btn"><i class="fas fa-times"></i></span>
-                <div class="modal-header">
-                    <h2 data-i18n="exchangeRateTitle">환율 정보</h2>
-                </div>
+                <div class="modal-header"><h2 data-i18n="exchangeRateTitle">환율 정보</h2></div>
                 <p id="exchange-rate-date"></p>
                 <div id="exchange-rate-info"></div>
-                <p style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted); text-align: center;">
-                    <i class="fas fa-info-circle"></i> <span data-i18n="rateNotice">입력창에서 지출 건별로 원하는 환율을 직접 수정할 수 있습니다.</span>
-                </p>
+                <p style="margin-top: 1rem; font-size: 0.85rem; color: var(--text-muted); text-align: center;"><i class="fas fa-info-circle"></i> <span data-i18n="rateNotice">입력창에서 직접 수정 가능.</span></p>
             </div>
         </div>
 
@@ -204,25 +206,15 @@
             <div class="modal-content card" style="max-width: 400px;">
                 <span class="close-modal-btn"><i class="fas fa-times"></i></span>
                 <h2 style="margin-bottom: 1.5rem;"><i class="fas fa-calculator"></i> <span data-i18n="appliedExchangeRate">적용된 환율 상세</span></h2>
-                
                 <div class="rate-calc-box">
-                    <div class="rate-row">
-                        <span class="currency-flag" id="calc-foreign-currency"></span>
-                        <span class="currency-amount" id="calc-foreign-amount">1</span>
-                    </div>
+                    <div class="rate-row"><span class="currency-flag" id="calc-foreign-currency"></span><span class="currency-amount" id="calc-foreign-amount">1</span></div>
                     <div class="rate-divider"><i class="fas fa-equals"></i></div>
-                    <div class="rate-row base-row">
-                        <span class="currency-flag" id="calc-base-currency"></span>
-                        <span class="currency-amount" id="calc-base-amount"></span>
-                    </div>
+                    <div class="rate-row base-row"><span class="currency-flag" id="calc-base-currency"></span><span class="currency-amount" id="calc-base-amount"></span></div>
                 </div>
-
                 <div class="calc-result-summary">
                     <p data-i18n="totalConverted">총 변환 금액</p>
                     <div class="calc-result-numbers">
-                        <span id="calc-total-foreign" class="text-muted"></span>
-                        <i class="fas fa-arrow-right"></i>
-                        <span id="calc-total-base" class="text-primary-bold"></span>
+                        <span id="calc-total-foreign" class="text-muted"></span> <i class="fas fa-arrow-right"></i> <span id="calc-total-base" class="text-primary-bold"></span>
                     </div>
                 </div>
             </div>
@@ -241,7 +233,6 @@
                     <input type="text" id="edit-item-amount" data-i18n-placeholder="amount" inputmode="decimal">
                     <select id="edit-item-currency"></select>
                 </div>
-
                 <div id="edit-rate-config-wrapper" class="rate-config-wrapper hidden">
                     <div class="rate-config-inner">
                         <div class="rate-input-row">
@@ -257,18 +248,54 @@
                             <button type="button" id="edit-live-rate-btn" class="rate-btn btn-outline-small"><i class="fas fa-bolt"></i> <span data-i18n="applyLiveRate">실시간 최신</span></button>
                         </div>
                     </div>
-                    <div class="converted-preview">
-                        <span data-i18n="convertedAmount">최종 변환 금액</span>: <strong id="edit-converted-total">0</strong>
-                    </div>
+                    <div class="converted-preview"><span data-i18n="convertedAmount">최종 변환 금액</span>: <strong id="edit-converted-total">0</strong></div>
                 </div>
-
                 <div class="form-grid-row">
                     <select id="edit-item-payer"></select>
                     <select id="edit-split-method" data-i18n-options="splitEqually,splitByAmount"></select>
                 </div>
                 <div id="edit-split-amount-inputs" class="hidden dynamic-split-grid"></div>
-                
                 <button id="save-expense-changes-btn" data-i18n="saveChanges"></button>
+            </div>
+        </div>
+
+        <div id="share-modal" class="hidden">
+            <div class="modal-content card" style="max-width: 450px;">
+                <span class="close-modal-btn"><i class="fas fa-times"></i></span>
+                <h2 style="margin-bottom: 1.5rem;"><i class="fas fa-share-alt" style="color: var(--primary);"></i> 친구 초대 및 공유</h2>
+                
+                <div class="share-section">
+                    <label>🔗 클릭 한 번에 접속하는 마법 링크</label>
+                    <div class="share-input-group">
+                        <input type="text" id="share-link-input" readonly>
+                        <button id="copy-share-link-btn" class="btn-outline"><i class="fas fa-copy"></i> 복사</button>
+                    </div>
+                </div>
+
+                <div class="share-section">
+                    <label>🔑 6자리 초대 코드</label>
+                    <div class="share-input-group">
+                        <input type="text" id="share-code-input" readonly>
+                        <button id="copy-share-code-btn" class="btn-outline"><i class="fas fa-copy"></i> 복사</button>
+                    </div>
+                </div>
+
+                <div style="margin-top: 2rem;">
+                    <button id="share-email-btn" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-envelope"></i> 이메일로 초대장 보내기
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="join-modal" class="hidden">
+            <div class="modal-content card" style="max-width: 380px; text-align: center;">
+                <span class="close-modal-btn"><i class="fas fa-times"></i></span>
+                <i class="fas fa-keyboard" style="font-size: 2.5rem; color: var(--primary); margin-bottom: 1rem;"></i>
+                <h2 style="margin-bottom: 0.5rem; font-size: 1.25rem;">초대 코드 입력</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">친구에게 받은 6자리 코드를 입력하세요.</p>
+                <input type="text" id="join-code-input" placeholder="예: A1B2C3" style="text-align: center; font-size: 1.5rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 1rem;">
+                <button id="submit-join-code-btn" style="width: 100%;">참가하기</button>
             </div>
         </div>
         
@@ -278,22 +305,19 @@
                 <h3 id="confirm-message" style="margin-bottom: 1.5rem; font-size: 1.1rem; font-weight: 600;"></h3>
                 <div style="display: flex; gap: 1rem; justify-content: center;">
                     <button id="confirm-no-btn" class="btn-outline" style="flex: 1;">취소</button>
-                    <button id="confirm-yes-btn" style="flex: 1; background-color: var(--danger);">확인</button>
+                    <button id="confirm-yes-btn" style="flex: 1; background-color: var(--danger); color: white; border-color: var(--danger);">확인</button>
                 </div>
             </div>
         </div>
 
     </div>
     
-    <div id="global-loader" class="hidden">
-        <div class="spinner"></div>
-    </div>
-
+    <div id="global-loader" class="hidden"><div class="spinner"></div></div>
     <div id="toast-container"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="main.js?v=18"></script>
+    <script src="main.js?v=25"></script>
 </body>
 </html>

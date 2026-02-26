@@ -48,7 +48,7 @@ const locales = {
         applyLiveRate: "실시간 최신",
         copyText: "정산 결과 텍스트로 복사하기",
         saveImage: "정산 결과 이미지로 저장하기",
-        copySuccess: "정산 요약이 클립보드에 복사되었습니다. 카톡 등 메신저에 붙여넣기 하세요!", // <-- 쉼표 추가!
+        copySuccess: "정산 요약이 클립보드에 복사되었습니다. 카톡 등 메신저에 붙여넣기 하세요!",
         email: "이메일",
         password: "비밀번호",
         confirmPassword: "비밀번호 확인",
@@ -65,7 +65,9 @@ const locales = {
         checkEmailForLink: "이메일로 전송된 링크를 확인해 주세요!",
         signupSuccess: "가입 성공! 이메일 인증 링크를 확인해 주세요.",
         updatePassword: "새 비밀번호 저장",
-        passwordUpdated: "비밀번호가 성공적으로 변경되었습니다."
+        passwordUpdated: "비밀번호가 성공적으로 변경되었습니다.",
+        shareLink: "공유 링크 복사",
+        shareLinkSuccess: "공유 링크가 클립보드에 복사되었습니다! 친구들에게 전달하세요."
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -116,7 +118,7 @@ const locales = {
         applyLiveRate: "Live Latest",
         copyText: "Copy Settlement Text",
         saveImage: "Save as Image",
-        copySuccess: "Settlement summary copied to clipboard. Paste it in your messenger!", // <-- 쉼표 추가!
+        copySuccess: "Settlement summary copied to clipboard. Paste it in your messenger!",
         email: "Email",
         password: "Password",
         confirmPassword: "Confirm Password",
@@ -133,7 +135,9 @@ const locales = {
         checkEmailForLink: "Please check your email for the link!",
         signupSuccess: "Sign up successful! Please check your email to verify.",
         updatePassword: "Save New Password",
-        passwordUpdated: "Password updated successfully."
+        passwordUpdated: "Password updated successfully.",
+        shareLink: "Share Link",
+        shareLinkSuccess: "Share link copied to clipboard!"
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -184,7 +188,7 @@ const locales = {
         applyLiveRate: "リアルタイム最新",
         copyText: "精算結果をテキストでコピー",
         saveImage: "精算結果を画像で保存",
-        copySuccess: "精算の概要がクリップボードにコピーされました。メッセンジャーなどに貼り付けてください！", // <-- 쉼표 추가!
+        copySuccess: "精算の概要がクリップボードにコピーされました。メッセンジャーなどに貼り付けてください！",
         email: "メールアドレス",
         password: "パスワード",
         confirmPassword: "パスワード（確認）",
@@ -201,6 +205,8 @@ const locales = {
         checkEmailForLink: "メールに送信されたリンクを確認してください！",
         signupSuccess: "登録成功！メールの認証リンクを確認してください。",
         updatePassword: "新しいパスワードを保存",
-        passwordUpdated: "パスワードが正常に変更されました。"
+        passwordUpdated: "パスワードが正常に変更されました。",
+        shareLink: "共有リンク",
+        shareLinkSuccess: "共有リンクをコピーしました！"
     }
 };

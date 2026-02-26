@@ -24,7 +24,7 @@ header { height: 60px; background: white; border-bottom: 1px solid var(--border)
 #app-icon { width: 28px; height: 28px; object-fit: contain; }
 header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-spacing: -0.5px; margin: 0; }
 .header-controls { display: flex; align-items: center; gap: 1rem; }
-#mobile-menu-btn { display: none; background: transparent; border: none; color: var(--text-main); font-size: 1.4rem; cursor: pointer; padding: 0; transition: color 0.2s; }
+#mobile-menu-btn { display: block; background: transparent; border: none; color: var(--text-main); font-size: 1.4rem; cursor: pointer; padding: 0; transition: color 0.2s; }
 #mobile-menu-btn:hover { color: var(--primary); }
 .language-selector { display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); }
 .language-selector i { font-size: 0.9rem; }
@@ -32,11 +32,16 @@ header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-
 #language-switcher:focus { outline: 1px solid var(--primary); }
 
 #main-container { display: flex; flex: 1; overflow: hidden; }
-#left-pane { width: var(--sidebar-width); background-color: var(--side-bg); border-right: 1px solid var(--border); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s; overflow: hidden; flex-shrink: 0; opacity: 1; }
+#left-pane { width: var(--sidebar-width); background-color: var(--side-bg); border-right: 1px solid var(--border); transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s; overflow: hidden; flex-shrink: 0; opacity: 1; display: flex; flex-direction: column;}
 #left-pane.collapsed { width: 0; opacity: 0; border-right-color: transparent; }
-.sidebar-content { padding: 1.5rem; width: var(--sidebar-width); height: 100%; display: flex; flex-direction: column; }
+.sidebar-content { padding: 1.5rem; width: var(--sidebar-width); height: 100%; display: flex; flex-direction: column; flex: 1;}
 #left-pane h2 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 1rem; }
 #settlement-list-container { overflow-y: auto; flex: 1; padding-bottom: 0rem; }
+
+/* 초대 코드로 참가 버튼 추가 */
+.join-by-code-container { padding: 1rem 1.5rem; border-top: 1px solid var(--border); background: white; }
+#open-join-modal-btn { width: 100%; background: #eef2ff; color: var(--primary); border: 1px dashed var(--primary); padding: 0.75rem; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 0.5rem; transition: background 0.2s; }
+#open-join-modal-btn:hover { background: #e0e7ff; }
 
 .settlement-item-wrapper { display: flex; align-items: center; gap: 0.5rem; width: 100%; margin-bottom: 0.6rem; }
 .settlement-item { flex-grow: 1; padding: 0.85rem 1rem; border-radius: 8px; background: white; border: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: all 0.2s; font-size: 0.9rem; color: var(--text-main); box-shadow: var(--shadow-sm); overflow: hidden; }
@@ -62,6 +67,10 @@ header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-
 .delete-settlement-btn { background: #fee2e2; color: var(--danger); border: 1px solid #fecaca; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
 .delete-settlement-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
 
+/* 🚀 방 나가기 버튼 스타일 추가 */
+.leave-settlement-btn { background: #f8fafc; color: var(--text-muted); border: 1px solid var(--border); width: 36px; height: 36px; border-radius: 8px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.leave-settlement-btn:hover { background: #e2e8f0; color: var(--text-main); }
+
 #right-pane { flex: 1; background-color: var(--main-bg); overflow-y: auto; padding: 2.5rem; display: flex; flex-direction: column; align-items: center; }
 #right-pane > div { width: 100%; max-width: 800px; }
 #placeholder-right-pane { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: var(--text-muted); }
@@ -72,10 +81,10 @@ header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-
 
 .settlement-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid var(--app-bg); flex-wrap: wrap; gap: 1rem;}
 .header-title-group { display: flex; align-items: center; gap: 0.8rem; }
-.header-action-group { display: flex; gap: 0.5rem; }
+.header-action-group { display: flex; gap: 0.5rem; flex-wrap: wrap;}
 #settlement-display { font-size: 1.75rem; font-weight: 800; margin-bottom: 0; }
 
-.btn-outline { background: transparent; color: var(--text-main); border: 1px solid var(--border); padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.4rem; }
+.btn-outline { background: transparent; color: var(--text-main); border: 1px solid var(--border); padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; }
 .btn-outline:hover { background: #f8fafc; border-color: #cbd5e1; }
 .btn-outline i { color: var(--primary); }
 
@@ -90,9 +99,9 @@ header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-
 #total-expense { font-size: 1rem; opacity: 0.9; }
 
 #final-settlement-container { margin-bottom: 0rem; text-align: right; }
-.transfer-item { font-size: 1.3rem; font-weight: 700; margin-bottom: 0.3rem; }
+.transfer-item { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.3rem; }
 
-#expense-form-card.is-settled, .is-settled .delete-settlement-btn { opacity: 0.6; pointer-events: none; user-select: none; }
+#expense-form-card.is-settled, .is-settled .delete-settlement-btn, .is-settled .leave-settlement-btn { opacity: 0.6; pointer-events: none; user-select: none; }
 .form-grid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
 #expense-form { margin-top: 1.25rem; }
 #expense-form > button { width: 100%; margin-top: 0.5rem; }
@@ -156,48 +165,19 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 #download-excel-btn { background-color: var(--secondary); font-size: 0.85rem; padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; }
 #download-excel-btn:hover { background-color: var(--secondary-hover); }
 
-#add-settlement-fab { display: flex; justify-content: center; align-items: center; padding: 0; position: fixed; bottom: 2rem; left: 20px; width: 48px; height: 48px; border-radius: 50%; box-shadow: var(--shadow-md); z-index: 5; transition: transform 0.3s; font-size: 1.2rem; }
+#add-settlement-fab { display: flex; justify-content: center; align-items: center; padding: 0; position: fixed; bottom: 2rem; right: 2.5rem; width: 48px; height: 48px; border-radius: 50%; box-shadow: var(--shadow-md); z-index: 5; transition: transform 0.3s; font-size: 1.2rem; }
 
-/* 🚀 해결 1: custom-confirm-modal 이름 추가 완료! (정상적으로 화면 중앙에 뜹니다) */
-#add-settlement-modal, #exchange-rate-modal, #expense-rate-modal, #edit-expense-modal, #custom-confirm-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); animation: fadeIn 0.2s ease; }
+#add-settlement-modal, #exchange-rate-modal, #expense-rate-modal, #edit-expense-modal, #custom-confirm-modal, #share-modal, #join-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); animation: fadeIn 0.2s ease; }
 
 .modal-content { max-width: 500px; width: 90%; position: relative; animation: slideInUp 0.3s ease-out; max-height: 90vh; overflow-y: auto; }
 .modal-content.card { max-width: 700px; } 
 .modal-content .form-grid-row { margin-bottom: 1rem; }
 .modal-content #save-expense-changes-btn, .modal-content #create-settlement-btn { width: 100%; margin-top: 0.5rem; padding: 0.85rem; font-size: 1rem; }
 
-.modal-header { 
-    display: flex; 
-    align-items: center; 
-    justify-content: space-between; 
-    gap: 1rem; 
-    margin-bottom: 1.5rem; 
-    padding-right: 2rem; 
-}
-.modal-header h2 { 
-    margin-bottom: 0; 
-    font-size: 1.35rem; 
-    white-space: nowrap; 
-}
-.modal-date-picker { 
-    padding: 0.5rem 0.8rem; 
-    border: 1px solid var(--border); 
-    border-radius: 8px; 
-    font-family: var(--font-family); 
-    color: var(--text-main); 
-    font-size: 0.95rem; 
-    background: var(--side-bg); 
-    outline: none; 
-    transition: border-color 0.2s;
-    width: 100%;
-    max-width: 160px; 
-    cursor: pointer;
-}
-.modal-date-picker:focus { 
-    border-color: var(--primary); 
-    background: #ffffff;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); 
-}
+.modal-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; padding-right: 2rem; }
+.modal-header h2 { margin-bottom: 0; font-size: 1.35rem; white-space: nowrap; }
+.modal-date-picker { padding: 0.5rem 0.8rem; border: 1px solid var(--border); border-radius: 8px; font-family: var(--font-family); color: var(--text-main); font-size: 0.95rem; background: var(--side-bg); outline: none; transition: border-color 0.2s; width: 100%; max-width: 160px; cursor: pointer; }
+.modal-date-picker:focus { border-color: var(--primary); background: #ffffff; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15); }
 
 .close-modal-btn { position: absolute; top: 1rem; right: 1rem; cursor: pointer; color: var(--text-muted); font-size: 1.2rem; transition: color 0.2s; z-index: 10; background: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;}
 .close-modal-btn:hover { color: var(--text-main); background: var(--app-bg); }
@@ -223,71 +203,17 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 .calc-result-numbers i { color: var(--border); }
 .calc-result-numbers .text-primary-bold { color: var(--text-main); font-weight: 800; }
 
-.capture-mode {
-    min-width: 800px !important;
-    width: max-content !important; 
-    max-width: none !important;
-    background: #ffffff !important;
-    padding: 40px !important;
-    box-sizing: border-box !important;
-}
-
-.capture-mode .header-action-group,
-.capture-mode #exchange-rate-info-btn,
-.capture-mode #expense-form-card,
-.capture-mode .card-header button,
-.capture-mode th:last-child, 
-.capture-mode td:last-child {
-    display: none !important;
-}
-
-.capture-mode i, 
-.capture-mode .fas, 
-.capture-mode .far, 
-.capture-mode .fab {
-    display: none !important;
-}
-
-.capture-mode .settlement-header {
-    flex-direction: row !important; 
-    align-items: center !important;
-    border-bottom: 2px solid #e2e8f0 !important;
-    padding-bottom: 1.5rem !important;
-    margin-bottom: 2rem !important;
-}
-.capture-mode #settlement-display {
-    font-size: 2.2rem !important;
-    white-space: nowrap !important;
-}
-.capture-mode .card {
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-}
-.capture-mode #summary-card {
-    padding: 2.5rem 2rem !important;
-    border-radius: 12px !important;
-    margin-bottom: 2.5rem !important;
-    flex-direction: row !important; 
-}
-.capture-mode .summary-right {
-    text-align: right !important;
-    margin-top: 0 !important;
-}
-.capture-mode #expense-table-container {
-    overflow: visible !important; 
-}
-.capture-mode #expense-table {
-    width: 100% !important;
-    table-layout: auto !important; 
-}
-
-.capture-mode .clickable-amount {
-    border-bottom: none !important;
-    color: var(--text-main) !important;
-    cursor: default !important;
-}
+.capture-mode { min-width: 800px !important; width: max-content !important; max-width: none !important; background: #ffffff !important; padding: 40px !important; box-sizing: border-box !important; }
+.capture-mode .header-action-group, .capture-mode #exchange-rate-info-btn, .capture-mode #expense-form-card, .capture-mode .card-header button, .capture-mode th:last-child, .capture-mode td:last-child { display: none !important; }
+.capture-mode i, .capture-mode .fas, .capture-mode .far, .capture-mode .fab { display: none !important; }
+.capture-mode .settlement-header { flex-direction: row !important; align-items: center !important; border-bottom: 2px solid #e2e8f0 !important; padding-bottom: 1.5rem !important; margin-bottom: 2rem !important; }
+.capture-mode #settlement-display { font-size: 2.2rem !important; white-space: nowrap !important; }
+.capture-mode .card { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
+.capture-mode #summary-card { padding: 2.5rem 2rem !important; border-radius: 12px !important; margin-bottom: 2.5rem !important; flex-direction: row !important; }
+.capture-mode .summary-right { text-align: right !important; margin-top: 0 !important; }
+.capture-mode #expense-table-container { overflow: visible !important; }
+.capture-mode #expense-table { width: 100% !important; table-layout: auto !important; }
+.capture-mode .clickable-amount { border-bottom: none !important; color: var(--text-main) !important; cursor: default !important; }
 
 /* --- Mobile Responsiveness --- */
 @media (max-width: 768px) {
@@ -309,35 +235,26 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
     .form-grid-row { grid-template-columns: 1fr; }
     #add-settlement-fab { left: auto; right: 1.5rem; transform: none !important; }
     .settlement-item { padding: 0.8rem 1rem; font-size: 0.95rem; min-height: 52px; align-items: center; }
-    .delete-settlement-btn { width: 52px; height: 52px; }
-    .delete-settlement-btn i { font-size: 1rem; }
+    
+    /* 🚀 모바일 환경에서도 버튼 크기 통일 */
+    .delete-settlement-btn, .leave-settlement-btn { width: 52px; height: 52px; }
+    .delete-settlement-btn i, .leave-settlement-btn i { font-size: 1rem; }
     
     .modal-header { flex-direction: column; align-items: flex-start; gap: 0.8rem; }
     .modal-date-picker { max-width: 100%; width: 100%; }
 
-    /* 🚀 해결 2: 모바일 헤더 찌그러짐 최적화 (텍스트 숨기기 및 간격 축소) */
     header { padding: 0 1rem; }
-    .brand-container h1 { display: none; } /* 앱 이름 텍스트 숨김 (로고만 유지) */
+    .brand-container h1 { display: none; }
     .header-controls { gap: 0.4rem; }
     
-    /* 긴 이메일 주소를 일정 길이 넘어가면 ... 으로 표시 */
     #user-info-display { max-width: 120px; padding: 0.3rem 0.4rem; } 
-    #user-email-text { 
-        white-space: nowrap; 
-        overflow: hidden; 
-        text-overflow: ellipsis; 
-        display: inline-block; 
-        vertical-align: middle; 
-        max-width: 80px; 
-    }
-    
-    /* 모바일에서는 로그아웃 텍스트 숨기고 아이콘만 예쁘게 표시 */
+    #user-email-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; max-width: 80px; }
     #auth-btn span { display: none; }
     #auth-btn { padding: 0.4rem 0.6rem; border: none !important; }
 }
 @keyframes slideInUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-/* --- Auth Page Specific Styles (login.html 용) --- */
+/* --- Auth Page Specific Styles --- */
 .auth-page-wrapper { display: flex; align-items: center; justify-content: center; min-height: 100vh; background-color: var(--app-bg); padding: 1rem; position: relative; }
 .auth-lang-selector { position: absolute; top: 1.5rem; right: 1.5rem; display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); }
 .auth-card { width: 100%; max-width: 400px; background: white; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-md); padding: 2.5rem 2rem; animation: slideInUp 0.4s ease-out; }
@@ -347,45 +264,32 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 .auth-card a { transition: opacity 0.2s; }
 .auth-card a:hover { opacity: 0.7; }
 
-/* --- UI Enhancements (Toast, Loader, Confirm Modal) --- */
-
-/* 1. Global Loader (로딩 스피너) */
-#global-loader {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(2px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 99999;
-}
-.spinner {
-    border: 4px solid rgba(99, 102, 241, 0.2);
-    border-top: 4px solid var(--primary);
-    border-radius: 50%;
-    width: 48px; height: 48px;
-    animation: spin 1s linear infinite;
-}
+/* --- UI Enhancements --- */
+#global-loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(2px); display: flex; justify-content: center; align-items: center; z-index: 99999; }
+.spinner { border: 4px solid rgba(99, 102, 241, 0.2); border-top: 4px solid var(--primary); border-radius: 50%; width: 48px; height: 48px; animation: spin 1s linear infinite; }
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-/* 2. Toast Notifications (토스트 알림창) */
-#toast-container {
-    position: fixed;
-    bottom: 30px; left: 50%; transform: translateX(-50%);
-    display: flex; flex-direction: column; gap: 10px;
-    z-index: 100000; pointer-events: none;
-}
-.toast {
-    background: #333; color: white;
-    padding: 12px 24px; border-radius: 50px;
-    font-size: 0.95rem; font-weight: 500;
-    display: flex; align-items: center; gap: 10px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    opacity: 0; transform: translateY(20px);
-    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
+#toast-container { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; gap: 10px; z-index: 100000; pointer-events: none; }
+.toast { background: #333; color: white; padding: 12px 24px; border-radius: 50px; font-size: 0.95rem; font-weight: 500; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); opacity: 0; transform: translateY(20px); transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .toast.show { opacity: 1; transform: translateY(0); }
 .toast-success { background-color: #10b981; }
 .toast-error { background-color: #ef4444; }
 .toast-info { background-color: #3b82f6; }
+
+/* --- Party & Membership Enhancements --- */
+.item-badges { display: flex; gap: 4px; margin-bottom: 6px; }
+.badge { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 3px; }
+.badge-host { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+.badge-guest { background: #dcfce7; color: #059669; border: 1px solid #bbf7d0; }
+.settlement-item.active .badge-host { background: rgba(255,255,255,0.2); color: white; border-color: transparent;}
+.settlement-item.active .badge-guest { background: rgba(255,255,255,0.2); color: white; border-color: transparent;}
+#join-room-btn { background-color: var(--secondary); border-color: var(--secondary); color: white; animation: pulse 2s infinite; }
+#join-room-btn:hover { background-color: var(--secondary-hover); }
+@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
+
+/* 공유/참가 모달 스타일 */
+.share-section { margin-bottom: 1.5rem; }
+.share-section label { display: block; font-size: 0.9rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.5rem; }
+.share-input-group { display: flex; gap: 0.5rem; }
+.share-input-group input { flex: 1; background: #f8fafc; cursor: text; font-family: monospace; font-size: 1rem; color: var(--primary); font-weight: 600; text-align: center; }
+.share-input-group button { white-space: nowrap; }
