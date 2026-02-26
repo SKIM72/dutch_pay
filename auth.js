@@ -106,7 +106,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
         
         if (error) {
-            alert(error.message);
+            // 🚀 에러 메시지가 'Invalid login credentials'인 경우 친절한 다국어 메시지로 교체
+            let displayMessage = error.message;
+            if (displayMessage === 'Invalid login credentials') {
+                displayMessage = locales[currentLang]?.invalidCredentials || '없는 계정이거나 비밀번호가 맞지 않습니다.';
+            }
+            
+            alert(displayMessage);
             btn.innerHTML = originalText;
             btn.disabled = false;
         }

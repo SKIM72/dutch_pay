@@ -258,8 +258,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 🚀 모달에 초대 코드 텍스트 띄워주는 함수 (랜덤 6자리 생성 반영)
-    async function openShareModal() {
+    function openShareModal() {
         if(!currentSettlement) return;
         const currentUrl = window.location.origin + window.location.pathname;
         const shareUrl = `${currentUrl}?id=${currentSettlement.id}`;
@@ -267,22 +266,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const shareLinkInput = document.getElementById('share-link-input');
         if(shareLinkInput) shareLinkInput.value = shareUrl;
         
-        // 🚀 DB에 초대 코드가 없는 예전 방인 경우, 랜덤 6자리 생성 및 DB 업데이트
-        let inviteCode = currentSettlement.invite_code;
-        if (!inviteCode) {
-            // 영문+숫자 랜덤 6자리 생성
-            inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-            currentSettlement.invite_code = inviteCode; // 로컬 데이터 업데이트
-            
-            // Supabase DB에 새로 생성한 코드 저장 (백그라운드 처리)
-            supabaseClient
-                .from('settlements')
-                .update({ invite_code: inviteCode })
-                .eq('id', currentSettlement.id)
-                .then(({ error }) => {
-                    if (error) console.error("초대 코드 자동 생성 실패:", error);
-                });
-        }
+        const fallbackCode = String(currentSettlement.id).split('-')[0].toUpperCase();
+        const inviteCode = currentSettlement.invite_code || fallbackCode;
         
         const shareCodeInput = document.getElementById('share-code-input');
         if(shareCodeInput) shareCodeInput.value = inviteCode;
@@ -291,14 +276,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(shareModal) shareModal.classList.remove('hidden');
     }
 
-    // 🚀 이메일로 초대 보내기 로직 (랜덤 코드 사용)
     function sendEmailInvite() {
         if(!currentSettlement) return;
         const currentUrl = window.location.origin + window.location.pathname;
         const shareUrl = `${currentUrl}?id=${currentSettlement.id}`;
-        
-        // openShareModal에서 확인되거나 새로 생성된 코드를 그대로 사용
-        const inviteCode = currentSettlement.invite_code || "초대코드없음";
+        const fallbackCode = String(currentSettlement.id).split('-')[0].toUpperCase();
+        const inviteCode = currentSettlement.invite_code || fallbackCode;
         
         const subject = encodeURIComponent(`[Settle Up] ${currentSettlement.title} 정산에 초대합니다.`);
         const body = encodeURIComponent(`👋 ${currentSettlement.title} 정산 방이 만들어졌습니다!\n\n아래 링크를 클릭해서 바로 참여하거나, 앱에서 아래의 초대 코드를 입력해 주세요.\n\n🔗 접속 링크: ${shareUrl}\n🔑 초대 코드: ${inviteCode}\n\n감사합니다!`);
@@ -306,7 +289,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.location.href = `mailto:?subject=${subject}&body=${body}`;
     }
 
-    // 🚀 코드로 방 찾아서 참여하기 로직 (숫자 ID 예외 처리 포함)
     async function joinRoomByCode() {
         const joinCodeInput = document.getElementById('join-code-input');
         if(!joinCodeInput) return;
@@ -315,21 +297,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(!codeInput) { showToast('코드를 입력해주세요.', 'error'); return; }
 
         setLoading(true);
-
-        // 1. 먼저 DB의 invite_code 컬럼에서 1차 검색
         let { data, error } = await supabaseClient
             .from('settlements')
             .select('id')
             .eq('invite_code', codeInput)
+            .is('deleted_at', null) // 🚀 삭제되지 않은 정산건만 검색 (Soft Delete)
             .single();
             
-        // 2. 만약 못 찾았고 입력값이 숫자라면, 구버전 방(id)일 수 있으므로 id로 재검색
         if ((error || !data) && /^\d+$/.test(codeInput)) {
             const numericId = parseInt(codeInput, 10);
             const { data: idData, error: idError } = await supabaseClient
                 .from('settlements')
                 .select('id')
                 .eq('id', numericId)
+                .is('deleted_at', null) // 🚀 삭제되지 않은 정산건만 검색 (Soft Delete)
                 .single();
             
             data = idData;
@@ -428,6 +409,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             .from('settlements')
             .select(`*, expenses (*)`)
             .eq('id', roomId)
+            .is('deleted_at', null) // 🚀 삭제되지 않은 정산건만 검색 (Soft Delete)
             .single();
             
         if (error || !data) {
@@ -441,7 +423,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function loadData() {
         let allRooms = [];
         if (currentUser) {
-            const { data, error } = await supabaseClient.from('settlements').select(`* , expenses (*)`).eq('user_id', currentUser.id);
+            const { data, error } = await supabaseClient
+                .from('settlements')
+                .select(`* , expenses (*)`)
+                .eq('user_id', currentUser.id)
+                .is('deleted_at', null); // 🚀 삭제되지 않은 정산건만 검색 (Soft Delete)
+                
             if (error) {
                 console.error("데이터 로드 에러:", error);
                 if (error.message.includes('invite_code')) showToast("🚨 필수: SQL 에디터에서 invite_code 컬럼을 추가해주세요!", "error");
@@ -456,7 +443,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const joinedIds = getJoinedRooms();
         if (joinedIds.length > 0) {
-            const { data: guestData } = await supabaseClient.from('settlements').select(`* , expenses (*)`).in('id', joinedIds);
+            const { data: guestData } = await supabaseClient
+                .from('settlements')
+                .select(`* , expenses (*)`)
+                .in('id', joinedIds)
+                .is('deleted_at', null); // 🚀 삭제되지 않은 정산건만 검색 (Soft Delete)
+                
             if (guestData) {
                 guestData.forEach(room => {
                     if (!allRooms.find(r => r.id === room.id)) {
@@ -472,7 +464,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderSettlementList();
     }
 
-    // 🚀 방 나가기 버튼이 분기 처리된 리스트 렌더링 함수
     function renderSettlementList() {
         if(!settlementListContainer) return;
         
@@ -499,10 +490,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                     <i class="fas fa-chevron-right"></i>
                 </button>
-                ${s.is_host 
-                    ? `<button class="delete-settlement-btn" data-id="${s.id}" title="방 삭제"><i class="fas fa-trash-alt"></i></button>`
-                    : `<button class="leave-settlement-btn" data-id="${s.id}" title="방 나가기"><i class="fas fa-sign-out-alt"></i></button>`
-                }
+                ${s.is_host ? `<button class="delete-settlement-btn" data-id="${s.id}"><i class="fas fa-trash-alt"></i></button>` : ''}
             </div>
         `).join('');
         
@@ -517,13 +505,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation(); 
                 deleteSettlement(parseInt(e.currentTarget.dataset.id));
-            });
-        });
-
-        document.querySelectorAll('.leave-settlement-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation(); 
-                leaveSettlement(parseInt(e.currentTarget.dataset.id));
             });
         });
         
@@ -868,37 +849,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // 🚀 삭제를 Soft Delete 로직으로 변경 (expenses는 그대로 둠)
     async function deleteSettlement(settlementId) {
         if (await showConfirm(getLocale('deleteSettlementConfirm', '정말 방을 삭제하시겠습니까?'))) {
             setLoading(true);
-            await supabaseClient.from('expenses').delete().eq('settlement_id', settlementId);
-            const { error: settlementError } = await supabaseClient.from('settlements').delete().eq('id', settlementId);
+            // expenses 삭제 코드 제거
+            const { error: settlementError } = await supabaseClient
+                .from('settlements')
+                .update({ deleted_at: new Date().toISOString() }) // 🚀 삭제 시간만 기록
+                .eq('id', settlementId);
             setLoading(false);
 
             if (settlementError) { showToast('삭제에 실패했습니다. (방장만 삭제 가능합니다)', 'error'); return; }
             showToast('성공적으로 삭제되었습니다.', 'success');
-            settlements = settlements.filter(s => s.id !== settlementId);
-            if (currentSettlement && currentSettlement.id === settlementId) {
-                currentSettlement = null; 
-                if(calculatorView) calculatorView.classList.add('hidden'); 
-                if(placeholderRightPane) placeholderRightPane.classList.remove('hidden');
-                window.history.replaceState({}, '', window.location.pathname); 
-            }
-            renderSettlementList();
-        }
-    }
-
-    // 🚀 방 나가기 기능 수행
-    async function leaveSettlement(settlementId) {
-        if (await showConfirm(getLocale('leaveRoomConfirm', '정말 이 방에서 나가시겠습니까?'))) {
-            // 로컬 스토리지에서 해당 방 ID 제거
-            let rooms = getJoinedRooms();
-            rooms = rooms.filter(id => id != settlementId);
-            localStorage.setItem('joinedRooms', JSON.stringify(rooms));
-
-            showToast('방에서 성공적으로 나갔습니다.', 'success');
-            
-            // 화면 목록 및 현재 상태 업데이트
             settlements = settlements.filter(s => s.id !== settlementId);
             if (currentSettlement && currentSettlement.id === settlementId) {
                 currentSettlement = null; 
