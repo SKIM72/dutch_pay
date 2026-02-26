@@ -490,7 +490,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     </div>
                     <i class="fas fa-chevron-right"></i>
                 </button>
-                ${s.is_host ? `<button class="delete-settlement-btn" data-id="${s.id}"><i class="fas fa-trash-alt"></i></button>` : ''}
+                ${s.is_host 
+                    ? `<button class="delete-settlement-btn" data-id="${s.id}" title="방 삭제"><i class="fas fa-trash-alt"></i></button>`
+                    : `<button class="leave-settlement-btn" data-id="${s.id}" title="방 나가기"><i class="fas fa-sign-out-alt"></i></button>`
+                }
             </div>
         `).join('');
         
@@ -505,6 +508,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation(); 
                 deleteSettlement(parseInt(e.currentTarget.dataset.id));
+            });
+        });
+
+        document.querySelectorAll('.leave-settlement-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); 
+                leaveSettlement(parseInt(e.currentTarget.dataset.id));
             });
         });
         
@@ -873,6 +883,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // 🚀 방 나가기 기능 수행
+    async function leaveSettlement(settlementId) {
+        if (await showConfirm(getLocale('leaveRoomConfirm', '정말 이 방에서 나가시겠습니까?'))) {
+            // 로컬 스토리지에서 해당 방 ID 제거
+            let rooms = getJoinedRooms();
+            rooms = rooms.filter(id => id != settlementId);
+            localStorage.setItem('joinedRooms', JSON.stringify(rooms));
+
+            showToast('방에서 성공적으로 나갔습니다.', 'success');
+            
+            // 화면 목록 및 현재 상태 업데이트
+            settlements = settlements.filter(s => s.id !== settlementId);
+            if (currentSettlement && currentSettlement.id === settlementId) {
+                currentSettlement = null; 
+                if(calculatorView) calculatorView.classList.add('hidden'); 
+                if(placeholderRightPane) placeholderRightPane.classList.remove('hidden');
+                window.history.replaceState({}, '', window.location.pathname); 
+            }
+            renderSettlementList();
+        }
+    }
+
     function showExpenseExchangeRate(expenseId) {
         if (!currentSettlement) return;
         const expense = currentSettlement.expenses.find(e => e.id === expenseId);
@@ -1167,6 +1199,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function setupEventListeners() {
+        // 🚀 추가된 부분: 현재 시간 버튼 클릭 시 시간 업데이트
+        const setCurrentTimeBtn = document.getElementById('set-current-time-btn');
+        if(setCurrentTimeBtn) setCurrentTimeBtn.addEventListener('click', () => {
+            if(itemDateInput) itemDateInput.value = getLocalISOString();
+        });
+
+        const editSetCurrentTimeBtn = document.getElementById('edit-set-current-time-btn');
+        if(editSetCurrentTimeBtn) editSetCurrentTimeBtn.addEventListener('click', () => {
+            if(editItemDateInput) editItemDateInput.value = getLocalISOString();
+        });
+        // 🚀 추가된 부분 끝
+
         if(languageSwitcher) languageSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
         if(mobileMenuBtn) mobileMenuBtn.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
         if(authBtn) authBtn.addEventListener('click', handleAuthClick); 

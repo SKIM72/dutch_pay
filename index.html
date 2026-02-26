@@ -98,7 +98,10 @@
                         <h2><i class="fas fa-plus-circle"></i><span data-i18n="addExpense"></span></h2>
                         <div id="expense-form">
                             <div class="form-grid-row">
-                                <input type="datetime-local" id="item-date" title="지출 일시">
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <input type="datetime-local" id="item-date" title="지출 일시" style="flex: 1;">
+                                    <button type="button" id="set-current-time-btn" class="btn-outline" title="현재 시간으로 변경" style="margin: 0; padding: 0 0.8rem; height: 100%;"><i class="fas fa-clock"></i></button>
+                                </div>
                                 <input type="text" id="item-name" data-i18n-placeholder="expenseItem">
                             </div>
                             <div class="amount-input-wrapper" style="margin-bottom: 1rem;">
@@ -226,7 +229,10 @@
                 <input type="hidden" id="edit-expense-id">
                 <h2 data-i18n="editExpense">지출 수정</h2>
                 <div class="form-grid-row" style="margin-top: 1rem;">
-                    <input type="datetime-local" id="edit-item-date" title="지출 일시">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="datetime-local" id="edit-item-date" title="지출 일시" style="flex: 1;">
+                        <button type="button" id="edit-set-current-time-btn" class="btn-outline" title="현재 시간으로 변경" style="margin: 0; padding: 0 0.8rem; height: 100%;"><i class="fas fa-clock"></i></button>
+                    </div>
                     <input type="text" id="edit-item-name" data-i18n-placeholder="expenseItem">
                 </div>
                 <div class="amount-input-wrapper" style="margin-bottom: 1rem;">
