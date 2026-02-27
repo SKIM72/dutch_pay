@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (error) alert(error.message);
         else {
-            alert(locales[currentLang]?.signupSuccess || '가입 성공! 이메일을 확인해주세요.');
+            alert(locales[currentLang]?.signupSuccess || '가입 성공!');
             showView('login');
         }
     });
