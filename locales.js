@@ -75,7 +75,6 @@ const locales = {
         deleteAccount: "회원 탈퇴",
         deleteAccountConfirm: "정말로 탈퇴하시겠습니까? 복구할 수 없습니다.",
         accountDeletedSuccess: "회원 탈퇴가 완료되었습니다.",
-        // 🚀 추가된 부분: 모달 및 상태 표시 번역
         joinCodeTitle: "초대 코드 입력",
         joinCodeDesc: "친구에게 받은 6자리 코드를 입력하세요.",
         joinCodePlaceholder: "예: A1B2C3",
@@ -83,7 +82,10 @@ const locales = {
         joinByCodeBtn: "초대 코드로 참가",
         inviteShareBtn: "초대 & 공유",
         participating: "참여중",
-        host: "방장"
+        host: "방장",
+        logoutConfirm: "정말로 로그아웃 하시겠습니까?",
+        // 🚀 신규 추가된 로그인 유도 번역
+        loginToSave: "내 목록에 저장하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?"
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -161,7 +163,6 @@ const locales = {
         deleteAccount: "Delete Account",
         deleteAccountConfirm: "Are you sure you want to delete your account? This cannot be undone.",
         accountDeletedSuccess: "Account deleted successfully.",
-        // 🚀 추가된 부분: 모달 및 상태 표시 번역
         joinCodeTitle: "Enter Invite Code",
         joinCodeDesc: "Enter the 6-digit code received from your friend.",
         joinCodePlaceholder: "e.g., A1B2C3",
@@ -169,7 +170,10 @@ const locales = {
         joinByCodeBtn: "Join by Code",
         inviteShareBtn: "Invite & Share",
         participating: "Joined",
-        host: "Host"
+        host: "Host",
+        logoutConfirm: "Are you sure you want to log out?",
+        // 🚀 신규 추가된 로그인 유도 번역
+        loginToSave: "You need to log in to save to your list.\nGo to the Login/Sign Up page?"
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -247,7 +251,6 @@ const locales = {
         deleteAccount: "退会する",
         deleteAccountConfirm: "本当に退会しますか？この操作は取り消せません。",
         accountDeletedSuccess: "退会が完了しました。",
-        // 🚀 추가된 부분: 모달 및 상태 표시 번역
         joinCodeTitle: "招待コード入力",
         joinCodeDesc: "友達からもらった6桁のコードを入力してください。",
         joinCodePlaceholder: "例：A1B2C3",
@@ -255,6 +258,9 @@ const locales = {
         joinByCodeBtn: "招待コードで参加",
         inviteShareBtn: "招待＆共有",
         participating: "参加中",
-        host: "ホスト"
+        host: "ホスト",
+        logoutConfirm: "本当にログアウトしますか？",
+        // 🚀 신규 추가된 로그인 유도 번역
+        loginToSave: "リストに保存するにはログインが必要です。\nログイン画面に移動しますか？"
     }
 };

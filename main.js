@@ -38,7 +38,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const participantListContainer = document.getElementById('participant-list-container');
     const addParticipantBtn = document.getElementById('add-participant-btn');
 
-    // 모달 오픈용 버튼들
     const openShareModalBtn = document.getElementById('open-share-modal-btn'); 
     const openJoinModalBtn = document.getElementById('open-join-modal-btn'); 
 
@@ -161,8 +160,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function handleAuthClick() {
-        if (currentUser) { setLoading(true); await supabaseClient.auth.signOut(); window.location.replace('login.html'); } 
-        else { window.location.href = 'login.html'; }
+        if (currentUser) { 
+            if (await showConfirm(getLocale('logoutConfirm', '정말로 로그아웃 하시겠습니까?'))) {
+                setLoading(true); 
+                await supabaseClient.auth.signOut(); 
+                window.location.replace('login.html'); 
+            }
+        } 
+        else { 
+            window.location.href = 'login.html'; 
+        }
     }
 
     function updateUI(lang) {
@@ -472,7 +479,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         
-        // 🚀 다국어 처리 반영 ("방장", "참여중")
         settlementListContainer.innerHTML = settlements.map(s => `
             <div class="settlement-item-wrapper">
                 <button class="settlement-item ${s.is_settled ? 'is-settled' : ''}" data-id="${s.id}">
@@ -863,7 +869,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function deleteSettlement(settlementId) {
         if (await showConfirm(getLocale('deleteSettlementConfirm', '정말 방을 삭제하시겠습니까?'))) {
             setLoading(true);
-            // expenses 삭제 코드 제거
             const { error: settlementError } = await supabaseClient
                 .from('settlements')
                 .update({ deleted_at: new Date().toISOString() }) 
@@ -947,19 +952,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(exchangeRateModal) exchangeRateModal.classList.remove('hidden');
     }
 
+    // 🚀 비로그인 접속 시 폼 전체 잠금 로직이 반영된 render 함수
     function render() { 
         if (currentSettlement) { 
             currentSettlement.expenses.sort((a, b) => new Date(a.expense_date || a.created_at) - new Date(b.expense_date || b.created_at));
-            renderExpenses(); updateSummary(); toggleExpenseForm(currentSettlement.is_settled);
+            renderExpenses(); updateSummary(); 
+            // 🚀 로그인하지 않은 게스트는 무조건 폼 비활성화 (조회만 가능)
+            const isLocked = currentSettlement.is_settled || !currentUser; 
+            toggleExpenseForm(isLocked);
         }
     }
 
+    // 🚀 비로그인 접속 시 수정/삭제 기능 잠금 로직이 반영된 renderExpenses 함수
     function renderExpenses() {
         if(!expenseTableBody) return;
         expenseTableBody.innerHTML = '';
         if (!currentSettlement || !currentSettlement.expenses) return;
         const participants = currentSettlement.participants;
-        const isLocked = currentSettlement.is_settled;
+        
+        // 🚀 로그인하지 않은 게스트는 수정/삭제 불가능 (조회만 가능)
+        const isLocked = currentSettlement.is_settled || !currentUser;
 
         currentSettlement.expenses.forEach(exp => {
             const row = expenseTableBody.insertRow();
@@ -1023,6 +1035,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { transfers, balances }; 
     }
 
+    // 🚀 비로그인 접속 시 정산 완료/다시 열기 버튼 숨김 로직 추가
     function updateSummary() {
         if (!currentSettlement) return;
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
@@ -1047,12 +1060,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     finalSettlementContainer.appendChild(div);
                 });
             }
-            completeSettlementBtn.textContent = getLocale('editSettlement', 'Reopen Settlement');
-            completeSettlementBtn.classList.add('edit-mode'); 
-            completeSettlementBtn.classList.remove('hidden');
+            if (currentUser) { // 🚀 로그인한 유저만 볼 수 있음
+                completeSettlementBtn.textContent = getLocale('editSettlement', 'Reopen Settlement');
+                completeSettlementBtn.classList.add('edit-mode'); 
+                completeSettlementBtn.classList.remove('hidden');
+            }
         } else {
             finalSettlementContainer.innerHTML = `<div class="transfer-item text-muted">${getLocale('settlementInProgress', 'Settlement in progress...')}</div>`;
-            if (expenses.length > 0) {
+            if (expenses.length > 0 && currentUser) { // 🚀 로그인한 유저만 볼 수 있음
                 completeSettlementBtn.textContent = getLocale('completeSettlement', 'Complete Settlement');
                 completeSettlementBtn.classList.remove('edit-mode'); 
                 completeSettlementBtn.classList.remove('hidden');
@@ -1267,8 +1282,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(titleInput) titleInput.focus();
         });
 
-        if(joinRoomBtn) joinRoomBtn.addEventListener('click', () => {
+        // 🚀 비로그인 시 '내 목록에 저장' 클릭 시 로그인 화면 유도
+        if(joinRoomBtn) joinRoomBtn.addEventListener('click', async () => {
             if (!currentSettlement) return;
+            
+            if (!currentUser) { // 로그인 안 한 상태
+                if (await showConfirm(getLocale('loginToSave', '내 목록에 저장하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?'))) {
+                    window.location.href = 'login.html';
+                }
+                return;
+            }
+
             saveJoinedRoom(currentSettlement.id);
             joinRoomBtn.classList.add('hidden');
             showToast('내 정산 목록에 저장되었습니다!', 'success');
