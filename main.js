@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const participantListContainer = document.getElementById('participant-list-container');
     const addParticipantBtn = document.getElementById('add-participant-btn');
 
-    // 🚀 모달 오픈용 버튼들
+    // 모달 오픈용 버튼들
     const openShareModalBtn = document.getElementById('open-share-modal-btn'); 
     const openJoinModalBtn = document.getElementById('open-join-modal-btn'); 
 
@@ -301,7 +301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             .from('settlements')
             .select('id')
             .eq('invite_code', codeInput)
-            .is('deleted_at', null) // 🚀 삭제되지 않은 정산건만 검색 (Soft Delete)
+            .is('deleted_at', null) 
             .single();
             
         if ((error || !data) && /^\d+$/.test(codeInput)) {
@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 .from('settlements')
                 .select('id')
                 .eq('id', numericId)
-                .is('deleted_at', null) // 🚀 삭제되지 않은 정산건만 검색 (Soft Delete)
+                .is('deleted_at', null) 
                 .single();
             
             data = idData;
@@ -409,7 +409,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             .from('settlements')
             .select(`*, expenses (*)`)
             .eq('id', roomId)
-            .is('deleted_at', null) // 🚀 삭제되지 않은 정산건만 검색 (Soft Delete)
+            .is('deleted_at', null) 
             .single();
             
         if (error || !data) {
@@ -427,7 +427,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 .from('settlements')
                 .select(`* , expenses (*)`)
                 .eq('user_id', currentUser.id)
-                .is('deleted_at', null); // 🚀 삭제되지 않은 정산건만 검색 (Soft Delete)
+                .is('deleted_at', null); 
                 
             if (error) {
                 console.error("데이터 로드 에러:", error);
@@ -447,7 +447,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 .from('settlements')
                 .select(`* , expenses (*)`)
                 .in('id', joinedIds)
-                .is('deleted_at', null); // 🚀 삭제되지 않은 정산건만 검색 (Soft Delete)
+                .is('deleted_at', null); 
                 
             if (guestData) {
                 guestData.forEach(room => {
@@ -472,13 +472,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
         
+        // 🚀 다국어 처리 반영 ("방장", "참여중")
         settlementListContainer.innerHTML = settlements.map(s => `
             <div class="settlement-item-wrapper">
                 <button class="settlement-item ${s.is_settled ? 'is-settled' : ''}" data-id="${s.id}">
                     <div class="item-content">
                         <div class="item-text-group">
                             <div class="item-badges">
-                                ${s.is_host ? '<span class="badge badge-host"><i class="fas fa-crown"></i> 방장</span>' : '<span class="badge badge-guest"><i class="fas fa-users"></i> 참여중</span>'}
+                                ${s.is_host ? `<span class="badge badge-host"><i class="fas fa-crown"></i> ${getLocale('host', '방장')}</span>` : `<span class="badge badge-guest"><i class="fas fa-users"></i> ${getLocale('participating', '참여중')}</span>`}
                             </div>
                             <div class="date-row">
                                 ${s.is_settled ? '<i class="fas fa-check-circle settled-icon"></i>' : ''}
@@ -859,14 +860,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 🚀 삭제를 Soft Delete 로직으로 변경 (expenses는 그대로 둠)
     async function deleteSettlement(settlementId) {
         if (await showConfirm(getLocale('deleteSettlementConfirm', '정말 방을 삭제하시겠습니까?'))) {
             setLoading(true);
             // expenses 삭제 코드 제거
             const { error: settlementError } = await supabaseClient
                 .from('settlements')
-                .update({ deleted_at: new Date().toISOString() }) // 🚀 삭제 시간만 기록
+                .update({ deleted_at: new Date().toISOString() }) 
                 .eq('id', settlementId);
             setLoading(false);
 
@@ -883,17 +883,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 🚀 방 나가기 기능 수행
     async function leaveSettlement(settlementId) {
         if (await showConfirm(getLocale('leaveRoomConfirm', '정말 이 방에서 나가시겠습니까?'))) {
-            // 로컬 스토리지에서 해당 방 ID 제거
             let rooms = getJoinedRooms();
             rooms = rooms.filter(id => id != settlementId);
             localStorage.setItem('joinedRooms', JSON.stringify(rooms));
 
             showToast('방에서 성공적으로 나갔습니다.', 'success');
             
-            // 화면 목록 및 현재 상태 업데이트
             settlements = settlements.filter(s => s.id !== settlementId);
             if (currentSettlement && currentSettlement.id === settlementId) {
                 currentSettlement = null; 
@@ -1156,7 +1153,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         else showToast('복사에 실패했습니다.', 'error');
     }
 
-    // 🚀 html-to-image 보안(CORS) 에러 완벽 해결
+    // html-to-image 보안(CORS) 에러 완벽 해결
     async function saveAsImage() {
         if (!currentSettlement) return;
         setLoading(true);
@@ -1199,7 +1196,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function setupEventListeners() {
-        // 🚀 추가된 부분: 현재 시간 버튼 클릭 시 시간 업데이트
         const setCurrentTimeBtn = document.getElementById('set-current-time-btn');
         if(setCurrentTimeBtn) setCurrentTimeBtn.addEventListener('click', () => {
             if(itemDateInput) itemDateInput.value = getLocalISOString();
@@ -1210,7 +1206,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(editItemDateInput) editItemDateInput.value = getLocalISOString();
         });
 
-        // 🚀 마이페이지 모달 열기 연결
         const userInfoDisplay = document.getElementById('user-info-display');
         if(userInfoDisplay) {
             userInfoDisplay.title = getLocale('myPage', '마이페이지');
@@ -1220,7 +1215,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         
-        // 🚀 비밀번호 변경 (Supabase 내장 로직 활용)
         const submitChangePasswordBtn = document.getElementById('submit-change-password-btn');
         if(submitChangePasswordBtn) submitChangePasswordBtn.addEventListener('click', async () => {
             const profileNewPassword = document.getElementById('profile-new-password');
@@ -1242,7 +1236,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        // 🚀 회원 탈퇴 (Supabase RPC 호출)
         const deleteAccountBtn = document.getElementById('delete-account-btn');
         if(deleteAccountBtn) deleteAccountBtn.addEventListener('click', async () => {
             if (await showConfirm(getLocale('deleteAccountConfirm', '정말로 탈퇴하시겠습니까? 복구할 수 없습니다.'))) {
@@ -1260,7 +1253,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
         });
-        // 🚀 추가된 부분 끝
 
         if(languageSwitcher) languageSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
         if(mobileMenuBtn) mobileMenuBtn.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
@@ -1322,7 +1314,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if(addParticipantBtn) addParticipantBtn.addEventListener('click', () => addParticipantInputUI());
         
-        // 🚀 프로필 모달까지 클릭 외부 닫기 및 x버튼 이벤트에 연결
         [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal, document.getElementById('share-modal'), document.getElementById('join-modal'), document.getElementById('profile-modal')].forEach(modal => {
             if(modal) {
                 modal.addEventListener('click', (e) => { 

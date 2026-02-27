@@ -49,7 +49,7 @@
                     <div id="settlement-list-container"></div>
                 </div>
                 <div class="join-by-code-container">
-                    <button id="open-join-modal-btn"><i class="fas fa-keyboard"></i> 초대 코드로 참가</button>
+                    <button id="open-join-modal-btn"><i class="fas fa-keyboard"></i> <span data-i18n="joinByCodeBtn">초대 코드로 참가</span></button>
                 </div>
             </aside>
 
@@ -72,7 +72,7 @@
                                 <i class="fas fa-star"></i> <span>내 목록에 저장</span>
                             </button>
                             <button id="open-share-modal-btn" class="btn-outline">
-                                <i class="fas fa-share-alt"></i> <span>초대 & 공유</span>
+                                <i class="fas fa-share-alt"></i> <span data-i18n="inviteShareBtn">초대 & 공유</span>
                             </button>
                             <button id="copy-text-btn" class="btn-outline">
                                 <i class="fas fa-copy"></i> <span data-i18n="copyText">텍스트 복사</span>
@@ -298,10 +298,10 @@
             <div class="modal-content card" style="max-width: 380px; text-align: center;">
                 <span class="close-modal-btn"><i class="fas fa-times"></i></span>
                 <i class="fas fa-keyboard" style="font-size: 2.5rem; color: var(--primary); margin-bottom: 1rem;"></i>
-                <h2 style="margin-bottom: 0.5rem; font-size: 1.25rem;">초대 코드 입력</h2>
-                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;">친구에게 받은 6자리 코드를 입력하세요.</p>
-                <input type="text" id="join-code-input" placeholder="예: A1B2C3" style="text-align: center; font-size: 1.5rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 1rem;">
-                <button id="submit-join-code-btn" style="width: 100%;">참가하기</button>
+                <h2 style="margin-bottom: 0.5rem; font-size: 1.25rem; justify-content: center;" data-i18n="joinCodeTitle">초대 코드 입력</h2>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;" data-i18n="joinCodeDesc">친구에게 받은 6자리 코드를 입력하세요.</p>
+                <input type="text" id="join-code-input" data-i18n-placeholder="joinCodePlaceholder" placeholder="예: A1B2C3" style="text-align: center; font-size: 1.5rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 1rem;">
+                <button id="submit-join-code-btn" style="width: 100%;" data-i18n="joinSubmit">참가하기</button>
             </div>
         </div>
 
@@ -343,6 +343,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="main.js?v=25"></script>
+    <script src="main.js?v=26"></script>
 </body>
 </html>

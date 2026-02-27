@@ -69,13 +69,21 @@ const locales = {
         shareLink: "공유 링크 복사",
         shareLinkSuccess: "공유 링크가 클립보드에 복사되었습니다! 친구들에게 전달하세요.",
         invalidCredentials: "없는 계정이거나 비밀번호가 맞지 않습니다.",
-        // 🚀 신규 추가된 번역 키
         myPage: "마이페이지",
         changePassword: "비밀번호 변경",
         newPassword: "새 비밀번호 (6자리 이상)",
         deleteAccount: "회원 탈퇴",
         deleteAccountConfirm: "정말로 탈퇴하시겠습니까? 복구할 수 없습니다.",
-        accountDeletedSuccess: "회원 탈퇴가 완료되었습니다."
+        accountDeletedSuccess: "회원 탈퇴가 완료되었습니다.",
+        // 🚀 추가된 부분: 모달 및 상태 표시 번역
+        joinCodeTitle: "초대 코드 입력",
+        joinCodeDesc: "친구에게 받은 6자리 코드를 입력하세요.",
+        joinCodePlaceholder: "예: A1B2C3",
+        joinSubmit: "참가하기",
+        joinByCodeBtn: "초대 코드로 참가",
+        inviteShareBtn: "초대 & 공유",
+        participating: "참여중",
+        host: "방장"
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -147,13 +155,21 @@ const locales = {
         shareLink: "Share Link",
         shareLinkSuccess: "Share link copied to clipboard!",
         invalidCredentials: "Invalid login credentials. Please check your email and password.",
-        // 🚀 신규 추가된 번역 키
         myPage: "My Page",
         changePassword: "Change Password",
         newPassword: "New Password (min 6 chars)",
         deleteAccount: "Delete Account",
         deleteAccountConfirm: "Are you sure you want to delete your account? This cannot be undone.",
-        accountDeletedSuccess: "Account deleted successfully."
+        accountDeletedSuccess: "Account deleted successfully.",
+        // 🚀 추가된 부분: 모달 및 상태 표시 번역
+        joinCodeTitle: "Enter Invite Code",
+        joinCodeDesc: "Enter the 6-digit code received from your friend.",
+        joinCodePlaceholder: "e.g., A1B2C3",
+        joinSubmit: "Join",
+        joinByCodeBtn: "Join by Code",
+        inviteShareBtn: "Invite & Share",
+        participating: "Joined",
+        host: "Host"
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -225,12 +241,20 @@ const locales = {
         shareLink: "共有リンク",
         shareLinkSuccess: "共有リンクをコピーしました！",
         invalidCredentials: "アカウントが存在しないか、パスワードが間違っています。",
-        // 🚀 신규 추가된 번역 키
         myPage: "マイページ",
         changePassword: "パスワード変更",
         newPassword: "新しいパスワード（6文字以上）",
         deleteAccount: "退会する",
         deleteAccountConfirm: "本当に退会しますか？この操作は取り消せません。",
-        accountDeletedSuccess: "退会が完了しました。"
+        accountDeletedSuccess: "退会が完了しました。",
+        // 🚀 추가된 부분: 모달 및 상태 표시 번역
+        joinCodeTitle: "招待コード入力",
+        joinCodeDesc: "友達からもらった6桁のコードを入力してください。",
+        joinCodePlaceholder: "例：A1B2C3",
+        joinSubmit: "参加する",
+        joinByCodeBtn: "招待コードで参加",
+        inviteShareBtn: "招待＆共有",
+        participating: "参加中",
+        host: "ホスト"
     }
 };
