@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="style.css?v=28">
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
 </head>
@@ -278,6 +279,13 @@
                 <span class="close-modal-btn"><i class="fas fa-times"></i></span>
                 <h2 style="margin-bottom: 1.5rem;"><i class="fas fa-share-alt" style="color: var(--primary);"></i> 친구 초대 및 공유</h2>
                 
+                <div class="share-section" style="text-align: center; margin-bottom: 2rem;">
+                    <label data-i18n="shareQrCode">📱 카메라로 QR 스캔하여 참가</label>
+                    <div style="display: flex; justify-content: center; margin-top: 1rem;">
+                        <div id="qrcode-container" style="padding: 1rem; background: white; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);"></div>
+                    </div>
+                </div>
+
                 <div class="share-section">
                     <label>🔗 클릭 한 번에 접속하는 마법 링크</label>
                     <div class="share-input-group">

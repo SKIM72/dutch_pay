@@ -92,9 +92,10 @@ const locales = {
         currencyUSD: "USD (미국 달러)",
         searchSettlementPlaceholder: "제목 또는 날짜 검색...",
         noSearchResult: "검색 결과가 없습니다.",
-        // 🚀 신규 추가 (확인 모달 버튼 로컬라이징)
         btnCancel: "취소",
-        btnConfirm: "확인"
+        btnConfirm: "확인",
+        // 🚀 신규 추가
+        shareQrCode: "📱 카메라로 QR 스캔하여 참가"
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -189,9 +190,10 @@ const locales = {
         currencyUSD: "USD (US Dollar)",
         searchSettlementPlaceholder: "Search by title or date...",
         noSearchResult: "No results found.",
-        // 🚀 신규 추가 (확인 모달 버튼 로컬라이징)
         btnCancel: "Cancel",
-        btnConfirm: "Confirm"
+        btnConfirm: "Confirm",
+        // 🚀 신규 추가
+        shareQrCode: "📱 Scan QR to Join"
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -286,8 +288,9 @@ const locales = {
         currencyUSD: "USD (米ドル)",
         searchSettlementPlaceholder: "タイトルまたは日付で検索...",
         noSearchResult: "検索結果がありません。",
-        // 🚀 신규 추가 (확인 모달 버튼 로컬라이징)
         btnCancel: "キャンセル",
-        btnConfirm: "確認"
+        btnConfirm: "確認",
+        // 🚀 신규 추가
+        shareQrCode: "📱 カメラでQRスキャンして参加"
     }
 };

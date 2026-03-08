@@ -25,7 +25,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const placeholderRightPane = document.getElementById('placeholder-right-pane');
     const calculatorView = document.getElementById('calculator');
     
-    // 🚀 검색창 요소 추가
     const settlementSearchInput = document.getElementById('settlement-search-input');
 
     const addSettlementModal = document.getElementById('add-settlement-modal');
@@ -281,6 +280,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const shareCodeInput = document.getElementById('share-code-input');
         if(shareCodeInput) shareCodeInput.value = inviteCode;
+
+        // 🚀 QR 코드 동적 생성 로직 추가
+        const qrContainer = document.getElementById('qrcode-container');
+        if (qrContainer) {
+            qrContainer.innerHTML = '';
+            if (typeof QRCode !== 'undefined') {
+                new QRCode(qrContainer, {
+                    text: shareUrl,
+                    width: 160,
+                    height: 160,
+                    colorDark : "#1e293b",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+            }
+        }
         
         const shareModal = document.getElementById('share-modal');
         if(shareModal) shareModal.classList.remove('hidden');
@@ -383,15 +398,38 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (guestRoomId) {
                 await loadSingleSettlement(guestRoomId);
-                if (!getJoinedRooms().includes(guestRoomId) && joinRoomBtn) {
-                    joinRoomBtn.classList.remove('hidden');
+                
+                // 🚀 로그인 여부에 따른 자동 참가 및 대기열 저장 로직 추가
+                if (currentUser) {
+                    if (!getJoinedRooms().includes(guestRoomId)) {
+                        saveJoinedRoom(guestRoomId);
+                        showToast('정산 방에 자동 참가되었습니다.', 'success');
+                        await loadData(); 
+                    }
+                    if (joinRoomBtn) joinRoomBtn.classList.add('hidden');
+                } else {
+                    localStorage.setItem('pendingJoinRoomId', guestRoomId);
+                    if (!getJoinedRooms().includes(guestRoomId) && joinRoomBtn) {
+                        joinRoomBtn.classList.remove('hidden');
+                    }
                 }
             } else {
                 if (!currentUser) {
                     window.location.replace('login.html'); 
                     return; 
                 } else {
-                    await loadData(); 
+                    // 🚀 회원가입/로그인 완료 후 돌아왔을 때 대기열에 있던 방 자동 참가 처리
+                    const pendingId = localStorage.getItem('pendingJoinRoomId');
+                    if (pendingId) {
+                        saveJoinedRoom(pendingId);
+                        localStorage.removeItem('pendingJoinRoomId');
+                        showToast('정산 방에 자동 참가되었습니다.', 'success');
+                        window.history.replaceState({}, '', `${window.location.pathname}?id=${pendingId}`);
+                        await loadData();
+                        await loadSingleSettlement(pendingId);
+                    } else {
+                        await loadData(); 
+                    }
                 }
             }
 
@@ -477,7 +515,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderSettlementList() {
         if(!settlementListContainer) return;
         
-        // 🚀 검색어 필터링 로직 추가
         const query = settlementSearchInput ? settlementSearchInput.value.toLowerCase().trim() : '';
         let displaySettlements = settlements;
         
@@ -1303,7 +1340,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(mobileMenuBtn) mobileMenuBtn.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
         if(authBtn) authBtn.addEventListener('click', handleAuthClick); 
 
-        // 🚀 검색창 인풋 이벤트 리스너
+        // 검색창 인풋 이벤트 리스너
         if(settlementSearchInput) {
             settlementSearchInput.addEventListener('input', () => {
                 renderSettlementList();
@@ -1319,11 +1356,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(titleInput) titleInput.focus();
         });
 
-        // 🚀 비로그인 시 '내 목록에 저장' 클릭 시 로그인 화면 유도
         if(joinRoomBtn) joinRoomBtn.addEventListener('click', async () => {
             if (!currentSettlement) return;
             
-            if (!currentUser) { // 로그인 안 한 상태
+            if (!currentUser) { 
                 if (await showConfirm(getLocale('loginToSave', '내 목록에 저장하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?'))) {
                     window.location.href = 'login.html';
                 }
@@ -1336,7 +1372,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             loadData(); 
         });
 
-        // 공유 모달 이벤트 연결
         const openShareModalBtn = document.getElementById('open-share-modal-btn');
         if(openShareModalBtn) openShareModalBtn.addEventListener('click', openShareModal);
         
@@ -1355,7 +1390,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const shareEmailBtn = document.getElementById('share-email-btn');
         if(shareEmailBtn) shareEmailBtn.addEventListener('click', sendEmailInvite);
 
-        // 코드로 참가 모달 이벤트 연결
         const openJoinModalBtn = document.getElementById('open-join-modal-btn');
         if(openJoinModalBtn) openJoinModalBtn.addEventListener('click', () => {
             const joinModal = document.getElementById('join-modal');
@@ -1411,7 +1445,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             fetchAndSetRate('latest', itemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('add-custom-rate'), updateAddPreview); 
         });
 
-        // 🚀 지출 추가 - 지출일 기준 환율 버튼 이벤트
         const addExpenseRateBtn = document.getElementById('add-expense-rate-btn');
         if(addExpenseRateBtn) addExpenseRateBtn.addEventListener('click', () => { 
             const expDate = document.getElementById('item-date').value;
@@ -1440,7 +1473,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             fetchAndSetRate('latest', editItemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('edit-custom-rate'), updateEditPreview); 
         });
 
-        // 🚀 지출 수정 - 지출일 기준 환율 버튼 이벤트
         const editExpenseRateBtn = document.getElementById('edit-expense-rate-btn');
         if(editExpenseRateBtn) editExpenseRateBtn.addEventListener('click', () => { 
             const expDate = document.getElementById('edit-item-date').value;
