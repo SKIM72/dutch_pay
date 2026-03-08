@@ -601,12 +601,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(editSplitAmountInputs) attachDynamicSplitInputListeners(editSplitAmountInputs, editItemAmountInput, updateEditPreview);
     }
 
-    async function fetchAndSetRate(fetchType, currencyFrom, currencyTo, inputEl, previewUpdater) {
+    // 수정된 fetchAndSetRate 함수
+    async function fetchAndSetRate(fetchType, currencyFrom, currencyTo, inputEl, previewUpdater, customDateStr = null) {
         if (!currentSettlement) return;
         setLoading(true);
-        const fetchDate = fetchType === 'latest' ? 'latest' : currentSettlement.date;
+        
+        let fetchDate = currentSettlement.date; 
+        
+        if (fetchType === 'latest') {
+            fetchDate = 'latest';
+        } else if (fetchType === 'expense' && customDateStr) {
+            fetchDate = customDateStr.split('T')[0];
+        }
+
         const rate = await getExchangeRate(fetchDate, currencyFrom, currencyTo);
-        if (rate !== null && inputEl) { inputEl.value = rate.toFixed(4); if (previewUpdater) previewUpdater(); }
+        
+        if (rate !== null && inputEl) { 
+            inputEl.value = rate.toFixed(4); 
+            if (previewUpdater) previewUpdater(); 
+        } else if (rate === null && fetchType === 'expense') {
+            showToast('해당 날짜의 환율 정보를 가져오지 못했습니다.', 'error');
+        }
         setLoading(false);
     }
 
@@ -981,7 +996,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (exp.expense_date) {
                 const d = new Date(exp.expense_date);
                 let localeCode = currentLang === 'en' ? 'en-US' : (currentLang === 'ja' ? 'ja-JP' : 'ko-KR');
-                const dateStr = d.toLocaleDateString(localeCode, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                // 🚀 hour12: false 옵션을 추가하여 24시간제로 변경
+                const dateStr = d.toLocaleDateString(localeCode, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
                 dateHtml = `<div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">${dateStr}</div>`;
             }
             let amountHtml = `${formatNumber(exp.original_amount, 2)} ${exp.currency}`;
@@ -1374,6 +1390,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             fetchAndSetRate('latest', itemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('add-custom-rate'), updateAddPreview); 
         });
 
+        // 🚀 지출 추가 - 지출일 기준 환율 버튼 이벤트
+        const addExpenseRateBtn = document.getElementById('add-expense-rate-btn');
+        if(addExpenseRateBtn) addExpenseRateBtn.addEventListener('click', () => { 
+            const expDate = document.getElementById('item-date').value;
+            if(!expDate) return showToast(getLocale('invalidInput', '지출 일시를 먼저 입력해주세요.'), 'error');
+            fetchAndSetRate('expense', itemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('add-custom-rate'), updateAddPreview, expDate); 
+        });
+
         if(editItemCurrencySelect) editItemCurrencySelect.addEventListener('change', () => { 
             const editRateInput = document.getElementById('edit-custom-rate');
             if(editRateInput) editRateInput.value = ''; 
@@ -1393,6 +1417,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         const editLiveRateBtn = document.getElementById('edit-live-rate-btn');
         if(editLiveRateBtn) editLiveRateBtn.addEventListener('click', () => { 
             fetchAndSetRate('latest', editItemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('edit-custom-rate'), updateEditPreview); 
+        });
+
+        // 🚀 지출 수정 - 지출일 기준 환율 버튼 이벤트
+        const editExpenseRateBtn = document.getElementById('edit-expense-rate-btn');
+        if(editExpenseRateBtn) editExpenseRateBtn.addEventListener('click', () => { 
+            const expDate = document.getElementById('edit-item-date').value;
+            if(!expDate) return showToast(getLocale('invalidInput', '지출 일시를 먼저 입력해주세요.'), 'error');
+            fetchAndSetRate('expense', editItemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('edit-custom-rate'), updateEditPreview, expDate); 
         });
 
         if(completeSettlementBtn) completeSettlementBtn.addEventListener('click', async () => {

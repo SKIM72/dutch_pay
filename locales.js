@@ -44,8 +44,9 @@ const locales = {
         customRateLabel: "적용 환율",
         convertedAmount: "최종 변환 금액",
         rateNotice: "입력창에서 지출 건별로 원하는 환율을 직접 수정할 수 있습니다.",
-        applySettlementRate: "정산일 기준",
-        applyLiveRate: "실시간 최신",
+        applyExpenseRate: "지출일",
+        applySettlementRate: "정산일",
+        applyLiveRate: "실시간",
         copyText: "정산 결과 텍스트로 복사하기",
         saveImage: "정산 결과 이미지로 저장하기",
         copySuccess: "정산 요약이 클립보드에 복사되었습니다. 카톡 등 메신저에 붙여넣기 하세요!",
@@ -84,7 +85,6 @@ const locales = {
         participating: "참여중",
         host: "방장",
         logoutConfirm: "정말로 로그아웃 하시겠습니까?",
-        // 🚀 신규 추가된 로그인 유도 번역
         loginToSave: "내 목록에 저장하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?"
     },
     en: {
@@ -132,8 +132,9 @@ const locales = {
         customRateLabel: "Custom Rate",
         convertedAmount: "Final Converted",
         rateNotice: "You can modify the exchange rate for each expense directly in the input field.",
-        applySettlementRate: "Settlement Date",
-        applyLiveRate: "Live Latest",
+        applyExpenseRate: "Expense",
+        applySettlementRate: "Settlement",
+        applyLiveRate: "Live",
         copyText: "Copy Settlement Text",
         saveImage: "Save as Image",
         copySuccess: "Settlement summary copied to clipboard. Paste it in your messenger!",
@@ -172,7 +173,6 @@ const locales = {
         participating: "Joined",
         host: "Host",
         logoutConfirm: "Are you sure you want to log out?",
-        // 🚀 신규 추가된 로그인 유도 번역
         loginToSave: "You need to log in to save to your list.\nGo to the Login/Sign Up page?"
     },
     ja: {
@@ -220,8 +220,9 @@ const locales = {
         customRateLabel: "適用レート",
         convertedAmount: "最終変換額",
         rateNotice: "各支出の入力フィールドで希望のレートを直接修正できます。",
-        applySettlementRate: "精算日基準",
-        applyLiveRate: "リアルタイム最新",
+        applyExpenseRate: "支出日",
+        applySettlementRate: "精算日",
+        applyLiveRate: "リアルタイム",
         copyText: "精算結果をテキストでコピー",
         saveImage: "精算結果を画像で保存",
         copySuccess: "精算の概要がクリップボードにコピーされました。メッセンジャーなどに貼り付けてください！",
@@ -260,7 +261,6 @@ const locales = {
         participating: "参加中",
         host: "ホスト",
         logoutConfirm: "本当にログアウトしますか？",
-        // 🚀 신규 추가된 로그인 유도 번역
         loginToSave: "リストに保存するにはログインが必要です。\nログイン画面に移動しますか？"
     }
 };
