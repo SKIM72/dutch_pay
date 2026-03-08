@@ -85,12 +85,16 @@ const locales = {
         host: "방장",
         logoutConfirm: "정말로 로그아웃 하시겠습니까?",
         loginToSave: "내 목록에 저장하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?",
-        // 신규 추가된 로컬라이징 키
         participantList: "참가자 명단",
         addParticipant: "참가자 추가",
         currencyJPY: "JPY (일본 엔)",
         currencyKRW: "KRW (한국 원)",
-        currencyUSD: "USD (미국 달러)"
+        currencyUSD: "USD (미국 달러)",
+        searchSettlementPlaceholder: "제목 또는 날짜 검색...",
+        noSearchResult: "검색 결과가 없습니다.",
+        // 🚀 신규 추가 (확인 모달 버튼 로컬라이징)
+        btnCancel: "취소",
+        btnConfirm: "확인"
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -178,12 +182,16 @@ const locales = {
         host: "Host",
         logoutConfirm: "Are you sure you want to log out?",
         loginToSave: "You need to log in to save to your list.\nGo to the Login/Sign Up page?",
-        // 신규 추가된 로컬라이징 키
         participantList: "Participant List",
         addParticipant: "Add Participant",
         currencyJPY: "JPY (Japanese Yen)",
         currencyKRW: "KRW (Korean Won)",
-        currencyUSD: "USD (US Dollar)"
+        currencyUSD: "USD (US Dollar)",
+        searchSettlementPlaceholder: "Search by title or date...",
+        noSearchResult: "No results found.",
+        // 🚀 신규 추가 (확인 모달 버튼 로컬라이징)
+        btnCancel: "Cancel",
+        btnConfirm: "Confirm"
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -271,11 +279,15 @@ const locales = {
         host: "ホスト",
         logoutConfirm: "本当にログアウトしますか？",
         loginToSave: "リストに保存するにはログインが必要です。\nログイン画面に移動しますか？",
-        // 신규 추가된 로컬라이징 키
         participantList: "参加者リスト",
         addParticipant: "参加者追加",
         currencyJPY: "JPY (日本円)",
         currencyKRW: "KRW (韓国ウォン)",
-        currencyUSD: "USD (米ドル)"
+        currencyUSD: "USD (米ドル)",
+        searchSettlementPlaceholder: "タイトルまたは日付で検索...",
+        noSearchResult: "検索結果がありません。",
+        // 🚀 신규 추가 (확인 모달 버튼 로컬라이징)
+        btnCancel: "キャンセル",
+        btnConfirm: "確認"
     }
 };

@@ -25,6 +25,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const placeholderRightPane = document.getElementById('placeholder-right-pane');
     const calculatorView = document.getElementById('calculator');
     
+    // 🚀 검색창 요소 추가
+    const settlementSearchInput = document.getElementById('settlement-search-input');
+
     const addSettlementModal = document.getElementById('add-settlement-modal');
     const exchangeRateModal = document.getElementById('exchange-rate-modal');
     const editExpenseModal = document.getElementById('edit-expense-modal');
@@ -474,12 +477,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     function renderSettlementList() {
         if(!settlementListContainer) return;
         
-        if (settlements.length === 0) {
-            settlementListContainer.innerHTML = `<p class="subtitle">${getLocale('noHistory', '참여 중인 정산 내역이 없습니다.')}</p>`;
+        // 🚀 검색어 필터링 로직 추가
+        const query = settlementSearchInput ? settlementSearchInput.value.toLowerCase().trim() : '';
+        let displaySettlements = settlements;
+        
+        if (query) {
+            displaySettlements = settlements.filter(s => {
+                const titleMatch = (s.title || '').toLowerCase().includes(query);
+                const dateMatch = (formatDisplayDate(s.date) || '').includes(query);
+                return titleMatch || dateMatch;
+            });
+        }
+        
+        if (displaySettlements.length === 0) {
+            const fallbackText = query ? getLocale('noSearchResult', '검색 결과가 없습니다.') : getLocale('noHistory', '참여 중인 정산 내역이 없습니다.');
+            settlementListContainer.innerHTML = `<p class="subtitle" style="text-align: center; color: var(--text-muted); margin-top: 1.5rem; font-size: 0.9rem;">${fallbackText}</p>`;
             return;
         }
         
-        settlementListContainer.innerHTML = settlements.map(s => `
+        settlementListContainer.innerHTML = displaySettlements.map(s => `
             <div class="settlement-item-wrapper">
                 <button class="settlement-item ${s.is_settled ? 'is-settled' : ''}" data-id="${s.id}">
                     <div class="item-content">
@@ -601,7 +617,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(editSplitAmountInputs) attachDynamicSplitInputListeners(editSplitAmountInputs, editItemAmountInput, updateEditPreview);
     }
 
-    // 수정된 fetchAndSetRate 함수
     async function fetchAndSetRate(fetchType, currencyFrom, currencyTo, inputEl, previewUpdater, customDateStr = null) {
         if (!currentSettlement) return;
         setLoading(true);
@@ -996,7 +1011,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (exp.expense_date) {
                 const d = new Date(exp.expense_date);
                 let localeCode = currentLang === 'en' ? 'en-US' : (currentLang === 'ja' ? 'ja-JP' : 'ko-KR');
-                // 🚀 hour12: false 옵션을 추가하여 24시간제로 변경
                 const dateStr = d.toLocaleDateString(localeCode, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
                 dateHtml = `<div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">${dateStr}</div>`;
             }
@@ -1288,6 +1302,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(languageSwitcher) languageSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
         if(mobileMenuBtn) mobileMenuBtn.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
         if(authBtn) authBtn.addEventListener('click', handleAuthClick); 
+
+        // 🚀 검색창 인풋 이벤트 리스너
+        if(settlementSearchInput) {
+            settlementSearchInput.addEventListener('input', () => {
+                renderSettlementList();
+            });
+        }
 
         if(addSettlementFab) addSettlementFab.addEventListener('click', () => {
             const dateInput = document.getElementById('new-settlement-date');

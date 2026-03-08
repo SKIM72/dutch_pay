@@ -11,7 +11,7 @@
     <link rel="icon" href="icon.png" type="image/png">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=27">
+    <link rel="stylesheet" href="style.css?v=28">
     
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
@@ -49,10 +49,15 @@
             <aside id="left-pane">
                 <div class="sidebar-content">
                     <h2 data-i18n="settlementHistory">정산 내역 조회</h2>
+                    
+                    <div style="margin-bottom: 0.8rem; position: relative;">
+                        <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem;"></i>
+                        <input type="text" id="settlement-search-input" data-i18n-placeholder="searchSettlementPlaceholder" placeholder="제목 또는 날짜 검색..." style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 32px; font-size: 0.9rem; border-radius: 8px;">
+                    </div>
+                    
+                    <button id="open-join-modal-btn" style="margin-bottom: 1.2rem;"><i class="fas fa-keyboard"></i> <span data-i18n="joinByCodeBtn">초대 코드로 참가</span></button>
+                    
                     <div id="settlement-list-container"></div>
-                </div>
-                <div class="join-by-code-container">
-                    <button id="open-join-modal-btn"><i class="fas fa-keyboard"></i> <span data-i18n="joinByCodeBtn">초대 코드로 참가</span></button>
                 </div>
             </aside>
 
@@ -332,8 +337,8 @@
                 <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: var(--danger); margin-bottom: 1rem;"></i>
                 <h3 id="confirm-message" style="margin-bottom: 1.5rem; font-size: 1.1rem; font-weight: 600;"></h3>
                 <div style="display: flex; gap: 1rem; justify-content: center;">
-                    <button id="confirm-no-btn" class="btn-outline" style="flex: 1;">취소</button>
-                    <button id="confirm-yes-btn" style="flex: 1; background-color: var(--danger); color: white; border-color: var(--danger);">확인</button>
+                    <button id="confirm-no-btn" class="btn-outline" style="flex: 1;" data-i18n="btnCancel">취소</button>
+                    <button id="confirm-yes-btn" style="flex: 1; background-color: var(--danger); color: white; border-color: var(--danger);" data-i18n="btnConfirm">확인</button>
                 </div>
             </div>
         </div>
@@ -346,6 +351,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="main.js?v=27"></script>
+    <script src="main.js?v=28"></script>
 </body>
 </html>
