@@ -358,7 +358,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         setLoading(false);
     }
 
-
     async function getExchangeRate(date, base, target) {
         if (base === target) return 1;
         const cacheKey = `${date}_${base}_${target}`;
@@ -580,6 +579,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    function updateOpenGraphTags(settlement) {
+        let ogTitle = document.querySelector('meta[property="og:title"]');
+        let ogDesc = document.querySelector('meta[property="og:description"]');
+        let ogUrl = document.querySelector('meta[property="og:url"]');
+
+        const shareUrl = `${window.location.origin}${window.location.pathname}?id=${settlement.id}`;
+        const titleText = `💸 [${settlement.title}] 정산이 도착했어요!`;
+        const descText = "내야 할 금액을 확인하고 간편하게 송금하세요.";
+
+        if (ogTitle) ogTitle.content = titleText;
+        if (ogDesc) ogDesc.content = descText;
+        if (ogUrl) ogUrl.content = shareUrl;
+        
+        document.title = titleText; 
+    }
+
     function selectSettlement(settlement) {
         currentSettlement = settlement;
         
@@ -602,6 +617,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(itemDateInput) itemDateInput.value = getLocalISOString();
         
         window.history.replaceState({}, '', `${window.location.pathname}?id=${settlement.id}`);
+        
+        updateOpenGraphTags(settlement);
+
         render();
     }
 
@@ -1094,6 +1112,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { transfers, balances }; 
     }
 
+    // 🚀 결과 화면에 딥링크 버튼을 동적으로 생성하는 로직 (수정됨)
     function updateSummary() {
         if (!currentSettlement) return;
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
@@ -1114,7 +1133,38 @@ document.addEventListener('DOMContentLoaded', async () => {
                 transfers.forEach(tr => {
                     const div = document.createElement('div');
                     div.className = 'transfer-item';
-                    div.textContent = `${tr.from} ➡️ ${tr.to} (${formatNumber(tr.amount, 2)} ${base_currency})`;
+                    
+                    // 🚀 디자인이 개선된 송금 버튼 생성 (LINE Pay 제거)
+                    let payButtons = '';
+                    if (base_currency === 'KRW' || currentLang === 'ko') {
+                        payButtons = `
+                            <div style="display:flex; gap:0.5rem; margin-top: 0.8rem;">
+                                <a href="supertoss://send?amount=${Math.round(tr.amount)}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#3182f6; color:white; border-radius:8px; padding:0.6rem;"><i class="fas fa-paper-plane"></i> 토스 송금</a>
+                                <a href="kakaotalk://kakaopay/money/to/send" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#FEE500; color:#191919; border-radius:8px; padding:0.6rem;"><i class="fas fa-comment-dollar"></i> 카카오페이</a>
+                            </div>
+                        `;
+                    } else if (base_currency === 'JPY' || currentLang === 'ja') {
+                        payButtons = `
+                            <div style="display:flex; gap:0.5rem; margin-top: 0.8rem;">
+                                <a href="paypay://" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#FF0033; color:white; border-radius:8px; padding:0.6rem;">PayPay</a>
+                            </div>
+                        `;
+                    } else {
+                        payButtons = `
+                            <div style="display:flex; gap:0.5rem; margin-top: 0.8rem;">
+                                <a href="venmo://paycharge?txn=pay&amount=${Math.round(tr.amount)}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#008CFF; color:white; border-radius:8px; padding:0.6rem;">Venmo</a>
+                                <a href="https://www.paypal.com/myaccount/transfer/homepage" target="_blank" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#003087; color:white; border-radius:8px; padding:0.6rem;">PayPal</a>
+                            </div>
+                        `;
+                    }
+
+                    // 🚀 원래의 깔끔한 한 줄 텍스트 형태로 복구 (흰색 글씨)
+                    div.innerHTML = `
+                        <div style="font-weight: 700; text-align: right; color: white;">
+                            ${tr.from} ➡️ ${tr.to} (${formatNumber(tr.amount, 2)} ${base_currency})
+                        </div>
+                        ${payButtons}
+                    `;
                     finalSettlementContainer.appendChild(div);
                 });
             }
@@ -1197,7 +1247,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         else updateEditPreview();
     }
 
-    // 🚀 복사하기 버튼 클릭 시 송금 딥링크 자동 추가
     async function copySummaryText() {
         if (!currentSettlement) return;
         const { title, base_currency, expenses, participants } = currentSettlement;
@@ -1208,26 +1257,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             ko: { 
                 summary: "정산 요약", total: "총 지출", result: "정산 결과", 
                 sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}에게 ${amount} ${currency} 송금 부탁할게! 💸`, 
-                notice: "상세 내역 확인하기: ", 
-                quickLinkTitle: "🚀 빠른 송금 링크", 
-                quickLinks: "- 토스(Toss): supertoss://send\n- 카카오페이: kakaotalk://kakaopay/money/to/send" 
+                notice: "✅ 아래 링크로 접속하면 [금액이 자동 입력된 토스/카카오페이 송금 버튼]을 사용할 수 있어요!"
             },
             en: { 
                 summary: "Settlement Summary", total: "Total Expense", result: "Settlement Result", 
                 sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}: Please send ${amount} ${currency}! 💸`, 
-                notice: "Check details at: ", 
-                quickLinkTitle: "🚀 Quick Transfer Links", 
-                quickLinks: "- Venmo: venmo://\n- PayPal: https://www.paypal.com/myaccount/transfer/homepage" 
+                notice: "✅ Click the link below to use the auto-filled quick transfer buttons!"
             },
             ja: { 
                 summary: "精算の概要", total: "総支出", result: "精算結果", 
                 sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}へ ${amount} ${currency} の送金をお願い！ 💸`, 
-                notice: "詳細を確認する: ", 
-                quickLinkTitle: "🚀 クイック送金リンク", 
-                quickLinks: "- PayPay: paypay://\n- LINE Pay: line://pay/transfer" 
+                notice: "✅ 下のリンクを開くと、金額が自動入力される送金ボタンが使えます！"
             }
         };
-        
         const t = copyTexts[currentLang] || copyTexts['ko'];
         let resultString = '';
         
@@ -1240,14 +1282,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const currentUrl = window.location.origin + window.location.pathname;
         const shareUrl = `${currentUrl}?id=${currentSettlement.id}`;
         
-        let text = `🧾 [${title}] ${t.summary}\n\n💰 ${t.total}: ${formatNumber(totalAmount, 0)} ${base_currency}\n🔔 ${t.result}:\n${resultString}\n\n`;
-        
-        // 정산해서 송금할 금액이 존재할 때만 딥링크 삽입
-        if (transfers.length > 0) {
-            text += `${t.quickLinkTitle}\n${t.quickLinks}\n\n`;
-        }
-
-        text += `${t.notice}\n${shareUrl}`;
+        const text = `🧾 [${title}] ${t.summary}\n\n💰 ${t.total}: ${formatNumber(totalAmount, 0)} ${base_currency}\n🔔 ${t.result}:\n${resultString}\n\n${t.notice}\n${shareUrl}`;
         
         const success = await fallbackCopyTextToClipboard(text);
         if (success) showToast(getLocale('copySuccess', "Copied!"), 'success');
