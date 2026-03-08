@@ -244,7 +244,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return names.length >= 2 ? names : ['A', 'B']; 
     }
 
-    // 클립보드 복사 백업 함수
     async function fallbackCopyTextToClipboard(text) {
         try {
             await navigator.clipboard.writeText(text);
@@ -281,7 +280,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const shareCodeInput = document.getElementById('share-code-input');
         if(shareCodeInput) shareCodeInput.value = inviteCode;
 
-        // 🚀 QR 코드 동적 생성 로직 추가
         const qrContainer = document.getElementById('qrcode-container');
         if (qrContainer) {
             qrContainer.innerHTML = '';
@@ -399,7 +397,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (guestRoomId) {
                 await loadSingleSettlement(guestRoomId);
                 
-                // 🚀 로그인 여부에 따른 자동 참가 및 대기열 저장 로직 추가
                 if (currentUser) {
                     if (!getJoinedRooms().includes(guestRoomId)) {
                         saveJoinedRoom(guestRoomId);
@@ -418,7 +415,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     window.location.replace('login.html'); 
                     return; 
                 } else {
-                    // 🚀 회원가입/로그인 완료 후 돌아왔을 때 대기열에 있던 방 자동 참가 처리
                     const pendingId = localStorage.getItem('pendingJoinRoomId');
                     if (pendingId) {
                         saveJoinedRoom(pendingId);
@@ -1019,25 +1015,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(exchangeRateModal) exchangeRateModal.classList.remove('hidden');
     }
 
-    // 🚀 비로그인 접속 시 폼 전체 잠금 로직이 반영된 render 함수
     function render() { 
         if (currentSettlement) { 
             currentSettlement.expenses.sort((a, b) => new Date(a.expense_date || a.created_at) - new Date(b.expense_date || b.created_at));
             renderExpenses(); updateSummary(); 
-            // 🚀 로그인하지 않은 게스트는 무조건 폼 비활성화 (조회만 가능)
             const isLocked = currentSettlement.is_settled || !currentUser; 
             toggleExpenseForm(isLocked);
         }
     }
 
-    // 🚀 비로그인 접속 시 수정/삭제 기능 잠금 로직이 반영된 renderExpenses 함수
     function renderExpenses() {
         if(!expenseTableBody) return;
         expenseTableBody.innerHTML = '';
         if (!currentSettlement || !currentSettlement.expenses) return;
         const participants = currentSettlement.participants;
         
-        // 🚀 로그인하지 않은 게스트는 수정/삭제 불가능 (조회만 가능)
         const isLocked = currentSettlement.is_settled || !currentUser;
 
         currentSettlement.expenses.forEach(exp => {
@@ -1102,7 +1094,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { transfers, balances }; 
     }
 
-    // 🚀 비로그인 접속 시 정산 완료/다시 열기 버튼 숨김 로직 추가
     function updateSummary() {
         if (!currentSettlement) return;
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
@@ -1127,14 +1118,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     finalSettlementContainer.appendChild(div);
                 });
             }
-            if (currentUser) { // 🚀 로그인한 유저만 볼 수 있음
+            if (currentUser) { 
                 completeSettlementBtn.textContent = getLocale('editSettlement', 'Reopen Settlement');
                 completeSettlementBtn.classList.add('edit-mode'); 
                 completeSettlementBtn.classList.remove('hidden');
             }
         } else {
             finalSettlementContainer.innerHTML = `<div class="transfer-item text-muted">${getLocale('settlementInProgress', 'Settlement in progress...')}</div>`;
-            if (expenses.length > 0 && currentUser) { // 🚀 로그인한 유저만 볼 수 있음
+            if (expenses.length > 0 && currentUser) { 
                 completeSettlementBtn.textContent = getLocale('completeSettlement', 'Complete Settlement');
                 completeSettlementBtn.classList.remove('edit-mode'); 
                 completeSettlementBtn.classList.remove('hidden');
@@ -1206,6 +1197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         else updateEditPreview();
     }
 
+    // 🚀 복사하기 버튼 클릭 시 송금 딥링크 자동 추가
     async function copySummaryText() {
         if (!currentSettlement) return;
         const { title, base_currency, expenses, participants } = currentSettlement;
@@ -1213,10 +1205,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { transfers } = calculateMinimumTransfers(expenses, participants);
 
         const copyTexts = {
-            ko: { summary: "정산 요약", total: "총 지출", result: "정산 결과", sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}에게 ${amount} ${currency} 송금 부탁할게! 💸`, notice: "상세 내역 확인하기: " },
-            en: { summary: "Settlement Summary", total: "Total Expense", result: "Settlement Result", sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}: Please send ${amount} ${currency}! 💸`, notice: "Check details at: " },
-            ja: { summary: "精算の概要", total: "総支出", result: "精算結果", sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}へ ${amount} ${currency} の送金をお願い！ 💸`, notice: "詳細を確認する: " }
+            ko: { 
+                summary: "정산 요약", total: "총 지출", result: "정산 결과", 
+                sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}에게 ${amount} ${currency} 송금 부탁할게! 💸`, 
+                notice: "상세 내역 확인하기: ", 
+                quickLinkTitle: "🚀 빠른 송금 링크", 
+                quickLinks: "- 토스(Toss): supertoss://send\n- 카카오페이: kakaotalk://kakaopay/money/to/send" 
+            },
+            en: { 
+                summary: "Settlement Summary", total: "Total Expense", result: "Settlement Result", 
+                sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}: Please send ${amount} ${currency}! 💸`, 
+                notice: "Check details at: ", 
+                quickLinkTitle: "🚀 Quick Transfer Links", 
+                quickLinks: "- Venmo: venmo://\n- PayPal: https://www.paypal.com/myaccount/transfer/homepage" 
+            },
+            ja: { 
+                summary: "精算の概要", total: "総支出", result: "精算結果", 
+                sendFormat: (from, to, amount, currency) => `${from} ➡️ ${to}へ ${amount} ${currency} の送金をお願い！ 💸`, 
+                notice: "詳細を確認する: ", 
+                quickLinkTitle: "🚀 クイック送金リンク", 
+                quickLinks: "- PayPay: paypay://\n- LINE Pay: line://pay/transfer" 
+            }
         };
+        
         const t = copyTexts[currentLang] || copyTexts['ko'];
         let resultString = '';
         
@@ -1228,14 +1239,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const currentUrl = window.location.origin + window.location.pathname;
         const shareUrl = `${currentUrl}?id=${currentSettlement.id}`;
-        const text = `🧾 [${title}] ${t.summary}\n\n💰 ${t.total}: ${formatNumber(totalAmount, 0)} ${base_currency}\n🔔 ${t.result}:\n${resultString}\n\n${t.notice}\n${shareUrl}`;
+        
+        let text = `🧾 [${title}] ${t.summary}\n\n💰 ${t.total}: ${formatNumber(totalAmount, 0)} ${base_currency}\n🔔 ${t.result}:\n${resultString}\n\n`;
+        
+        // 정산해서 송금할 금액이 존재할 때만 딥링크 삽입
+        if (transfers.length > 0) {
+            text += `${t.quickLinkTitle}\n${t.quickLinks}\n\n`;
+        }
+
+        text += `${t.notice}\n${shareUrl}`;
         
         const success = await fallbackCopyTextToClipboard(text);
         if (success) showToast(getLocale('copySuccess', "Copied!"), 'success');
         else showToast('복사에 실패했습니다.', 'error');
     }
 
-    // html-to-image 보안(CORS) 에러 완벽 해결
     async function saveAsImage() {
         if (!currentSettlement) return;
         setLoading(true);
@@ -1340,7 +1358,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(mobileMenuBtn) mobileMenuBtn.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
         if(authBtn) authBtn.addEventListener('click', handleAuthClick); 
 
-        // 검색창 인풋 이벤트 리스너
         if(settlementSearchInput) {
             settlementSearchInput.addEventListener('input', () => {
                 renderSettlementList();
