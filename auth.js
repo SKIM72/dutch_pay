@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('new-password').addEventListener('keypress', handleEnterKey('submit-update-password-btn'));
 
 
-    // 🚀 소셜 로그인(OAuth) 처리 로직 추가 (네이버, 라인 제거)
+    // 🚀 소셜 로그인(OAuth) 처리 로직
     const handleOAuthLogin = async (provider) => {
         const { data, error } = await supabaseClient.auth.signInWithOAuth({
             provider: provider,
@@ -102,9 +102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (error) alert(error.message);
     };
 
-    const btnKakao = document.getElementById('btn-kakao');
-    if (btnKakao) btnKakao.addEventListener('click', () => handleOAuthLogin('kakao'));
-
+    // 카카오 리스너 깔끔하게 제거됨
     const btnGoogle = document.getElementById('btn-google');
     if (btnGoogle) btnGoogle.addEventListener('click', () => handleOAuthLogin('google'));
 
