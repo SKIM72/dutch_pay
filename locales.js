@@ -94,8 +94,10 @@ const locales = {
         noSearchResult: "검색 결과가 없습니다.",
         btnCancel: "취소",
         btnConfirm: "확인",
+        shareQrCode: "📱 카메라로 QR 스캔하여 참가",
         // 🚀 신규 추가
-        shareQrCode: "📱 카메라로 QR 스캔하여 참가"
+        editTitle: "정산 제목 수정",
+        newTitlePlaceholder: "새로운 제목 입력"
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -192,8 +194,10 @@ const locales = {
         noSearchResult: "No results found.",
         btnCancel: "Cancel",
         btnConfirm: "Confirm",
+        shareQrCode: "📱 Scan QR to Join",
         // 🚀 신규 추가
-        shareQrCode: "📱 Scan QR to Join"
+        editTitle: "Edit Title",
+        newTitlePlaceholder: "Enter new title"
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -290,7 +294,9 @@ const locales = {
         noSearchResult: "検索結果がありません。",
         btnCancel: "キャンセル",
         btnConfirm: "確認",
+        shareQrCode: "📱 カメラでQRスキャンして参加",
         // 🚀 신규 추가
-        shareQrCode: "📱 カメラでQRスキャンして参加"
+        editTitle: "タイトル修正",
+        newTitlePlaceholder: "新しいタイトルを入力"
     }
 };

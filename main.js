@@ -78,6 +78,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const addExpenseBtn = document.getElementById('add-expense-btn');
     const itemNameInput = document.getElementById('item-name');
     const itemAmountInput = document.getElementById('item-amount');
+    
+    // 🚀 새로 추가된 엘리먼트
+    const editSettlementTitleBtn = document.getElementById('edit-settlement-title-btn');
+    const editTitleModal = document.getElementById('edit-title-modal');
+    const editTitleInput = document.getElementById('edit-title-input');
+    const saveTitleBtn = document.getElementById('save-title-btn');
 
     function getLocale(key, fallbackText) {
         if (typeof locales !== 'undefined' && locales[currentLang] && locales[currentLang][key]) {
@@ -603,6 +609,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(settlementDisplay) settlementDisplay.textContent = settlement.title;
         if(itemCurrencySelect) itemCurrencySelect.value = settlement.base_currency;
         
+        // 🚀 로그인한 사용자만 제목 수정 버튼 표시
+        if(editSettlementTitleBtn) {
+            if(currentUser) editSettlementTitleBtn.classList.remove('hidden');
+            else editSettlementTitleBtn.classList.add('hidden');
+        }
+
         const wrapper = document.getElementById('add-rate-config-wrapper');
         if(wrapper) wrapper.classList.add('hidden'); 
         
@@ -1112,7 +1124,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { transfers, balances }; 
     }
 
-    // 🚀 결과 화면에 딥링크 버튼을 동적으로 생성하는 로직 (수정됨)
     function updateSummary() {
         if (!currentSettlement) return;
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
@@ -1134,7 +1145,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const div = document.createElement('div');
                     div.className = 'transfer-item';
                     
-                    // 🚀 디자인이 개선된 송금 버튼 생성 (LINE Pay 제거)
                     let payButtons = '';
                     if (base_currency === 'KRW' || currentLang === 'ko') {
                         payButtons = `
@@ -1158,7 +1168,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         `;
                     }
 
-                    // 🚀 원래의 깔끔한 한 줄 텍스트 형태로 복구 (흰색 글씨)
                     div.innerHTML = `
                         <div style="font-weight: 700; text-align: right; color: white;">
                             ${tr.from} ➡️ ${tr.to} (${formatNumber(tr.amount, 2)} ${base_currency})
@@ -1461,7 +1470,47 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if(addParticipantBtn) addParticipantBtn.addEventListener('click', () => addParticipantInputUI());
         
-        [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal, document.getElementById('share-modal'), document.getElementById('join-modal'), document.getElementById('profile-modal')].forEach(modal => {
+        // 🚀 제목 수정 버튼 이벤트
+        if(editSettlementTitleBtn) {
+            editSettlementTitleBtn.addEventListener('click', () => {
+                if(!currentSettlement) return;
+                if(editTitleInput) editTitleInput.value = currentSettlement.title;
+                if(editTitleModal) editTitleModal.classList.remove('hidden');
+            });
+        }
+
+        if(saveTitleBtn) {
+            saveTitleBtn.addEventListener('click', async () => {
+                if(!currentSettlement) return;
+                const newTitle = editTitleInput ? editTitleInput.value.trim() : '';
+                if(!newTitle) {
+                    showToast(getLocale('invalidInput', '올바르게 입력해주세요.'), 'error');
+                    return;
+                }
+
+                setLoading(true);
+                const { error } = await supabaseClient.from('settlements').update({ title: newTitle }).eq('id', currentSettlement.id);
+                setLoading(false);
+
+                if(error) {
+                    showToast('제목 수정에 실패했습니다.', 'error');
+                    return;
+                }
+
+                showToast('제목이 수정되었습니다.', 'success');
+                currentSettlement.title = newTitle;
+                
+                const sIndex = settlements.findIndex(s => s.id === currentSettlement.id);
+                if(sIndex > -1) settlements[sIndex].title = newTitle;
+                
+                if(settlementDisplay) settlementDisplay.textContent = newTitle;
+                renderSettlementList();
+                updateOpenGraphTags(currentSettlement); 
+                if(editTitleModal) editTitleModal.classList.add('hidden');
+            });
+        }
+
+        [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal, document.getElementById('share-modal'), document.getElementById('join-modal'), document.getElementById('profile-modal'), editTitleModal].forEach(modal => {
             if(modal) {
                 modal.addEventListener('click', (e) => { 
                     if (e.target === modal) modal.classList.add('hidden'); 
