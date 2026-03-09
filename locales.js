@@ -44,8 +44,10 @@ const locales = {
         customRateLabel: "적용 환율",
         convertedAmount: "최종 변환 금액",
         rateNotice: "입력창에서 지출 건별로 원하는 환율을 직접 수정할 수 있습니다.",
-        applySettlementRate: "정산일 기준",
-        applyLiveRate: "실시간 최신",
+        // 🚀 지출일 환율 복구 및 버튼 텍스트 간결화
+        applyExpenseRate: "지출일",
+        applySettlementRate: "정산일",
+        applyLiveRate: "실시간",
         copyText: "정산 결과 텍스트로 복사하기",
         saveImage: "정산 결과 이미지로 저장하기",
         copySuccess: "정산 요약이 클립보드에 복사되었습니다. 카톡 등 메신저에 붙여넣기 하세요!",
@@ -95,7 +97,6 @@ const locales = {
         btnCancel: "취소",
         btnConfirm: "확인",
         shareQrCode: "📱 카메라로 QR 스캔하여 참가",
-        // 🚀 신규 추가
         editTitle: "정산 제목 수정",
         newTitlePlaceholder: "새로운 제목 입력"
     },
@@ -144,8 +145,10 @@ const locales = {
         customRateLabel: "Custom Rate",
         convertedAmount: "Final Converted",
         rateNotice: "You can modify the exchange rate for each expense directly in the input field.",
-        applySettlementRate: "Settlement Date",
-        applyLiveRate: "Live Latest",
+        // 🚀 지출일 환율 복구
+        applyExpenseRate: "Expense",
+        applySettlementRate: "Settlement",
+        applyLiveRate: "Live",
         copyText: "Copy Settlement Text",
         saveImage: "Save as Image",
         copySuccess: "Settlement summary copied to clipboard. Paste it in your messenger!",
@@ -195,7 +198,6 @@ const locales = {
         btnCancel: "Cancel",
         btnConfirm: "Confirm",
         shareQrCode: "📱 Scan QR to Join",
-        // 🚀 신규 추가
         editTitle: "Edit Title",
         newTitlePlaceholder: "Enter new title"
     },
@@ -244,8 +246,10 @@ const locales = {
         customRateLabel: "適用レート",
         convertedAmount: "最終変換額",
         rateNotice: "各支出の入力フィールドで希望のレートを直接修正できます。",
-        applySettlementRate: "精算日基準",
-        applyLiveRate: "リアルタイム最新",
+        // 🚀 지출일 환율 복구
+        applyExpenseRate: "支出日",
+        applySettlementRate: "精算日",
+        applyLiveRate: "リアルタイム",
         copyText: "精算結果をテキストでコピー",
         saveImage: "精算結果を画像で保存",
         copySuccess: "精算の概要がクリップボードにコピーされました。メッセンジャーなどに貼り付けてください！",
@@ -295,7 +299,6 @@ const locales = {
         btnCancel: "キャンセル",
         btnConfirm: "確認",
         shareQrCode: "📱 カメラでQRスキャンして参加",
-        // 🚀 신규 추가
         editTitle: "タイトル修正",
         newTitlePlaceholder: "新しいタイトルを入力"
     }

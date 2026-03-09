@@ -79,7 +79,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const itemNameInput = document.getElementById('item-name');
     const itemAmountInput = document.getElementById('item-amount');
     
-    // 🚀 새로 추가된 엘리먼트
     const editSettlementTitleBtn = document.getElementById('edit-settlement-title-btn');
     const editTitleModal = document.getElementById('edit-title-modal');
     const editTitleInput = document.getElementById('edit-title-input');
@@ -609,7 +608,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(settlementDisplay) settlementDisplay.textContent = settlement.title;
         if(itemCurrencySelect) itemCurrencySelect.value = settlement.base_currency;
         
-        // 🚀 로그인한 사용자만 제목 수정 버튼 표시
         if(editSettlementTitleBtn) {
             if(currentUser) editSettlementTitleBtn.classList.remove('hidden');
             else editSettlementTitleBtn.classList.add('hidden');
@@ -680,6 +678,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(editSplitAmountInputs) attachDynamicSplitInputListeners(editSplitAmountInputs, editItemAmountInput, updateEditPreview);
     }
 
+    // 🚀 환율 가져오기 로직 유지
     async function fetchAndSetRate(fetchType, currencyFrom, currencyTo, inputEl, previewUpdater, customDateStr = null) {
         if (!currentSettlement) return;
         setLoading(true);
@@ -1150,7 +1149,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         payButtons = `
                             <div style="display:flex; gap:0.5rem; margin-top: 0.8rem;">
                                 <a href="supertoss://send?amount=${Math.round(tr.amount)}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#3182f6; color:white; border-radius:8px; padding:0.6rem;"><i class="fas fa-paper-plane"></i> 토스 송금</a>
-                                <a href="kakaotalk://kakaopay/money/to/send" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#FEE500; color:#191919; border-radius:8px; padding:0.6rem;"><i class="fas fa-comment-dollar"></i> 카카오페이</a>
+                                <a href="kakaotalk://kakaopay/home" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#FEE500; color:#191919; border-radius:8px; padding:0.6rem;"><i class="fas fa-comment-dollar"></i> 카카오페이</a>
                             </div>
                         `;
                     } else if (base_currency === 'JPY' || currentLang === 'ja') {
@@ -1470,7 +1469,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if(addParticipantBtn) addParticipantBtn.addEventListener('click', () => addParticipantInputUI());
         
-        // 🚀 제목 수정 버튼 이벤트
         if(editSettlementTitleBtn) {
             editSettlementTitleBtn.addEventListener('click', () => {
                 if(!currentSettlement) return;
@@ -1525,6 +1523,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(saveExpenseChangesBtn) saveExpenseChangesBtn.addEventListener('click', handleSaveExpenseChanges);
         if(exchangeRateInfoBtn) exchangeRateInfoBtn.addEventListener('click', showExchangeRateModal);
         
+        // 🚀 지출 환율 관련 이벤트 리스너 복구 확인 완료
         if(itemCurrencySelect) itemCurrencySelect.addEventListener('change', () => { 
             const rateInput = document.getElementById('add-custom-rate');
             if(rateInput) rateInput.value = ''; 
@@ -1546,6 +1545,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             fetchAndSetRate('latest', itemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('add-custom-rate'), updateAddPreview); 
         });
 
+        // 🚀 지출 추가 폼의 '지출일' 버튼
         const addExpenseRateBtn = document.getElementById('add-expense-rate-btn');
         if(addExpenseRateBtn) addExpenseRateBtn.addEventListener('click', () => { 
             const expDate = document.getElementById('item-date').value;
@@ -1574,6 +1574,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             fetchAndSetRate('latest', editItemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('edit-custom-rate'), updateEditPreview); 
         });
 
+        // 🚀 지출 수정 폼의 '지출일' 버튼
         const editExpenseRateBtn = document.getElementById('edit-expense-rate-btn');
         if(editExpenseRateBtn) editExpenseRateBtn.addEventListener('click', () => { 
             const expDate = document.getElementById('edit-item-date').value;
