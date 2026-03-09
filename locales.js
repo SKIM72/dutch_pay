@@ -44,8 +44,9 @@ const locales = {
         customRateLabel: "적용 환율",
         convertedAmount: "최종 변환 금액",
         rateNotice: "입력창에서 지출 건별로 원하는 환율을 직접 수정할 수 있습니다.",
-        applySettlementRate: "정산일 기준",
-        applyLiveRate: "실시간 최신",
+        applyExpenseRate: "지출일",
+        applySettlementRate: "정산일",
+        applyLiveRate: "실시간",
         copyText: "정산 결과 텍스트로 복사하기",
         saveImage: "정산 결과 이미지로 저장하기",
         copySuccess: "정산 요약이 클립보드에 복사되었습니다. 카톡 등 메신저에 붙여넣기 하세요!",
@@ -97,13 +98,14 @@ const locales = {
         shareQrCode: "📱 카메라로 QR 스캔하여 참가",
         editTitle: "정산 제목 수정",
         newTitlePlaceholder: "새로운 제목 입력",
-        // 🚀 신규 추가: 소셜 로그인
         continueWithKakao: "카카오로 계속하기",
         continueWithNaver: "네이버로 계속하기",
         continueWithLine: "LINE으로 계속하기",
         continueWithGoogle: "Google로 계속하기",
         continueWithApple: "Apple로 계속하기",
-        orLoginWithEmail: "또는 이메일로 로그인"
+        orLoginWithEmail: "또는 이메일로 로그인",
+        // 🚀 신규 추가: 앱 업데이트 알림
+        newVersionAvailable: "앱의 새로운 버전이 업데이트되었습니다. 지금 새로고침 하시겠습니까?"
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -150,8 +152,9 @@ const locales = {
         customRateLabel: "Custom Rate",
         convertedAmount: "Final Converted",
         rateNotice: "You can modify the exchange rate for each expense directly in the input field.",
-        applySettlementRate: "Settlement Date",
-        applyLiveRate: "Live Latest",
+        applyExpenseRate: "Expense",
+        applySettlementRate: "Settlement",
+        applyLiveRate: "Live",
         copyText: "Copy Settlement Text",
         saveImage: "Save as Image",
         copySuccess: "Settlement summary copied to clipboard. Paste it in your messenger!",
@@ -203,13 +206,14 @@ const locales = {
         shareQrCode: "📱 Scan QR to Join",
         editTitle: "Edit Title",
         newTitlePlaceholder: "Enter new title",
-        // 🚀 신규 추가: 소셜 로그인
         continueWithKakao: "Continue with Kakao",
         continueWithNaver: "Continue with Naver",
         continueWithLine: "Continue with LINE",
         continueWithGoogle: "Continue with Google",
         continueWithApple: "Continue with Apple",
-        orLoginWithEmail: "or login with email"
+        orLoginWithEmail: "or login with email",
+        // 🚀 신규 추가: 앱 업데이트 알림
+        newVersionAvailable: "A new version of the app is available. Would you like to refresh now?"
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -256,8 +260,9 @@ const locales = {
         customRateLabel: "適用レート",
         convertedAmount: "最終変換額",
         rateNotice: "各支出の入力フィールドで希望のレートを直接修正できます。",
-        applySettlementRate: "精算日基準",
-        applyLiveRate: "リアルタイム最新",
+        applyExpenseRate: "支出日",
+        applySettlementRate: "精算日",
+        applyLiveRate: "リアルタイム",
         copyText: "精算結果をテキストでコピー",
         saveImage: "精算結果を画像で保存",
         copySuccess: "精算の概要がクリップボードにコピーされました。メッセンジャーなどに貼り付けてください！",
@@ -309,12 +314,13 @@ const locales = {
         shareQrCode: "📱 カメラでQRスキャンして参加",
         editTitle: "タイトル修正",
         newTitlePlaceholder: "新しいタイトルを入力",
-        // 🚀 신규 추가: 소셜 로그인
         continueWithKakao: "カカオで続ける",
         continueWithNaver: "Naverで続ける",
         continueWithLine: "LINEで続ける",
         continueWithGoogle: "Googleで続ける",
         continueWithApple: "Appleで続ける",
-        orLoginWithEmail: "またはメールでログイン"
+        orLoginWithEmail: "またはメールでログイン",
+        // 🚀 신규 추가: 앱 업데이트 알림
+        newVersionAvailable: "アプリの新しいバージョンが利用可能です。今すぐリロードして更新しますか？"
     }
 };

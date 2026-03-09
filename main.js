@@ -202,7 +202,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         updateAuthUI();
-        if (currentSettlement) { updateParticipantNames(currentSettlement.participants); render(); }
+        if (currentSettlement) { 
+            updateParticipantNames(currentSettlement.participants); 
+            // 🚀 핵심 추가: 언어가 바뀔 때 분담액 헤더 표도 즉시 다시 그림
+            renderTableHeader(currentSettlement.participants); 
+            render(); 
+        }
         renderSettlementList();
     }
 
@@ -1122,7 +1127,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { transfers, balances }; 
     }
 
-    // 🚀 수정된 부분: 영어 모드 버튼 숨김 및 페이페이 크기/정렬 조정
     function updateSummary() {
         if (!currentSettlement) return;
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
@@ -1146,7 +1150,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     
                     let payButtons = '';
 
-                    // 🚀 조건 1: 언어가 'en'(영어)이면 버튼 아예 생성 안 함
                     if (currentLang === 'en') {
                         payButtons = '';
                     } 
@@ -1158,7 +1161,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </div>
                         `;
                     } 
-                    // 🚀 조건 2: 페이페이 버튼 크기를 절반(calc(50% - 0.25rem))으로 고정하고, 우측 정렬(justify-content: flex-end)
                     else if (base_currency === 'JPY' || currentLang === 'ja') {
                         payButtons = `
                             <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%; justify-content: flex-end;">
@@ -1731,6 +1733,28 @@ document.addEventListener('DOMContentLoaded', async () => {
         XLSX.utils.book_append_sheet(wb, ws, 'Expenses');
         XLSX.writeFile(wb, `${getLocale('expenseReport', 'Expense_Report')}_${title}_${timestamp}.xlsx`, { cellStyles: true });
         showToast('엑셀 파일이 다운로드되었습니다.', 'success');
+    }
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').then(reg => {
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                newWorker.addEventListener('statechange', async () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        if (await showConfirm(getLocale('newVersionAvailable', '앱의 새로운 버전이 업데이트되었습니다. 지금 새로고침 하시겠습니까?'))) {
+                            newWorker.postMessage({ type: 'SKIP_WAITING' });
+                        }
+                    }
+                });
+            });
+        }).catch(err => console.error('Service Worker registration failed:', err));
+
+        let refreshing;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (refreshing) return;
+            window.location.reload();
+            refreshing = true;
+        });
     }
 
     initialize();

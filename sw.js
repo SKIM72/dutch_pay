@@ -1,36 +1,35 @@
-const CACHE_NAME = 'settle-up-cache-v2';
+const CACHE_NAME = 'settle-up-cache-v29'; // 코드가 변경될 때마다 버전 번호를 올려주세요!
 const urlsToCache = [
-  '/dutch_pay/',
-  '/dutch_pay/index.html',
-  '/dutch_pay/style.css',
-  '/dutch_pay/main.js',
-  '/dutch_pay/locales.js',
-  '/dutch_pay/config.js',
-  '/dutch_pay/icon.png'
+  './',
+  './index.html',
+  './login.html',
+  './style.css',
+  './main.js',
+  './auth.js',
+  './locales.js',
+  './config.js',
+  './icon.png'
 ];
 
-// 설치 시 캐싱
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
+      .then(cache => cache.addAll(urlsToCache))
   );
 });
 
-// 패치(네트워크 요청) 시 캐시 먼저 확인
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        return response || fetch(event.request);
+        if (response) {
+          return response;
+        }
+        return fetch(event.request);
       })
   );
 });
 
-// 새로운 버전의 서비스 워커가 활성화될 때 이전 캐시 삭제
 self.addEventListener('activate', event => {
   const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
@@ -44,4 +43,11 @@ self.addEventListener('activate', event => {
       );
     })
   );
+});
+
+// 🚀 [핵심 추가] 메인 파일(main.js)에서 업데이트 알림 수락 시 기존 캐시를 무시하고 즉시 새 버전을 활성화하도록 명령 수신
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
 });
