@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', async () => {
 
-    // 🚀 다시 안전한 원래 방식(config.js 전역 변수)으로 연결
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
     // --- Global State ---
@@ -1123,6 +1122,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { transfers, balances }; 
     }
 
+    // 🚀 수정된 부분: 영어 모드 버튼 숨김 및 페이페이 크기/정렬 조정
     function updateSummary() {
         if (!currentSettlement) return;
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
@@ -1145,22 +1145,29 @@ document.addEventListener('DOMContentLoaded', async () => {
                     div.className = 'transfer-item';
                     
                     let payButtons = '';
-                    if (base_currency === 'KRW' || currentLang === 'ko') {
+
+                    // 🚀 조건 1: 언어가 'en'(영어)이면 버튼 아예 생성 안 함
+                    if (currentLang === 'en') {
+                        payButtons = '';
+                    } 
+                    else if (base_currency === 'KRW' || currentLang === 'ko') {
                         payButtons = `
-                            <div style="display:flex; gap:0.5rem; margin-top: 0.8rem;">
+                            <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%;">
                                 <a href="supertoss://send?amount=${Math.round(tr.amount)}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#3182f6; color:white; border-radius:8px; padding:0.6rem;"><i class="fas fa-paper-plane"></i> 토스 송금</a>
                                 <a href="kakaotalk://kakaopay/home" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#FEE500; color:#191919; border-radius:8px; padding:0.6rem;"><i class="fas fa-comment-dollar"></i> 카카오페이</a>
                             </div>
                         `;
-                    } else if (base_currency === 'JPY' || currentLang === 'ja') {
+                    } 
+                    // 🚀 조건 2: 페이페이 버튼 크기를 절반(calc(50% - 0.25rem))으로 고정하고, 우측 정렬(justify-content: flex-end)
+                    else if (base_currency === 'JPY' || currentLang === 'ja') {
                         payButtons = `
-                            <div style="display:flex; gap:0.5rem; margin-top: 0.8rem;">
-                                <a href="paypay://" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#FF0033; color:white; border-radius:8px; padding:0.6rem;">PayPay</a>
+                            <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%; justify-content: flex-end;">
+                                <a href="paypay://" style="text-decoration:none; text-align:center; width:calc(50% - 0.25rem); font-size:0.9rem; font-weight:600; background-color:#FF0033; color:white; border-radius:8px; padding:0.6rem;">PayPay</a>
                             </div>
                         `;
                     } else {
                         payButtons = `
-                            <div style="display:flex; gap:0.5rem; margin-top: 0.8rem;">
+                            <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%;">
                                 <a href="venmo://paycharge?txn=pay&amount=${Math.round(tr.amount)}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#008CFF; color:white; border-radius:8px; padding:0.6rem;">Venmo</a>
                                 <a href="https://www.paypal.com/myaccount/transfer/homepage" target="_blank" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#003087; color:white; border-radius:8px; padding:0.6rem;">PayPal</a>
                             </div>
@@ -1168,7 +1175,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
 
                     div.innerHTML = `
-                        <div style="font-weight: 700; text-align: right; color: white;">
+                        <div style="font-weight: 700; color: white;">
                             ${tr.from} ➡️ ${tr.to} (${formatNumber(tr.amount, 2)} ${base_currency})
                         </div>
                         ${payButtons}
