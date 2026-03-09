@@ -67,7 +67,6 @@ header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-
 .delete-settlement-btn { background: #fee2e2; color: var(--danger); border: 1px solid #fecaca; width: 36px; height: 36px; border-radius: 8px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
 .delete-settlement-btn:hover { background: var(--danger); color: white; border-color: var(--danger); }
 
-/* 🚀 방 나가기 버튼 스타일 추가 */
 .leave-settlement-btn { background: #f8fafc; color: var(--text-muted); border: 1px solid var(--border); width: 36px; height: 36px; border-radius: 8px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
 .leave-settlement-btn:hover { background: #e2e8f0; color: var(--text-main); }
 
@@ -167,7 +166,6 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 
 #add-settlement-fab { display: flex; justify-content: center; align-items: center; padding: 0; position: fixed; bottom: 2rem; right: 2.5rem; width: 48px; height: 48px; border-radius: 50%; box-shadow: var(--shadow-md); z-index: 5; transition: transform 0.3s; font-size: 1.2rem; }
 
-/* 🚀 수정된 부분: #edit-title-modal 아이디가 목록에 추가되었습니다! */
 #add-settlement-modal, #exchange-rate-modal, #expense-rate-modal, #edit-expense-modal, #custom-confirm-modal, #share-modal, #join-modal, #profile-modal, #edit-title-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); animation: fadeIn 0.2s ease; }
 
 .modal-content { max-width: 500px; width: 90%; position: relative; animation: slideInUp 0.3s ease-out; max-height: 90vh; overflow-y: auto; }
@@ -237,7 +235,6 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
     #add-settlement-fab { left: auto; right: 1.5rem; transform: none !important; }
     .settlement-item { padding: 0.8rem 1rem; font-size: 0.95rem; min-height: 52px; align-items: center; }
     
-    /* 🚀 모바일 환경에서도 버튼 크기 통일 */
     .delete-settlement-btn, .leave-settlement-btn { width: 52px; height: 52px; }
     .delete-settlement-btn i, .leave-settlement-btn i { font-size: 1rem; }
     
@@ -294,3 +291,19 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 .share-input-group { display: flex; gap: 0.5rem; }
 .share-input-group input { flex: 1; background: #f8fafc; cursor: text; font-family: monospace; font-size: 1rem; color: var(--primary); font-weight: 600; text-align: center; }
 .share-input-group button { white-space: nowrap; }
+
+/* 🚀 소셜 로그인 관련 스타일 추가 */
+.social-login-container { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.5rem; }
+.social-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 8px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: opacity 0.2s; border: none; }
+.social-btn:hover { opacity: 0.85; }
+.social-btn.kakao { background-color: #FEE500; color: #191919; }
+.social-btn.naver { background-color: #03C75A; color: white; }
+.social-btn.line { background-color: #06C755; color: white; }
+.social-btn.google { background-color: #ffffff; color: #3c4043; border: 1px solid #e2e8f0; }
+.social-btn.apple { background-color: #000000; color: white; }
+.naver-icon { font-weight: 900; font-style: normal; font-family: Arial, sans-serif; font-size: 1.1rem; }
+
+.divider { display: flex; align-items: center; text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
+.divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--border); }
+.divider:not(:empty)::before { margin-right: .8em; }
+.divider:not(:empty)::after { margin-left: .8em; }

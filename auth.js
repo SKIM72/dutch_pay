@@ -91,6 +91,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('new-password').addEventListener('keypress', handleEnterKey('submit-update-password-btn'));
 
 
+    // 🚀 소셜 로그인(OAuth) 처리 로직 추가 (네이버, 라인 제거)
+    const handleOAuthLogin = async (provider) => {
+        const { data, error } = await supabaseClient.auth.signInWithOAuth({
+            provider: provider,
+            options: {
+                redirectTo: window.location.origin + window.location.pathname.replace('login.html', 'index.html')
+            }
+        });
+        if (error) alert(error.message);
+    };
+
+    const btnKakao = document.getElementById('btn-kakao');
+    if (btnKakao) btnKakao.addEventListener('click', () => handleOAuthLogin('kakao'));
+
+    const btnGoogle = document.getElementById('btn-google');
+    if (btnGoogle) btnGoogle.addEventListener('click', () => handleOAuthLogin('google'));
+
+    const btnApple = document.getElementById('btn-apple');
+    if (btnApple) btnApple.addEventListener('click', () => handleOAuthLogin('apple'));
+
+
     // --- Auth Logic ---
     document.getElementById('submit-login-btn').addEventListener('click', async () => {
         const email = document.getElementById('login-email').value;
@@ -106,7 +127,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
         
         if (error) {
-            // 🚀 에러 메시지가 'Invalid login credentials'인 경우 친절한 다국어 메시지로 교체
             let displayMessage = error.message;
             if (displayMessage === 'Invalid login credentials') {
                 displayMessage = locales[currentLang]?.invalidCredentials || '없는 계정이거나 비밀번호가 맞지 않습니다.';
