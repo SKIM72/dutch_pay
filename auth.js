@@ -1,4 +1,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
+    
+    // 🚀 오류 났던 환경 변수 방식 제거하고 원래 방식(전역 변수)으로 복구
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
     let currentLang = 'ko';
 
@@ -102,7 +104,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (error) alert(error.message);
     };
 
-    // 카카오 리스너 깔끔하게 제거됨
     const btnGoogle = document.getElementById('btn-google');
     if (btnGoogle) btnGoogle.addEventListener('click', () => handleOAuthLogin('google'));
 

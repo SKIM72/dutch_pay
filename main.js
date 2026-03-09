@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
 
+    // 🚀 다시 안전한 원래 방식(config.js 전역 변수)으로 연결
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
     // --- Global State ---
@@ -678,7 +679,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(editSplitAmountInputs) attachDynamicSplitInputListeners(editSplitAmountInputs, editItemAmountInput, updateEditPreview);
     }
 
-    // 🚀 환율 가져오기 로직 유지
     async function fetchAndSetRate(fetchType, currencyFrom, currencyTo, inputEl, previewUpdater, customDateStr = null) {
         if (!currentSettlement) return;
         setLoading(true);
@@ -1523,7 +1523,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(saveExpenseChangesBtn) saveExpenseChangesBtn.addEventListener('click', handleSaveExpenseChanges);
         if(exchangeRateInfoBtn) exchangeRateInfoBtn.addEventListener('click', showExchangeRateModal);
         
-        // 🚀 지출 환율 관련 이벤트 리스너 복구 확인 완료
         if(itemCurrencySelect) itemCurrencySelect.addEventListener('change', () => { 
             const rateInput = document.getElementById('add-custom-rate');
             if(rateInput) rateInput.value = ''; 
@@ -1545,7 +1544,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             fetchAndSetRate('latest', itemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('add-custom-rate'), updateAddPreview); 
         });
 
-        // 🚀 지출 추가 폼의 '지출일' 버튼
         const addExpenseRateBtn = document.getElementById('add-expense-rate-btn');
         if(addExpenseRateBtn) addExpenseRateBtn.addEventListener('click', () => { 
             const expDate = document.getElementById('item-date').value;
@@ -1574,7 +1572,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             fetchAndSetRate('latest', editItemCurrencySelect.value, currentSettlement.base_currency, document.getElementById('edit-custom-rate'), updateEditPreview); 
         });
 
-        // 🚀 지출 수정 폼의 '지출일' 버튼
         const editExpenseRateBtn = document.getElementById('edit-expense-rate-btn');
         if(editExpenseRateBtn) editExpenseRateBtn.addEventListener('click', () => { 
             const expDate = document.getElementById('edit-item-date').value;
