@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', async () => {
     
-    // 🚀 오류 났던 환경 변수 방식 제거하고 원래 방식(전역 변수)으로 복구
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
     let currentLang = 'ko';
 
@@ -153,15 +152,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
         btn.disabled = true;
 
-        const { error } = await supabaseClient.auth.signUp({ email, password });
+        const { data, error } = await supabaseClient.auth.signUp({ email, password });
         
         btn.innerHTML = originalText;
         btn.disabled = false;
 
         if (error) alert(error.message);
         else {
-            alert(locales[currentLang]?.signupSuccess || '가입 성공!');
-            showView('login');
+            // 🚀 수정됨: 회원가입 후 세션이 바로 생성되면(이메일 인증 OFF 상태) 즉시 로그인하여 메인으로 이동
+            if (data && data.session) {
+                window.location.replace('index.html');
+            } else {
+                alert(locales[currentLang]?.signupSuccess || '가입 성공!');
+                showView('login');
+            }
         }
     });
 

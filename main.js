@@ -84,6 +84,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const editTitleInput = document.getElementById('edit-title-input');
     const saveTitleBtn = document.getElementById('save-title-btn');
 
+    // 🚀 신규 추가: QR 스캐너 관련 변수
+    let html5QrcodeScanner = null;
+    const openQrScannerBtn = document.getElementById('open-qr-scanner-btn');
+    const qrScannerModal = document.getElementById('qr-scanner-modal');
+    const closeQrBtn = document.getElementById('close-qr-btn');
+
     function getLocale(key, fallbackText) {
         if (typeof locales !== 'undefined' && locales[currentLang] && locales[currentLang][key]) {
             return locales[currentLang][key];
@@ -321,11 +327,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.location.href = `mailto:?subject=${subject}&body=${body}`;
     }
 
-    async function joinRoomByCode() {
+    async function joinRoomByCode(directCode = null) {
         const joinCodeInput = document.getElementById('join-code-input');
-        if(!joinCodeInput) return;
-        
-        const codeInput = joinCodeInput.value.trim().toUpperCase();
+        // 🚀 스캐너에서 직접 코드가 들어올 수도 있으므로 파라미터 체크 추가
+        const codeInput = directCode || (joinCodeInput ? joinCodeInput.value.trim().toUpperCase() : '');
         if(!codeInput) { showToast('코드를 입력해주세요.', 'error'); return; }
 
         setLoading(true);
@@ -356,7 +361,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         saveJoinedRoom(data.id);
-        joinCodeInput.value = '';
+        if (joinCodeInput) joinCodeInput.value = '';
         
         const joinModal = document.getElementById('join-modal');
         if(joinModal) joinModal.classList.add('hidden');
@@ -423,11 +428,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     window.location.replace('login.html'); 
                     return; 
                 } else {
+                    // 🚀 수정됨: 회원가입/로그인 후 돌아왔을 때 보던 방이 있다면 즉시 자동 참가 처리
                     const pendingId = localStorage.getItem('pendingJoinRoomId');
                     if (pendingId) {
                         saveJoinedRoom(pendingId);
                         localStorage.removeItem('pendingJoinRoomId');
-                        showToast('정산 방에 자동 참가되었습니다.', 'success');
+                        showToast('이전 방에 자동 참가되었습니다.', 'success');
                         window.history.replaceState({}, '', `${window.location.pathname}?id=${pendingId}`);
                         await loadData();
                         await loadSingleSettlement(pendingId);
@@ -1346,6 +1352,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // 🚀 QR 스캐너 정지 로직
+    function stopQrScanner() {
+        if (html5QrcodeScanner) {
+            html5QrcodeScanner.stop().then(() => {
+                html5QrcodeScanner.clear();
+                html5QrcodeScanner = null;
+            }).catch(err => console.log("Failed to stop scanner", err));
+        }
+    }
+
     function setupEventListeners() {
         const setCurrentTimeBtn = document.getElementById('set-current-time-btn');
         if(setCurrentTimeBtn) setCurrentTimeBtn.addEventListener('click', () => {
@@ -1357,7 +1373,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(editItemDateInput) editItemDateInput.value = getLocalISOString();
         });
 
-        // 🚀 수정됨: 마이페이지(프로필 모달) 열 때 로그인 방식에 따라 UI 분기 처리
         const userInfoDisplay = document.getElementById('user-info-display');
         if(userInfoDisplay) {
             userInfoDisplay.title = getLocale('myPage', '마이페이지');
@@ -1366,7 +1381,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if(profileModal && currentUser) {
                     const providerInfo = document.getElementById('login-provider-info');
                     const pwSection = document.getElementById('password-change-section');
-                    // Supabase의 user 메타데이터에서 로그인 제공자 확인
                     const provider = currentUser.app_metadata?.provider || 'email';
                     
                     let providerHtml = '';
@@ -1385,7 +1399,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     if(providerInfo) providerInfo.innerHTML = providerHtml;
                     
-                    // 이메일 로그인이 아닐 경우 비밀번호 변경 영역 숨김
                     if(pwSection) {
                         if(isEmailLogin) pwSection.classList.remove('hidden');
                         else pwSection.classList.add('hidden');
@@ -1459,6 +1472,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             if (!currentUser) { 
                 if (await showConfirm(getLocale('loginToSave', '내 목록에 저장하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?'))) {
+                    // 🚀 수정됨: 게스트가 로그인 전 현재 보던 방을 기억하게 설정
+                    localStorage.setItem('pendingJoinRoomId', currentSettlement.id);
                     window.location.href = 'login.html';
                 }
                 return;
@@ -1495,12 +1510,63 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         const submitJoinCodeBtn = document.getElementById('submit-join-code-btn');
-        if(submitJoinCodeBtn) submitJoinCodeBtn.addEventListener('click', joinRoomByCode);
+        if(submitJoinCodeBtn) submitJoinCodeBtn.addEventListener('click', () => joinRoomByCode());
         
         const joinCodeInput = document.getElementById('join-code-input');
         if(joinCodeInput) joinCodeInput.addEventListener('keypress', (e) => {
             if(e.key === 'Enter') joinRoomByCode();
         });
+
+        // 🚀 신규 추가: 웹 QR 스캐너 작동 로직
+        if (openQrScannerBtn) {
+            openQrScannerBtn.addEventListener('click', () => {
+                if(qrScannerModal) qrScannerModal.classList.remove('hidden');
+                
+                // 이전 스캐너가 열려있다면 정리
+                stopQrScanner();
+
+                html5QrcodeScanner = new Html5Qrcode("qr-reader");
+                html5QrcodeScanner.start(
+                    { facingMode: "environment" }, // 후면 카메라 우선
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    (decodedText) => {
+                        // 스캔 성공 시
+                        stopQrScanner();
+                        if(qrScannerModal) qrScannerModal.classList.add('hidden');
+                        
+                        let parsedCode = decodedText;
+                        try {
+                            // URL인 경우 파라미터에서 id 추출
+                            const url = new URL(decodedText);
+                            const urlParams = new URLSearchParams(url.search);
+                            if (urlParams.has('id')) {
+                                parsedCode = urlParams.get('id');
+                            }
+                        } catch(e) {
+                            // URL 형식이 아니면 코드 그대로 사용
+                        }
+                        
+                        // 코드 처리
+                        if(joinCodeInput) joinCodeInput.value = parsedCode;
+                        joinRoomByCode(parsedCode);
+                    },
+                    (errorMessage) => {
+                        // 스캔 중 발생하는 지속적인 오류 메시지는 무시
+                    }
+                ).catch(err => {
+                    console.error("Camera error:", err);
+                    showToast(getLocale('qrScanError', '카메라 접근 오류'), 'error');
+                    if(qrScannerModal) qrScannerModal.classList.add('hidden');
+                });
+            });
+        }
+
+        if (closeQrBtn) {
+            closeQrBtn.addEventListener('click', () => {
+                stopQrScanner();
+                if(qrScannerModal) qrScannerModal.classList.add('hidden');
+            });
+        }
 
         if(copyTextBtn) copyTextBtn.addEventListener('click', copySummaryText);
         if(saveImageBtn) saveImageBtn.addEventListener('click', saveAsImage);
@@ -1546,13 +1612,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal, document.getElementById('share-modal'), document.getElementById('join-modal'), document.getElementById('profile-modal'), editTitleModal].forEach(modal => {
+        // 🚀 수정됨: QR 모달 바깥쪽 클릭 시 스캐너 정지 포함
+        [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal, document.getElementById('share-modal'), document.getElementById('join-modal'), document.getElementById('profile-modal'), editTitleModal, qrScannerModal].forEach(modal => {
             if(modal) {
                 modal.addEventListener('click', (e) => { 
-                    if (e.target === modal) modal.classList.add('hidden'); 
+                    if (e.target === modal) {
+                        if (modal === qrScannerModal) stopQrScanner();
+                        modal.classList.add('hidden'); 
+                    }
                 });
                 const closeBtn = modal.querySelector('.close-modal-btn');
-                if(closeBtn) closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+                if(closeBtn) closeBtn.addEventListener('click', () => {
+                    if (modal === qrScannerModal) stopQrScanner();
+                    modal.classList.add('hidden');
+                });
             }
         });
 

@@ -80,7 +80,7 @@ const locales = {
         joinCodeDesc: "친구에게 받은 6자리 코드를 입력하세요.",
         joinCodePlaceholder: "예: A1B2C3",
         joinSubmit: "참가하기",
-        joinByCodeBtn: "초대 코드로 참가",
+        joinByCodeBtn: "코드 참가",
         inviteShareBtn: "초대 & 공유",
         participating: "참여중",
         host: "방장",
@@ -105,10 +105,14 @@ const locales = {
         continueWithApple: "Apple로 계속하기",
         orLoginWithEmail: "또는 이메일로 로그인",
         newVersionAvailable: "앱의 새로운 버전이 업데이트되었습니다. 지금 새로고침 하시겠습니까?",
-        // 🚀 신규 추가: 로그인 계정 정보
         loggedInGoogle: "Google 계정으로 로그인됨",
         loggedInApple: "Apple 계정으로 로그인됨",
-        loggedInEmail: "이메일 계정으로 로그인됨"
+        loggedInEmail: "이메일 계정으로 로그인됨",
+        // 🚀 추가: 웹 QR 스캐너 관련 텍스트
+        scanQrCodeBtn: "QR 스캔",
+        qrScanTitle: "QR 코드 스캔",
+        qrScanInstructions: "카메라 권한을 허용하고 QR 코드를 사각형 안에 맞춰주세요.",
+        qrScanError: "카메라에 접근할 수 없거나 스캔에 실패했습니다."
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -191,7 +195,7 @@ const locales = {
         joinCodeDesc: "Enter the 6-digit code received from your friend.",
         joinCodePlaceholder: "e.g., A1B2C3",
         joinSubmit: "Join",
-        joinByCodeBtn: "Join by Code",
+        joinByCodeBtn: "Enter Code",
         inviteShareBtn: "Invite & Share",
         participating: "Joined",
         host: "Host",
@@ -216,10 +220,14 @@ const locales = {
         continueWithApple: "Continue with Apple",
         orLoginWithEmail: "or login with email",
         newVersionAvailable: "A new version of the app is available. Would you like to refresh now?",
-        // 🚀 신규 추가: 로그인 계정 정보
         loggedInGoogle: "Logged in with Google",
         loggedInApple: "Logged in with Apple",
-        loggedInEmail: "Logged in with Email"
+        loggedInEmail: "Logged in with Email",
+        // 🚀 추가: 웹 QR 스캐너 관련 텍스트
+        scanQrCodeBtn: "Scan QR",
+        qrScanTitle: "Scan QR Code",
+        qrScanInstructions: "Please allow camera access and fit the QR code inside the box.",
+        qrScanError: "Failed to access camera or scan the code."
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -302,7 +310,7 @@ const locales = {
         joinCodeDesc: "友達からもらった6桁のコードを入力してください。",
         joinCodePlaceholder: "例：A1B2C3",
         joinSubmit: "参加する",
-        joinByCodeBtn: "招待コードで参加",
+        joinByCodeBtn: "コード入力",
         inviteShareBtn: "招待＆共有",
         participating: "参加中",
         host: "ホスト",
@@ -327,9 +335,13 @@ const locales = {
         continueWithApple: "Appleで続ける",
         orLoginWithEmail: "またはメールでログイン",
         newVersionAvailable: "アプリの新しいバージョンが利用可能です。今すぐリロードして更新しますか？",
-        // 🚀 신규 추가: 로그인 계정 정보
         loggedInGoogle: "Googleアカウントでログイン中",
         loggedInApple: "Appleアカウントでログイン中",
-        loggedInEmail: "メールアドレスでログイン中"
+        loggedInEmail: "メールアドレスでログイン中",
+        // 🚀 추가: 웹 QR 스캐너 관련 텍스트
+        scanQrCodeBtn: "QRスキャン",
+        qrScanTitle: "QRコードをスキャン",
+        qrScanInstructions: "カメラのアクセスを許可し、枠内にQRコードを合わせてください。",
+        qrScanError: "カメラにアクセスできないか、スキャンに失敗しました。"
     }
 };
