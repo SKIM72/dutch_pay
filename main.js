@@ -204,7 +204,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateAuthUI();
         if (currentSettlement) { 
             updateParticipantNames(currentSettlement.participants); 
-            // 🚀 핵심 추가: 언어가 바뀔 때 분담액 헤더 표도 즉시 다시 그림
             renderTableHeader(currentSettlement.participants); 
             render(); 
         }
@@ -1358,12 +1357,42 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(editItemDateInput) editItemDateInput.value = getLocalISOString();
         });
 
+        // 🚀 수정됨: 마이페이지(프로필 모달) 열 때 로그인 방식에 따라 UI 분기 처리
         const userInfoDisplay = document.getElementById('user-info-display');
         if(userInfoDisplay) {
             userInfoDisplay.title = getLocale('myPage', '마이페이지');
             userInfoDisplay.addEventListener('click', () => {
                 const profileModal = document.getElementById('profile-modal');
-                if(profileModal) profileModal.classList.remove('hidden');
+                if(profileModal && currentUser) {
+                    const providerInfo = document.getElementById('login-provider-info');
+                    const pwSection = document.getElementById('password-change-section');
+                    // Supabase의 user 메타데이터에서 로그인 제공자 확인
+                    const provider = currentUser.app_metadata?.provider || 'email';
+                    
+                    let providerHtml = '';
+                    let isEmailLogin = false;
+
+                    if (provider === 'google') {
+                        providerHtml = `<i class="fab fa-google" style="color: #EA4335; font-size: 1.2rem;"></i> <span>${getLocale('loggedInGoogle', 'Google 계정으로 로그인됨')}</span>`;
+                    } else if (provider === 'apple') {
+                        providerHtml = `<i class="fab fa-apple" style="font-size: 1.2rem;"></i> <span>${getLocale('loggedInApple', 'Apple 계정으로 로그인됨')}</span>`;
+                    } else if (provider === 'email') {
+                        providerHtml = `<i class="fas fa-envelope" style="color: var(--primary); font-size: 1.2rem;"></i> <span>${getLocale('loggedInEmail', '이메일 계정으로 로그인됨')}</span>`;
+                        isEmailLogin = true;
+                    } else {
+                        providerHtml = `<i class="fas fa-user" style="font-size: 1.2rem;"></i> <span>${provider} 계정으로 로그인됨</span>`;
+                    }
+
+                    if(providerInfo) providerInfo.innerHTML = providerHtml;
+                    
+                    // 이메일 로그인이 아닐 경우 비밀번호 변경 영역 숨김
+                    if(pwSection) {
+                        if(isEmailLogin) pwSection.classList.remove('hidden');
+                        else pwSection.classList.add('hidden');
+                    }
+                    
+                    profileModal.classList.remove('hidden');
+                }
             });
         }
         

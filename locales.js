@@ -104,8 +104,11 @@ const locales = {
         continueWithGoogle: "Google로 계속하기",
         continueWithApple: "Apple로 계속하기",
         orLoginWithEmail: "또는 이메일로 로그인",
-        // 🚀 신규 추가: 앱 업데이트 알림
-        newVersionAvailable: "앱의 새로운 버전이 업데이트되었습니다. 지금 새로고침 하시겠습니까?"
+        newVersionAvailable: "앱의 새로운 버전이 업데이트되었습니다. 지금 새로고침 하시겠습니까?",
+        // 🚀 신규 추가: 로그인 계정 정보
+        loggedInGoogle: "Google 계정으로 로그인됨",
+        loggedInApple: "Apple 계정으로 로그인됨",
+        loggedInEmail: "이메일 계정으로 로그인됨"
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -212,8 +215,11 @@ const locales = {
         continueWithGoogle: "Continue with Google",
         continueWithApple: "Continue with Apple",
         orLoginWithEmail: "or login with email",
-        // 🚀 신규 추가: 앱 업데이트 알림
-        newVersionAvailable: "A new version of the app is available. Would you like to refresh now?"
+        newVersionAvailable: "A new version of the app is available. Would you like to refresh now?",
+        // 🚀 신규 추가: 로그인 계정 정보
+        loggedInGoogle: "Logged in with Google",
+        loggedInApple: "Logged in with Apple",
+        loggedInEmail: "Logged in with Email"
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -320,7 +326,10 @@ const locales = {
         continueWithGoogle: "Googleで続ける",
         continueWithApple: "Appleで続ける",
         orLoginWithEmail: "またはメールでログイン",
-        // 🚀 신규 추가: 앱 업데이트 알림
-        newVersionAvailable: "アプリの新しいバージョンが利用可能です。今すぐリロードして更新しますか？"
+        newVersionAvailable: "アプリの新しいバージョンが利用可能です。今すぐリロードして更新しますか？",
+        // 🚀 신규 추가: 로그인 계정 정보
+        loggedInGoogle: "Googleアカウントでログイン中",
+        loggedInApple: "Appleアカウントでログイン中",
+        loggedInEmail: "メールアドレスでログイン中"
     }
 };

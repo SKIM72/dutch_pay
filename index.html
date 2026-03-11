@@ -17,7 +17,7 @@
     <link rel="icon" href="icon.png" type="image/png">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=28">
+    <link rel="stylesheet" href="style.css?v=30">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -341,7 +341,9 @@
                 <span class="close-modal-btn"><i class="fas fa-times"></i></span>
                 <h2 style="margin-bottom: 1.5rem;"><i class="fas fa-user-cog" style="color: var(--primary);"></i> <span data-i18n="myPage">마이페이지</span></h2>
                 
-                <div class="form-grid-row" style="grid-template-columns: 1fr; margin-bottom: 1.5rem;">
+                <div id="login-provider-info" style="margin-bottom: 1.5rem; padding: 0.8rem; background: #f8fafc; border-radius: 8px; font-size: 0.95rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--border);"></div>
+
+                <div id="password-change-section" class="form-grid-row" style="grid-template-columns: 1fr; margin-bottom: 1.5rem;">
                     <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 600;" data-i18n="changePassword">비밀번호 변경</label>
                     <input type="password" id="profile-new-password" data-i18n-placeholder="newPassword" style="margin-bottom: 0.5rem;">
                     <button id="submit-change-password-btn" data-i18n="changePassword">비밀번호 변경</button>
@@ -385,6 +387,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="main.js?v=28"></script>
+    <script src="main.js?v=30"></script>
 </body>
 </html>
