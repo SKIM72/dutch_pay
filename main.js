@@ -159,7 +159,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 🚀 수정됨: 상단 헤더 마이페이지 버튼 내에 구글/애플/이메일 아이콘 동적 표시
     function updateAuthUI() {
         if (currentUser) {
             if(authBtn) { authBtn.innerHTML = `<i class="fas fa-sign-out-alt" style="color: var(--danger);"></i> <span style="color: var(--danger);">${getLocale('logout', '로그아웃')}</span>`; authBtn.style.background = '#fee2e2'; authBtn.style.borderColor = 'transparent'; }
@@ -175,7 +174,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else {
                     iconHtml = `<i class="fas fa-envelope" style="color: var(--primary); font-size: 1rem;"></i>`;
                 }
-                userInfoDisplay.innerHTML = `${iconHtml} <span>${currentUser.email}</span>`;
+                // 🚀 수정됨: 텍스트가 길어져도 버튼을 밀어내지 않고 ... 처리되도록 span 태그에 스타일 추가
+                userInfoDisplay.innerHTML = `${iconHtml} <span id="user-email-text" style="display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;">${currentUser.email}</span>`;
                 userInfoDisplay.classList.remove('hidden'); 
             }
         } else {
