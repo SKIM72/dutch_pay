@@ -84,7 +84,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const editTitleInput = document.getElementById('edit-title-input');
     const saveTitleBtn = document.getElementById('save-title-btn');
 
-    // 🚀 신규 추가: QR 스캐너 관련 변수
     let html5QrcodeScanner = null;
     const openQrScannerBtn = document.getElementById('open-qr-scanner-btn');
     const qrScannerModal = document.getElementById('qr-scanner-modal');
@@ -160,11 +159,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // 🚀 수정됨: 상단 헤더 마이페이지 버튼 내에 구글/애플/이메일 아이콘 동적 표시
     function updateAuthUI() {
         if (currentUser) {
             if(authBtn) { authBtn.innerHTML = `<i class="fas fa-sign-out-alt" style="color: var(--danger);"></i> <span style="color: var(--danger);">${getLocale('logout', '로그아웃')}</span>`; authBtn.style.background = '#fee2e2'; authBtn.style.borderColor = 'transparent'; }
             if(addSettlementFab) addSettlementFab.classList.remove('hidden'); 
-            if(userInfoDisplay && userEmailText) { userEmailText.textContent = currentUser.email; userInfoDisplay.classList.remove('hidden'); }
+            
+            if(userInfoDisplay) { 
+                const provider = currentUser.app_metadata?.provider || 'email';
+                let iconHtml = '';
+                if (provider === 'google') {
+                    iconHtml = `<i class="fab fa-google" style="color: #EA4335; font-size: 1rem;"></i>`;
+                } else if (provider === 'apple') {
+                    iconHtml = `<i class="fab fa-apple" style="font-size: 1.1rem; margin-bottom: 2px;"></i>`;
+                } else {
+                    iconHtml = `<i class="fas fa-envelope" style="color: var(--primary); font-size: 1rem;"></i>`;
+                }
+                userInfoDisplay.innerHTML = `${iconHtml} <span>${currentUser.email}</span>`;
+                userInfoDisplay.classList.remove('hidden'); 
+            }
         } else {
             if(authBtn) { authBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i> <span>${getLocale('login', '로그인')}</span>`; authBtn.style.background = 'transparent'; authBtn.style.borderColor = 'var(--border)'; }
             if(addSettlementFab) addSettlementFab.classList.add('hidden'); 
@@ -329,7 +342,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function joinRoomByCode(directCode = null) {
         const joinCodeInput = document.getElementById('join-code-input');
-        // 🚀 스캐너에서 직접 코드가 들어올 수도 있으므로 파라미터 체크 추가
         const codeInput = directCode || (joinCodeInput ? joinCodeInput.value.trim().toUpperCase() : '');
         if(!codeInput) { showToast('코드를 입력해주세요.', 'error'); return; }
 
@@ -428,7 +440,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     window.location.replace('login.html'); 
                     return; 
                 } else {
-                    // 🚀 수정됨: 회원가입/로그인 후 돌아왔을 때 보던 방이 있다면 즉시 자동 참가 처리
                     const pendingId = localStorage.getItem('pendingJoinRoomId');
                     if (pendingId) {
                         saveJoinedRoom(pendingId);
@@ -1352,7 +1363,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 🚀 QR 스캐너 정지 로직
     function stopQrScanner() {
         if (html5QrcodeScanner) {
             html5QrcodeScanner.stop().then(() => {
@@ -1472,7 +1482,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             if (!currentUser) { 
                 if (await showConfirm(getLocale('loginToSave', '내 목록에 저장하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?'))) {
-                    // 🚀 수정됨: 게스트가 로그인 전 현재 보던 방을 기억하게 설정
                     localStorage.setItem('pendingJoinRoomId', currentSettlement.id);
                     window.location.href = 'login.html';
                 }
@@ -1517,42 +1526,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(e.key === 'Enter') joinRoomByCode();
         });
 
-        // 🚀 신규 추가: 웹 QR 스캐너 작동 로직
         if (openQrScannerBtn) {
             openQrScannerBtn.addEventListener('click', () => {
                 if(qrScannerModal) qrScannerModal.classList.remove('hidden');
                 
-                // 이전 스캐너가 열려있다면 정리
                 stopQrScanner();
 
                 html5QrcodeScanner = new Html5Qrcode("qr-reader");
                 html5QrcodeScanner.start(
-                    { facingMode: "environment" }, // 후면 카메라 우선
+                    { facingMode: "environment" },
                     { fps: 10, qrbox: { width: 250, height: 250 } },
                     (decodedText) => {
-                        // 스캔 성공 시
                         stopQrScanner();
                         if(qrScannerModal) qrScannerModal.classList.add('hidden');
                         
                         let parsedCode = decodedText;
                         try {
-                            // URL인 경우 파라미터에서 id 추출
                             const url = new URL(decodedText);
                             const urlParams = new URLSearchParams(url.search);
                             if (urlParams.has('id')) {
                                 parsedCode = urlParams.get('id');
                             }
-                        } catch(e) {
-                            // URL 형식이 아니면 코드 그대로 사용
-                        }
+                        } catch(e) {}
                         
-                        // 코드 처리
                         if(joinCodeInput) joinCodeInput.value = parsedCode;
                         joinRoomByCode(parsedCode);
                     },
-                    (errorMessage) => {
-                        // 스캔 중 발생하는 지속적인 오류 메시지는 무시
-                    }
+                    (errorMessage) => {}
                 ).catch(err => {
                     console.error("Camera error:", err);
                     showToast(getLocale('qrScanError', '카메라 접근 오류'), 'error');
@@ -1612,7 +1612,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // 🚀 수정됨: QR 모달 바깥쪽 클릭 시 스캐너 정지 포함
         [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal, document.getElementById('share-modal'), document.getElementById('join-modal'), document.getElementById('profile-modal'), editTitleModal, qrScannerModal].forEach(modal => {
             if(modal) {
                 modal.addEventListener('click', (e) => { 
