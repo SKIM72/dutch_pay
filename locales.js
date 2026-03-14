@@ -117,9 +117,18 @@ const locales = {
         linkApple: "Apple 연동",
         linked: "연동됨",
         linkConfirm: "{provider} 계정을 현재 이메일에 연동하시겠습니까?",
-        // 🚀 신규 추가: 입력 헷갈림 방지 가이드 텍스트
         manualInputHelper: "👇 아래에 각자 쓴 금액을 입력하면 총액이 자동 계산됩니다.",
-        autoCalculated: "자동 계산됨"
+        autoCalculated: "자동 계산됨",
+        // 🚀 신규 추가: 랜딩 페이지 문구
+        landingHeroTitle: "여행 정산, 이제 스트레스 받지 마세요",
+        landingHeroSub: "환율 계산부터 송금까지 한 번에 Settle Up!",
+        landingStartBtn: "무료로 시작하기",
+        landingFeature1Title: "글로벌 여행에 최적화된 다중 환율",
+        landingFeature1Desc: "엔화, 달러, 원화를 섞어 써도 실시간 환율로 알아서 계산해 줍니다.",
+        landingFeature2Title: "복잡한 계산은 앱이 알아서",
+        landingFeature2Desc: "누가 누구에게 얼마를 보내야 하는지 최소 횟수로 깔끔하게 정리해 줍니다.",
+        landingFeature3Title: "버튼 한 번에 송금까지",
+        landingFeature3Desc: "토스, 카카오페이, PayPay 등 딥링크로 헷갈림 없이 바로 송금하세요."
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -239,9 +248,18 @@ const locales = {
         linkApple: "Link Apple",
         linked: "Linked",
         linkConfirm: "Would you like to link your {provider} account?",
-        // 🚀 신규 추가
         manualInputHelper: "👇 Enter individual amounts below, and the total will be auto-calculated.",
-        autoCalculated: "Auto-calculated"
+        autoCalculated: "Auto-calculated",
+        // 🚀 신규 추가: 랜딩 페이지 문구
+        landingHeroTitle: "Travel splitting, completely stress-free",
+        landingHeroSub: "From exchange rates to transfers, Settle Up!",
+        landingStartBtn: "Start for Free",
+        landingFeature1Title: "Multi-currency optimized for travel",
+        landingFeature1Desc: "Mix JPY, USD, and KRW, and we'll calculate with real-time rates.",
+        landingFeature2Title: "We do the complex math",
+        landingFeature2Desc: "We calculate exactly who owes whom with minimum transactions.",
+        landingFeature3Title: "Send money with a single tap",
+        landingFeature3Desc: "Deep links for Toss, KakaoPay, and PayPay makes transfers effortless."
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -361,8 +379,17 @@ const locales = {
         linkApple: "Apple 連携",
         linked: "連携済み",
         linkConfirm: "現在のメールアドレスに{provider}アカウントを連携しますか？",
-        // 🚀 신규 추가
         manualInputHelper: "👇 下に各自の金額を入力すると、総額が自動計算されます。",
-        autoCalculated: "自動計算"
+        autoCalculated: "自動計算",
+        // 🚀 신규 추가: 랜딩 페이지 문구
+        landingHeroTitle: "旅行の割り勘、もうストレス不要",
+        landingHeroSub: "為替計算から送金まで、Settle Upで一発解決！",
+        landingStartBtn: "無料で始める",
+        landingFeature1Title: "グローバル旅行に最適な多通貨対応",
+        landingFeature1Desc: "円、ドル、ウォンを混ぜて使ってもリアルタイムレートで自動計算します。",
+        landingFeature2Title: "複雑な計算はアプリにお任せ",
+        landingFeature2Desc: "誰が誰にいくら送るべきか、最小回数でスッキリ整理します。",
+        landingFeature3Title: "ワンクリックで即送金",
+        landingFeature3Desc: "Toss、カカオペイ、PayPayなどのディープリンクで迷わず送金できます。"
     }
 };

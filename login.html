@@ -11,19 +11,217 @@
     <link rel="icon" href="icon.png" type="image/png">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=16">
+    <link rel="stylesheet" href="style.css?v=39">
+
+    <style>
+        #landing-view {
+            width: 100%;
+            height: 100vh; /* 🚀 수정됨: 화면 전체 높이 사용 */
+            overflow-y: auto; /* 🚀 수정됨: 소개 페이지 내부 스크롤 활성화 */
+            overflow-x: hidden;
+            background-color: #ffffff;
+            color: #1e293b;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            display: none; 
+        }
+        
+        .landing-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 72px; 
+            padding: 0 5%;
+            box-sizing: border-box;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .landing-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #4f46e5;
+        }
+        .landing-logo img { width: 36px; height: 36px; }
+        
+        .landing-logo h1 { 
+            margin: 0; 
+            font-size: 1.8rem; 
+            font-weight: 800; 
+            color: #4f46e5; 
+            letter-spacing: -0.5px;
+            line-height: normal; /* 🚀 수정됨: 수직 정렬을 위해 normal로 변경 */
+            font-family: sans-serif; 
+            transform: translateY(-2px); /* 🚀 수정됨: 로고 아이콘과 시각적 중앙을 맞추기 위한 미세 조정 */
+        }
+        
+        .hero-section {
+            text-align: center;
+            padding: 5rem 5% 4rem;
+            background: linear-gradient(135deg, #eef2ff 0%, #ffffff 100%);
+        }
+        .hero-section h1 { font-size: 2.8rem; margin-bottom: 1rem; font-weight: 800; letter-spacing: -0.5px; }
+        .hero-section p { font-size: 1.2rem; color: #64748b; margin-bottom: 2.5rem; line-height: 1.6; }
+        .cta-btn {
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            padding: 1rem 2.5rem;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
+            transition: all 0.3s ease;
+        }
+        .cta-btn:hover { background-color: #4338ca; transform: translateY(-2px); }
+        .hero-img-box { margin-top: 3rem; }
+        
+        .feature-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 5rem 10%;
+            gap: 4rem;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .feature-section.reverse { flex-direction: row-reverse; background: #fafaf9; }
+        .feature-text { flex: 1; min-width: 300px; }
+        .feature-text h3 { font-size: 2rem; margin-bottom: 1.2rem; color: #0f172a; font-weight: 800; }
+        .feature-text p { font-size: 1.1rem; color: #64748b; line-height: 1.7; }
+        .feature-image-box { flex: 1; min-width: 300px; display: flex; justify-content: center; }
+        
+        .mockup-img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+            border: 1px solid #e2e8f0;
+        }
+        
+        @media(max-width: 768px) {
+            .hero-section h1 { font-size: 2rem; }
+            .feature-section { flex-direction: column; text-align: center; gap: 2rem; padding: 4rem 5%; }
+            .feature-section.reverse { flex-direction: column; }
+        }
+
+        .top-right-controls {
+            position: fixed;
+            top: 18px; 
+            right: 5%;
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        #nav-login-btn {
+            border-radius: 20px;
+            font-weight: 700;
+            border: 1px solid #cbd5e1;
+            color: #475569;
+            background: rgba(255, 255, 255, 0.95);
+            height: 36px;
+            padding: 0 1.2rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            box-sizing: border-box;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        #nav-login-btn:hover { background: #f8fafc; }
+        
+        .global-lang-selector {
+            position: static;
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 0 0.8rem;
+            border-radius: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border: 1px solid #cbd5e1;
+            color: #475569;
+            height: 36px;
+            box-sizing: border-box;
+        }
+        .global-lang-selector select {
+            padding: 0 0 0 0.4rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            color: inherit;
+            outline: none;
+            height: 100%;
+        }
+        .auth-page-wrapper .auth-lang-selector { display: none; }
+    </style>
 </head>
 <body>
-    <div class="auth-page-wrapper">
-        <div class="auth-lang-selector">
+
+    <div class="top-right-controls">
+        <button id="nav-login-btn" data-i18n="login">로그인</button>
+        <div class="global-lang-selector">
             <i class="fas fa-globe"></i>
-            <select id="language-switcher" style="padding: 0.25rem; font-size: 0.85rem; border: none; background: transparent; cursor: pointer;">
+            <select id="language-switcher">
                 <option value="ko">한국어</option>
                 <option value="en">English</option>
                 <option value="ja">日本語</option>
             </select>
         </div>
+    </div>
 
+    <div id="landing-view">
+        <header class="landing-header">
+            <div class="landing-logo">
+                <img src="icon.png" alt="Settle Up Logo">
+                <h1>Settle Up</h1> 
+            </div>
+            <div></div> 
+        </header>
+
+        <main>
+            <section class="hero-section">
+                <h1 data-i18n="landingHeroTitle">여행 정산, 이제 스트레스 받지 마세요</h1>
+                <p data-i18n="landingHeroSub">환율 계산부터 송금까지 한 번에 Settle Up!</p>
+                <button id="hero-start-btn" class="cta-btn" data-i18n="landingStartBtn">무료로 시작하기</button>
+                <div class="hero-img-box">
+                    <img src="photo1.png" alt="App Dashboard Preview" class="mockup-img" onerror="this.src='https://via.placeholder.com/800x450/eef2ff/4f46e5?text=Dashboard+Screenshot+(photo1.png)'">
+                </div>
+            </section>
+
+            <section class="feature-section">
+                <div class="feature-text">
+                    <h3 data-i18n="landingFeature1Title">글로벌 여행에 최적화된 다중 환율</h3>
+                    <p data-i18n="landingFeature1Desc">엔화, 달러, 원화를 섞어 써도 실시간 환율로 알아서 계산해 줍니다.</p>
+                </div>
+                <div class="feature-image-box">
+                    <img src="photo2.png" alt="Multi-currency Preview" class="mockup-img" style="max-width: 350px;" onerror="this.src='https://via.placeholder.com/350x600/f8fafc/64748b?text=Add+Expense+(photo2.png)'">
+                </div>
+            </section>
+
+            <section class="feature-section reverse">
+                <div class="feature-text">
+                    <h3 data-i18n="landingFeature2Title">복잡한 계산은 앱이 알아서</h3>
+                    <p data-i18n="landingFeature2Desc">누가 누구에게 얼마를 보내야 하는지 최소 횟수로 깔끔하게 정리해 줍니다.</p>
+                    
+                    <h3 data-i18n="landingFeature3Title" style="margin-top: 3rem;">버튼 한 번에 송금까지</h3>
+                    <p data-i18n="landingFeature3Desc">토스, 카카오페이, PayPay 등 딥링크로 헷갈림 없이 바로 송금하세요.</p>
+                </div>
+                <div class="feature-image-box">
+                    <img src="photo3.png" alt="Settlement Result Preview" class="mockup-img" style="max-width: 350px;" onerror="this.src='https://via.placeholder.com/350x600/f8fafc/64748b?text=Transfers+(photo3.png)'">
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div id="auth-wrapper" class="auth-page-wrapper" style="display: none;">
         <div class="auth-card">
             <div class="auth-logo">
                 <img src="icon.png" alt="Settle Up Icon">
@@ -98,6 +296,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="auth.js?v=16"></script>
+    <script src="auth.js?v=39"></script>
 </body>
 </html>

@@ -9,25 +9,49 @@ document.addEventListener('DOMContentLoaded', async () => {
     const signupView = document.getElementById('signup-view');
     const forgotPasswordView = document.getElementById('forgot-password-view');
     const updatePasswordView = document.getElementById('update-password-view');
+    
+    const landingView = document.getElementById('landing-view');
+    const authWrapper = document.getElementById('auth-wrapper');
     const authCard = document.querySelector('.auth-card'); 
 
-    // 🚀 매끄러운 자동 로그인을 위해 폼을 숨겨두고 시작
-    authCard.style.opacity = '0'; 
+    // 초기 깜빡임 방지용 숨김 처리
+    if(authCard) authCard.style.opacity = '0'; 
 
-    // --- Session Check (이미 로그인되어 있으면 바로 메인으로 이동) ---
+    // --- Session Check ---
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session) {
-        window.location.replace('index.html'); // 깜빡임 없이 즉시 메인 페이지로 이동
+        window.location.replace('index.html'); // 이미 로그인된 유저는 바로 메인 화면으로 패스
         return;
     } else {
-        // 비로그인 상태일 때만 서서히 로그인 폼을 표시
-        authCard.style.transition = 'opacity 0.3s ease';
-        authCard.style.opacity = '1';
+        if(landingView) landingView.style.display = 'block';
     }
+
+    // 🚀 소개 페이지에서 버튼 누를 때 로그인 창 보여주는 함수
+    const showAuthForm = () => {
+        if(landingView) landingView.style.display = 'none';
+        if(authWrapper) authWrapper.style.display = 'flex'; 
+        if(authCard) {
+            authCard.style.transition = 'opacity 0.3s ease';
+            authCard.style.opacity = '1';
+        }
+        
+        // 🚀 수정됨: 로그인 화면으로 전환 시, 불필요해진 상단 '로그인' 버튼 숨기기 (언어 선택기만 남음)
+        const navLoginBtn = document.getElementById('nav-login-btn');
+        if (navLoginBtn) navLoginBtn.style.display = 'none';
+    };
+
+    // 이벤트 리스너 연결
+    const navLoginBtn = document.getElementById('nav-login-btn');
+    if(navLoginBtn) navLoginBtn.addEventListener('click', showAuthForm);
+    
+    const heroStartBtn = document.getElementById('hero-start-btn');
+    if(heroStartBtn) heroStartBtn.addEventListener('click', showAuthForm);
+
 
     // 비밀번호 재설정 링크를 타고 왔는지 확인
     supabaseClient.auth.onAuthStateChange((event) => {
         if (event === 'PASSWORD_RECOVERY') {
+            showAuthForm(); 
             showView('update-password');
         }
     });
@@ -73,7 +97,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('go-to-forgot-password').addEventListener('click', (e) => { e.preventDefault(); showView('forgot-password'); });
     document.getElementById('go-to-login-from-reset').addEventListener('click', (e) => { e.preventDefault(); showView('login'); });
 
-    // 🚀 엔터 키(Enter)로 로그인/회원가입 버튼 자동 클릭
+    // 엔터 키 처리
     const handleEnterKey = (buttonId) => (e) => {
         if (e.key === 'Enter') {
             e.preventDefault(); 
@@ -92,7 +116,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('new-password').addEventListener('keypress', handleEnterKey('submit-update-password-btn'));
 
 
-    // 🚀 소셜 로그인(OAuth) 처리 로직
+    // 소셜 로그인 처리 로직
     const handleOAuthLogin = async (provider) => {
         const { data, error } = await supabaseClient.auth.signInWithOAuth({
             provider: provider,
@@ -159,7 +183,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (error) alert(error.message);
         else {
-            // 🚀 수정됨: 회원가입 후 세션이 바로 생성되면(이메일 인증 OFF 상태) 즉시 로그인하여 메인으로 이동
             if (data && data.session) {
                 window.location.replace('index.html');
             } else {
