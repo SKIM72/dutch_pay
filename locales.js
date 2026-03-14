@@ -30,7 +30,7 @@ const locales = {
         invalidInput: "항목명과 금액, 날짜를 올바르게 입력해주세요.",
         settlementInProgress: "정산이 필요합니다.",
         settlementDone: "정산이 완료되었습니다.",
-        completeSettlement: "정산 완료하기",
+        completeSettlement: "정산하기", 
         editSettlement: "정산 수정하기",
         baseCurrency: "기준 통화",
         exchangeRateTitle: "환율 정보",
@@ -108,11 +108,18 @@ const locales = {
         loggedInGoogle: "Google 계정으로 로그인됨",
         loggedInApple: "Apple 계정으로 로그인됨",
         loggedInEmail: "이메일 계정으로 로그인됨",
-        // 🚀 추가: 웹 QR 스캐너 관련 텍스트
         scanQrCodeBtn: "QR 스캔",
         qrScanTitle: "QR 코드 스캔",
         qrScanInstructions: "카메라 권한을 허용하고 QR 코드를 사각형 안에 맞춰주세요.",
-        qrScanError: "카메라에 접근할 수 없거나 스캔에 실패했습니다."
+        qrScanError: "카메라에 접근할 수 없거나 스캔에 실패했습니다.",
+        linkSocialAccount: "소셜 계정 연동",
+        linkGoogle: "Google 연동",
+        linkApple: "Apple 연동",
+        linked: "연동됨",
+        linkConfirm: "{provider} 계정을 현재 이메일에 연동하시겠습니까?",
+        // 🚀 신규 추가: 입력 헷갈림 방지 가이드 텍스트
+        manualInputHelper: "👇 아래에 각자 쓴 금액을 입력하면 총액이 자동 계산됩니다.",
+        autoCalculated: "자동 계산됨"
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -145,7 +152,7 @@ const locales = {
         invalidInput: "Please enter a valid item name, amount, and date.",
         settlementInProgress: "Settlement required.",
         settlementDone: "Settlement complete.",
-        completeSettlement: "Complete Settlement",
+        completeSettlement: "Settle Up",
         editSettlement: "Edit Settlement",
         baseCurrency: "Base Currency",
         exchangeRateTitle: "Exchange Rate Info",
@@ -223,11 +230,18 @@ const locales = {
         loggedInGoogle: "Logged in with Google",
         loggedInApple: "Logged in with Apple",
         loggedInEmail: "Logged in with Email",
-        // 🚀 추가: 웹 QR 스캐너 관련 텍스트
         scanQrCodeBtn: "Scan QR",
         qrScanTitle: "Scan QR Code",
         qrScanInstructions: "Please allow camera access and fit the QR code inside the box.",
-        qrScanError: "Failed to access camera or scan the code."
+        qrScanError: "Failed to access camera or scan the code.",
+        linkSocialAccount: "Link Social Account",
+        linkGoogle: "Link Google",
+        linkApple: "Link Apple",
+        linked: "Linked",
+        linkConfirm: "Would you like to link your {provider} account?",
+        // 🚀 신규 추가
+        manualInputHelper: "👇 Enter individual amounts below, and the total will be auto-calculated.",
+        autoCalculated: "Auto-calculated"
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -260,7 +274,7 @@ const locales = {
         invalidInput: "項目名、金額、日付を正しく入力してください。",
         settlementInProgress: "精算が必要です。",
         settlementDone: "精算が完了しました。",
-        completeSettlement: "精算を完了する",
+        completeSettlement: "精算する", 
         editSettlement: "精算を修正する",
         baseCurrency: "基準通貨",
         exchangeRateTitle: "為替レート情報",
@@ -338,10 +352,17 @@ const locales = {
         loggedInGoogle: "Googleアカウントでログイン中",
         loggedInApple: "Appleアカウントでログイン中",
         loggedInEmail: "メールアドレスでログイン中",
-        // 🚀 추가: 웹 QR 스캐너 관련 텍스트
         scanQrCodeBtn: "QRスキャン",
         qrScanTitle: "QRコードをスキャン",
         qrScanInstructions: "カメラのアクセスを許可し、枠内にQRコードを合わせてください。",
-        qrScanError: "カメラにアクセスできないか、スキャンに失敗しました。"
+        qrScanError: "カメラにアクセスできないか、スキャンに失敗しました。",
+        linkSocialAccount: "ソーシャルアカウント連携",
+        linkGoogle: "Google 連携",
+        linkApple: "Apple 連携",
+        linked: "連携済み",
+        linkConfirm: "現在のメールアドレスに{provider}アカウントを連携しますか？",
+        // 🚀 신규 추가
+        manualInputHelper: "👇 下に各自の金額を入力すると、総額が自動計算されます。",
+        autoCalculated: "自動計算"
     }
 };

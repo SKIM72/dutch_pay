@@ -96,7 +96,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         return fallbackText || key;
     }
 
-    const formatNumber = (num, decimals = 2) => isNaN(num) ? '0' : num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    const formatNumber = (num, decimalsOrCurrency = 2) => {
+        if (isNaN(num)) return '0';
+        let decimals = 2;
+        if (typeof decimalsOrCurrency === 'string') {
+            if (['KRW', 'JPY'].includes(decimalsOrCurrency)) decimals = 0;
+            else decimals = 2;
+        } else {
+            decimals = decimalsOrCurrency;
+        }
+        return num.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    };
+
     const parseFormattedNumber = (str) => parseFloat(String(str).replace(/,/g, '')) || 0;
     
     function getLocalDateString() { 
@@ -165,7 +176,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(addSettlementFab) addSettlementFab.classList.remove('hidden'); 
             
             if(userInfoDisplay) { 
-                const provider = currentUser.app_metadata?.provider || 'email';
+                const providers = currentUser.app_metadata?.providers || [];
+                let provider = 'email';
+                if (providers.includes('google')) provider = 'google';
+                else if (providers.includes('apple')) provider = 'apple';
+                else if (currentUser.app_metadata?.provider) provider = currentUser.app_metadata.provider;
+
                 let iconHtml = '';
                 if (provider === 'google') {
                     iconHtml = `<i class="fab fa-google" style="color: #EA4335; font-size: 1rem;"></i>`;
@@ -174,7 +190,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else {
                     iconHtml = `<i class="fas fa-envelope" style="color: var(--primary); font-size: 1rem;"></i>`;
                 }
-                // 🚀 수정됨: 텍스트가 길어져도 버튼을 밀어내지 않고 ... 처리되도록 span 태그에 스타일 추가
+                
                 userInfoDisplay.innerHTML = `${iconHtml} <span id="user-email-text" style="display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;">${currentUser.email}</span>`;
                 userInfoDisplay.classList.remove('hidden'); 
             }
@@ -679,8 +695,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(itemPayerSelect) itemPayerSelect.innerHTML = participants.map(p => `<option value="${p}">${paidByString.replace('{payer}', p)}</option>`).join('');
         if(editItemPayerSelect) editItemPayerSelect.innerHTML = participants.map(p => `<option value="${p}">${paidByString.replace('{payer}', p)}</option>`).join('');
 
-        if(splitAmountInputs) splitAmountInputs.innerHTML = ''; 
-        if(editSplitAmountInputs) editSplitAmountInputs.innerHTML = '';
+        // 🚀 UX 개선: 금액 직접 입력 시 눈에 띄는 안내 배너 추가
+        const helperHtml = `<div style="grid-column: 1 / -1; font-size: 0.85rem; color: #4f46e5; margin-bottom: 0.8rem; background: #eef2ff; padding: 0.6rem; border-radius: 8px; text-align: center; border: 1px solid #c7d2fe;"><i class="fas fa-info-circle"></i> <span data-i18n="manualInputHelper">${getLocale('manualInputHelper', '👇 아래에 각자 쓴 금액을 입력하면 총액이 자동 계산됩니다.')}</span></div>`;
+
+        if(splitAmountInputs) {
+            splitAmountInputs.innerHTML = helperHtml; 
+        }
+        if(editSplitAmountInputs) {
+            editSplitAmountInputs.innerHTML = helperHtml;
+        }
 
         participants.forEach(p => {
             if(splitAmountInputs) {
@@ -695,8 +718,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        if(splitAmountInputs) attachDynamicSplitInputListeners(splitAmountInputs, itemAmountInput, updateAddPreview);
-        if(editSplitAmountInputs) attachDynamicSplitInputListeners(editSplitAmountInputs, editItemAmountInput, updateEditPreview);
+        if(splitAmountInputs) attachDynamicSplitInputListeners(splitAmountInputs, itemAmountInput, updateAddPreview, false);
+        if(editSplitAmountInputs) attachDynamicSplitInputListeners(editSplitAmountInputs, editItemAmountInput, updateEditPreview, true);
     }
 
     async function fetchAndSetRate(fetchType, currencyFrom, currencyTo, inputEl, previewUpdater, customDateStr = null) {
@@ -746,7 +769,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const rate = rateInput ? parseFloat(rateInput.value) || 0 : 0;
         const base = currentSettlement ? currentSettlement.base_currency : '';
         const previewEl = document.getElementById('add-converted-total');
-        if(previewEl) previewEl.textContent = `${formatNumber(amount * rate, 2)} ${base}`;
+        if(previewEl) previewEl.textContent = `${formatNumber(amount * rate, base)} ${base}`;
     }
 
     async function handleEditCurrencyChange() {
@@ -773,7 +796,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const rate = rateInput ? parseFloat(rateInput.value) || 0 : 0;
         const base = currentSettlement ? currentSettlement.base_currency : '';
         const previewEl = document.getElementById('edit-converted-total');
-        if(previewEl) previewEl.textContent = `${formatNumber(amount * rate, 2)} ${base}`;
+        if(previewEl) previewEl.textContent = `${formatNumber(amount * rate, base)} ${base}`;
     }
 
     async function createSettlement() {
@@ -872,8 +895,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentEditingExpenseId = expenseId;
         editExpenseIdInput.value = expense.id;
         editItemNameInput.value = expense.name;
-        editItemAmountInput.value = formatNumber(expense.original_amount, 0);
-        editItemAmountInput.dataset.originalValue = formatNumber(expense.original_amount, 0);
+        editItemAmountInput.value = formatNumber(expense.original_amount, expense.currency);
+        editItemAmountInput.dataset.originalValue = formatNumber(expense.original_amount, expense.currency);
         
         if (expense.expense_date) {
             const d = new Date(expense.expense_date);
@@ -897,10 +920,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (expense.split === 'amount') {
             const inputs = editSplitAmountInputs.querySelectorAll('input');
-            inputs.forEach(inp => { const p = inp.dataset.participant; const originalShare = (expense.shares[p] || 0) / rate; inp.value = formatNumber(originalShare, 0); });
+            inputs.forEach(inp => { const p = inp.dataset.participant; const originalShare = (expense.shares[p] || 0) / rate; inp.value = formatNumber(originalShare, currentSettlement.base_currency); });
         } else { editSplitAmountInputs.querySelectorAll('input').forEach(inp => inp.value = ''); }
         
-        handleSplitMethodChange(editSplitMethodSelect, editItemAmountInput, editSplitAmountInputs);
+        handleSplitMethodChange(editSplitMethodSelect, editItemAmountInput, editSplitAmountInputs, true);
         if(editExpenseModal) editExpenseModal.classList.remove('hidden');
     }
 
@@ -1030,8 +1053,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const totalBaseEl = document.getElementById('calc-total-base');
 
         if(foreignCurEl) foreignCurEl.textContent = expense.currency; if(baseCurEl) baseCurEl.textContent = currentSettlement.base_currency;
-        if(baseAmEl) baseAmEl.textContent = formatNumber(appliedRate, 4); if(totalForEl) totalForEl.textContent = `${formatNumber(expense.original_amount, 2)} ${expense.currency}`;
-        if(totalBaseEl) totalBaseEl.textContent = `${formatNumber(expense.amount, 2)} ${currentSettlement.base_currency}`;
+        if(baseAmEl) baseAmEl.textContent = formatNumber(appliedRate, 4); if(totalForEl) totalForEl.textContent = `${formatNumber(expense.original_amount, expense.currency)} ${expense.currency}`;
+        if(totalBaseEl) totalBaseEl.textContent = `${formatNumber(expense.amount, currentSettlement.base_currency)} ${currentSettlement.base_currency}`;
         
         if(expenseRateModal) expenseRateModal.classList.remove('hidden');
     }
@@ -1092,13 +1115,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const dateStr = d.toLocaleDateString(localeCode, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
                 dateHtml = `<div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">${dateStr}</div>`;
             }
-            let amountHtml = `${formatNumber(exp.original_amount, 2)} ${exp.currency}`;
+            let amountHtml = `${formatNumber(exp.original_amount, exp.currency)} ${exp.currency}`;
             if (exp.currency !== currentSettlement.base_currency) { 
                 amountHtml = `<span class="clickable-amount" data-id="${exp.id}" title="적용 환율 보기"><i class="fas fa-info-circle"></i> ${amountHtml}</span>`; 
             }
             
             let htmlStr = `<td>${dateHtml}<div>${exp.name}</div></td><td>${amountHtml}</td><td>${exp.payer}</td>`;
-            participants.forEach(p => { htmlStr += `<td>${formatNumber(exp.shares[p] || 0, 2)} ${currentSettlement.base_currency}</td>`; });
+            participants.forEach(p => { htmlStr += `<td>${formatNumber(exp.shares[p] || 0, currentSettlement.base_currency)} ${currentSettlement.base_currency}</td>`; });
             htmlStr += `<td><button class="delete-expense-btn" data-id="${exp.id}"><i class="fas fa-trash-alt"></i></button></td>`;
             row.innerHTML = htmlStr;
             
@@ -1148,7 +1171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
         const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         
-        if(totalExpenseP) totalExpenseP.textContent = `${getLocale('totalExpense', 'Total Expense')}: ${formatNumber(totalAmount, 2)} ${base_currency}`;
+        if(totalExpenseP) totalExpenseP.textContent = `${getLocale('totalExpense', 'Total Expense')}: ${formatNumber(totalAmount, base_currency)} ${base_currency}`;
         if(finalSettlementContainer) finalSettlementContainer.innerHTML = '';
         if(completeSettlementBtn) completeSettlementBtn.classList.add('hidden');
 
@@ -1165,6 +1188,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     div.className = 'transfer-item';
                     
                     let payButtons = '';
+                    
+                    const linkAmount = (base_currency === 'KRW' || base_currency === 'JPY') ? Math.round(tr.amount) : tr.amount.toFixed(2);
 
                     if (currentLang === 'en') {
                         payButtons = '';
@@ -1172,7 +1197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     else if (base_currency === 'KRW' || currentLang === 'ko') {
                         payButtons = `
                             <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%;">
-                                <a href="supertoss://send?amount=${Math.round(tr.amount)}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#3182f6; color:white; border-radius:8px; padding:0.6rem;"><i class="fas fa-paper-plane"></i> 토스 송금</a>
+                                <a href="supertoss://send?amount=${linkAmount}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#3182f6; color:white; border-radius:8px; padding:0.6rem;"><i class="fas fa-paper-plane"></i> 토스 송금</a>
                                 <a href="kakaotalk://kakaopay/home" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#FEE500; color:#191919; border-radius:8px; padding:0.6rem;"><i class="fas fa-comment-dollar"></i> 카카오페이</a>
                             </div>
                         `;
@@ -1186,7 +1211,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     } else {
                         payButtons = `
                             <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%;">
-                                <a href="venmo://paycharge?txn=pay&amount=${Math.round(tr.amount)}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#008CFF; color:white; border-radius:8px; padding:0.6rem;">Venmo</a>
+                                <a href="venmo://paycharge?txn=pay&amount=${linkAmount}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#008CFF; color:white; border-radius:8px; padding:0.6rem;">Venmo</a>
                                 <a href="https://www.paypal.com/myaccount/transfer/homepage" target="_blank" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#003087; color:white; border-radius:8px; padding:0.6rem;">PayPal</a>
                             </div>
                         `;
@@ -1194,7 +1219,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     div.innerHTML = `
                         <div style="font-weight: 700; color: white;">
-                            ${tr.from} ➡️ ${tr.to} (${formatNumber(tr.amount, 2)} ${base_currency})
+                            ${tr.from} ➡️ ${tr.to} (${formatNumber(tr.amount, base_currency)} ${base_currency})
                         </div>
                         ${payButtons}
                     `;
@@ -1233,11 +1258,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(itemDateInput) itemDateInput.value = getLocalISOString(); 
         if(splitAmountInputs) splitAmountInputs.querySelectorAll('input').forEach(inp => inp.value = '');
         if(currentSettlement && itemCurrencySelect) { itemCurrencySelect.value = currentSettlement.base_currency; }
-        handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs); 
+        handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs, false); 
         if(itemNameInput) itemNameInput.focus();
     }
 
-    function attachDynamicSplitInputListeners(container, totalAmountInput, previewUpdater) {
+    function attachDynamicSplitInputListeners(container, totalAmountInput, previewUpdater, isEdit = false) {
         if(!container) return;
         const inputs = container.querySelectorAll('input');
         inputs.forEach(input => {
@@ -1245,7 +1270,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 handleAmountInput(e.target);
                 let sum = 0;
                 inputs.forEach(inp => sum += parseFormattedNumber(inp.value));
-                if(totalAmountInput) totalAmountInput.value = formatNumber(sum, 0);
+                const currency = isEdit ? document.getElementById('edit-item-currency').value : document.getElementById('item-currency').value;
+                if(totalAmountInput) totalAmountInput.value = formatNumber(sum, currency);
                 if(previewUpdater) previewUpdater();
             });
         });
@@ -1264,16 +1290,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    function handleSplitMethodChange(selectEl, amountEl, splitInputsEl) {
+    // 🚀 복구 완: 입력 헷갈림 방지를 위한 직관적 UX 개선 기능
+    function handleSplitMethodChange(selectEl, amountEl, splitInputsEl, isEdit = false) {
         if(!selectEl || !amountEl || !splitInputsEl) return;
         const isManualAmount = selectEl.value === 'amount';
         splitInputsEl.classList.toggle('hidden', !isManualAmount);
         amountEl.readOnly = isManualAmount;
+        
         if (isManualAmount) {
+            // 입력창 비활성화 시각 효과 및 문구 변경
+            amountEl.style.backgroundColor = '#f8fafc'; 
+            amountEl.style.color = '#94a3b8';
+            amountEl.style.borderStyle = 'dashed'; 
+            amountEl.placeholder = getLocale('autoCalculated', '자동 계산됨');
+            
             let sum = 0;
             splitInputsEl.querySelectorAll('input').forEach(inp => sum += parseFormattedNumber(inp.value));
-            amountEl.value = formatNumber(sum, 0);
+            const currency = isEdit ? document.getElementById('edit-item-currency').value : document.getElementById('item-currency').value;
+            amountEl.value = formatNumber(sum, currency);
         } else {
+            // 원상 복구
+            amountEl.style.backgroundColor = '';
+            amountEl.style.color = '';
+            amountEl.style.borderStyle = '';
+            amountEl.placeholder = getLocale('amount', '금액');
+            
             amountEl.value = amountEl.dataset.originalValue || '';
         }
         if (selectEl === splitMethodSelect) updateAddPreview();
@@ -1309,13 +1350,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (transfers.length === 0) { 
             resultString = getLocale('settlementDone', 'Settlement complete (No transfers needed)'); 
         } else { 
-            resultString = transfers.map(tr => t.sendFormat(tr.from, tr.to, formatNumber(tr.amount, 0), base_currency)).join('\n'); 
+            resultString = transfers.map(tr => t.sendFormat(tr.from, tr.to, formatNumber(tr.amount, base_currency), base_currency)).join('\n'); 
         }
 
         const currentUrl = window.location.origin + window.location.pathname;
         const shareUrl = `${currentUrl}?id=${currentSettlement.id}`;
         
-        const text = `🧾 [${title}] ${t.summary}\n\n💰 ${t.total}: ${formatNumber(totalAmount, 0)} ${base_currency}\n🔔 ${t.result}:\n${resultString}\n\n${t.notice}\n${shareUrl}`;
+        const text = `🧾 [${title}] ${t.summary}\n\n💰 ${t.total}: ${formatNumber(totalAmount, base_currency)} ${base_currency}\n🔔 ${t.result}:\n${resultString}\n\n${t.notice}\n${shareUrl}`;
         
         const success = await fallbackCopyTextToClipboard(text);
         if (success) showToast(getLocale('copySuccess', "Copied!"), 'success');
@@ -1391,7 +1432,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if(profileModal && currentUser) {
                     const providerInfo = document.getElementById('login-provider-info');
                     const pwSection = document.getElementById('password-change-section');
-                    const provider = currentUser.app_metadata?.provider || 'email';
+                    const providers = currentUser.app_metadata?.providers || [];
+                    let provider = 'email';
+                    if (providers.includes('google')) provider = 'google';
+                    else if (providers.includes('apple')) provider = 'apple';
+                    else if (currentUser.app_metadata?.provider) provider = currentUser.app_metadata.provider;
                     
                     let providerHtml = '';
                     let isEmailLogin = false;
@@ -1413,8 +1458,50 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if(isEmailLogin) pwSection.classList.remove('hidden');
                         else pwSection.classList.add('hidden');
                     }
+
+                    const linkGoogleBtn = document.getElementById('link-google-btn');
+                    const linkAppleBtn = document.getElementById('link-apple-btn');
+                    
+                    if(linkGoogleBtn) {
+                        if(providers.includes('google')) {
+                            linkGoogleBtn.disabled = true;
+                            linkGoogleBtn.innerHTML = `<i class="fab fa-google" style="color: #EA4335;"></i> <span>${getLocale('linked', '연동됨')}</span>`;
+                        } else {
+                            linkGoogleBtn.disabled = false;
+                            linkGoogleBtn.innerHTML = `<i class="fab fa-google" style="color: #EA4335;"></i> <span>${getLocale('linkGoogle', 'Google 연동')}</span>`;
+                        }
+                    }
+                    if(linkAppleBtn) {
+                        if(providers.includes('apple')) {
+                            linkAppleBtn.disabled = true;
+                            linkAppleBtn.innerHTML = `<i class="fab fa-apple"></i> <span>${getLocale('linked', '연동됨')}</span>`;
+                        } else {
+                            linkAppleBtn.disabled = false;
+                            linkAppleBtn.innerHTML = `<i class="fab fa-apple"></i> <span>${getLocale('linkApple', 'Apple 연동')}</span>`;
+                        }
+                    }
                     
                     profileModal.classList.remove('hidden');
+                }
+            });
+        }
+        
+        const linkGoogleBtn = document.getElementById('link-google-btn');
+        if(linkGoogleBtn) {
+            linkGoogleBtn.addEventListener('click', async () => {
+                if (await showConfirm(getLocale('linkConfirm', '{provider} 계정을 현재 이메일에 연동하시겠습니까?').replace('{provider}', 'Google'))) {
+                    const { error } = await supabaseClient.auth.linkIdentity({ provider: 'google', options: { redirectTo: window.location.origin + window.location.pathname } });
+                    if (error) showToast(error.message, 'error');
+                }
+            });
+        }
+
+        const linkAppleBtn = document.getElementById('link-apple-btn');
+        if(linkAppleBtn) {
+            linkAppleBtn.addEventListener('click', async () => {
+                if (await showConfirm(getLocale('linkConfirm', '{provider} 계정을 현재 이메일에 연동하시겠습니까?').replace('{provider}', 'Apple'))) {
+                    const { error } = await supabaseClient.auth.linkIdentity({ provider: 'apple', options: { redirectTo: window.location.origin + window.location.pathname } });
+                    if (error) showToast(error.message, 'error');
                 }
             });
         }
@@ -1705,8 +1792,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
         
-        if(splitMethodSelect) splitMethodSelect.addEventListener('change', () => handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs));
-        if(editSplitMethodSelect) editSplitMethodSelect.addEventListener('change', () => handleSplitMethodChange(editSplitMethodSelect, editItemAmountInput, editSplitAmountInputs));
+        if(splitMethodSelect) splitMethodSelect.addEventListener('change', () => handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs, false));
+        if(editSplitMethodSelect) editSplitMethodSelect.addEventListener('change', () => handleSplitMethodChange(editSplitMethodSelect, editItemAmountInput, editSplitAmountInputs, true));
         if(downloadExcelBtn) downloadExcelBtn.addEventListener('click', downloadExcel);
     }
 
@@ -1740,7 +1827,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         participants.forEach(p => participantTotals[p] = 0);
 
         expenses.forEach(exp => {
-            let excelAmountStr = `${formatNumber(exp.original_amount, 2)} ${exp.currency}`;
+            let excelAmountStr = `${formatNumber(exp.original_amount, exp.currency)} ${exp.currency}`;
             if (exp.currency !== base_currency) { 
                 const appliedRate = exp.amount / exp.original_amount; 
                 excelAmountStr += ` (적용환율: ${formatNumber(appliedRate, 4)})`; 
@@ -1755,7 +1842,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const rowData = [ dateStr, exp.name, excelAmountStr, exp.payer ];
             participants.forEach(p => { 
                 const shareAmount = exp.shares[p] || 0; 
-                rowData.push(`${formatNumber(shareAmount, 2)} ${base_currency}`); 
+                rowData.push(`${formatNumber(shareAmount, base_currency)} ${base_currency}`); 
                 participantTotals[p] += shareAmount; 
             });
             dataForExport.push(rowData);
@@ -1764,8 +1851,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         const { transfers } = calculateMinimumTransfers(expenses, participants);
 
-        const totalsRow = [ '', getLocale('totalExpense', '총 지출'), `${formatNumber(totalAmount, 2)} ${base_currency}`, '' ];
-        participants.forEach(p => totalsRow.push(`${formatNumber(participantTotals[p], 2)} ${base_currency}`));
+        const totalsRow = [ '', getLocale('totalExpense', '총 지출'), `${formatNumber(totalAmount, base_currency)} ${base_currency}`, '' ];
+        participants.forEach(p => totalsRow.push(`${formatNumber(participantTotals[p], base_currency)} ${base_currency}`));
         dataForExport.push(totalsRow); 
         dataForExport.push([]); 
         
@@ -1782,7 +1869,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             transfers.forEach(tr => { 
                 const trRow = new Array(header.length).fill(''); 
                 trRow[0] = `${tr.from} ➡️ ${tr.to}`; 
-                trRow[1] = `${formatNumber(tr.amount, 2)} ${base_currency}`; 
+                trRow[1] = `${formatNumber(tr.amount, base_currency)} ${base_currency}`; 
                 dataForExport.push(trRow); 
             });
         }
