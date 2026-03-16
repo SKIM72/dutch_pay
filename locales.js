@@ -119,7 +119,6 @@ const locales = {
         linkConfirm: "{provider} 계정을 현재 이메일에 연동하시겠습니까?",
         manualInputHelper: "👇 아래에 각자 쓴 금액을 입력하면 총액이 자동 계산됩니다.",
         autoCalculated: "자동 계산됨",
-        // 🚀 신규 추가: 랜딩 페이지 문구
         landingHeroTitle: "여행 정산, 이제 스트레스 받지 마세요",
         landingHeroSub: "환율 계산부터 송금까지 한 번에 Settle Up!",
         landingStartBtn: "무료로 시작하기",
@@ -128,7 +127,15 @@ const locales = {
         landingFeature2Title: "복잡한 계산은 앱이 알아서",
         landingFeature2Desc: "누가 누구에게 얼마를 보내야 하는지 최소 횟수로 깔끔하게 정리해 줍니다.",
         landingFeature3Title: "버튼 한 번에 송금까지",
-        landingFeature3Desc: "토스, 카카오페이, PayPay 등 딥링크로 헷갈림 없이 바로 송금하세요."
+        landingFeature3Desc: "토스, 카카오페이, PayPay 등 딥링크로 헷갈림 없이 바로 송금하세요.",
+        connectedAccounts: "참여 중인 계정",
+        viewParticipants: "참여 계정 확인",
+        kickUser: "내보내기",
+        kickConfirm: "정말로 이 사용자를 이 방에서 내보내시겠습니까?",
+        kickedAlert: "방장에 의해 내보내진 방입니다.",
+        badgeHost: "방장",
+        badgeMe: "나",
+        joinSuccess: "성공적으로 방에 참가했습니다!"
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -250,7 +257,6 @@ const locales = {
         linkConfirm: "Would you like to link your {provider} account?",
         manualInputHelper: "👇 Enter individual amounts below, and the total will be auto-calculated.",
         autoCalculated: "Auto-calculated",
-        // 🚀 신규 추가: 랜딩 페이지 문구
         landingHeroTitle: "Travel splitting, completely stress-free",
         landingHeroSub: "From exchange rates to transfers, Settle Up!",
         landingStartBtn: "Start for Free",
@@ -259,7 +265,15 @@ const locales = {
         landingFeature2Title: "We do the complex math",
         landingFeature2Desc: "We calculate exactly who owes whom with minimum transactions.",
         landingFeature3Title: "Send money with a single tap",
-        landingFeature3Desc: "Deep links for Toss, KakaoPay, and PayPay makes transfers effortless."
+        landingFeature3Desc: "Deep links for Toss, KakaoPay, and PayPay makes transfers effortless.",
+        connectedAccounts: "Connected Accounts",
+        viewParticipants: "View Accounts",
+        kickUser: "Kick",
+        kickConfirm: "Are you sure you want to remove this user from the room?",
+        kickedAlert: "You have been removed from this room by the host.",
+        badgeHost: "Host",
+        badgeMe: "Me",
+        joinSuccess: "Successfully joined the room!"
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -381,7 +395,6 @@ const locales = {
         linkConfirm: "現在のメールアドレスに{provider}アカウントを連携しますか？",
         manualInputHelper: "👇 下に各自の金額を入力すると、総額が自動計算されます。",
         autoCalculated: "自動計算",
-        // 🚀 신규 추가: 랜딩 페이지 문구
         landingHeroTitle: "旅行の割り勘、もうストレス不要",
         landingHeroSub: "為替計算から送金まで、Settle Upで一発解決！",
         landingStartBtn: "無料で始める",
@@ -390,6 +403,14 @@ const locales = {
         landingFeature2Title: "複雑な計算はアプリにお任せ",
         landingFeature2Desc: "誰が誰にいくら送るべきか、最小回数でスッキリ整理します。",
         landingFeature3Title: "ワンクリックで即送金",
-        landingFeature3Desc: "Toss、カカオペイ、PayPayなどのディープリンクで迷わず送金できます。"
+        landingFeature3Desc: "Toss、カカオペイ、PayPayなどのディープリンクで迷わず送金できます。",
+        connectedAccounts: "参加中のアカウント",
+        viewParticipants: "参加アカウント確認",
+        kickUser: "追放する",
+        kickConfirm: "本当にこのユーザーを部屋から追放しますか？",
+        kickedAlert: "ホストによって部屋から追放されました。",
+        badgeHost: "ホスト",
+        badgeMe: "自分",
+        joinSuccess: "正常に部屋に参加しました！"
     }
 };

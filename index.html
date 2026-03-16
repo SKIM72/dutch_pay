@@ -17,7 +17,7 @@
     <link rel="icon" href="icon.png" type="image/png">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=34">
+    <link rel="stylesheet" href="style.css?v=41">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -25,7 +25,10 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
 
     <style>
-        .capture-mode #edit-settlement-title-btn { display: none !important; }
+        /* 캡쳐 시 보기 싫은 상단 버튼들을 숨겨줍니다 */
+        .capture-mode #edit-settlement-title-btn,
+        .capture-mode #view-participants-btn,
+        .capture-mode #exchange-rate-info-btn { display: none !important; }
 
         #qr-scanner-modal {
             position: fixed;
@@ -102,6 +105,11 @@
                             <button id="edit-settlement-title-btn" class="btn-outline hidden" title="제목 수정">
                                 <i class="fas fa-edit"></i>
                             </button>
+                            
+                            <button id="view-participants-btn" class="btn-outline" title="참여 계정 확인">
+                                <i class="fas fa-users"></i>
+                            </button>
+
                             <button id="exchange-rate-info-btn" class="btn-outline" title="환율 정보">
                                 <i class="fas fa-exchange-alt"></i>
                             </button>
@@ -413,6 +421,14 @@
             </div>
         </div>
 
+        <div id="participants-modal" class="hidden">
+            <div class="modal-content card" style="max-width: 400px;">
+                <span class="close-modal-btn"><i class="fas fa-times"></i></span>
+                <h2 style="margin-bottom: 1.5rem;"><i class="fas fa-users" style="color: var(--primary);"></i> <span data-i18n="connectedAccounts">참여 중인 계정</span></h2>
+                <div id="participants-modal-list" style="display: flex; flex-direction: column; gap: 0.8rem; max-height: 60vh; overflow-y: auto;"></div>
+            </div>
+        </div>
+
     </div>
     
     <div id="global-loader" class="hidden"><div class="spinner"></div></div>
@@ -421,6 +437,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="main.js?v=34"></script>
+    <script src="main.js?v=41"></script>
 </body>
 </html>

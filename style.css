@@ -307,3 +307,19 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 .divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--border); }
 .divider:not(:empty)::before { margin-right: .8em; }
 .divider:not(:empty)::after { margin-left: .8em; }
+
+/* 참여자 목록 모달창 중앙 정렬 및 배경 블러 처리 */
+#participants-modal {
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    right: 0; 
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6); 
+    backdrop-filter: blur(4px);
+    display: flex; 
+    justify-content: center; 
+    align-items: center;
+    z-index: 1000; 
+    padding: 1rem;
+}

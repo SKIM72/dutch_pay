@@ -32,6 +32,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const editExpenseModal = document.getElementById('edit-expense-modal');
     const expenseRateModal = document.getElementById('expense-rate-modal');
 
+    // 🚀 참여자 모달 관련 변수 추가
+    const viewParticipantsBtn = document.getElementById('view-participants-btn');
+    const participantsModal = document.getElementById('participants-modal');
+    const participantsModalList = document.getElementById('participants-modal-list');
+
     const newSettlementDateInput = document.getElementById('new-settlement-date');
     const newSettlementTitleInput = document.getElementById('new-settlement-title');
     const baseCurrencySelect = document.getElementById('base-currency');
@@ -64,8 +69,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const settlementDisplay = document.getElementById('settlement-display');
     const expenseFormCard = document.getElementById('expense-form-card');
     const itemDateInput = document.getElementById('item-date');
-    const itemPayerSelect = document.getElementById('item-payer');
-    const itemCurrencySelect = document.getElementById('item-currency');
+    const itemPayerSelect = document.getElementById('item-currency');
     const splitMethodSelect = document.getElementById('split-method');
     const splitAmountInputs = document.getElementById('split-amount-inputs');
     
@@ -78,6 +82,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const addExpenseBtn = document.getElementById('add-expense-btn');
     const itemNameInput = document.getElementById('item-name');
     const itemAmountInput = document.getElementById('item-amount');
+    const itemCurrencySelect = document.getElementById('item-currency');
     
     const editSettlementTitleBtn = document.getElementById('edit-settlement-title-btn');
     const editTitleModal = document.getElementById('edit-title-modal');
@@ -168,6 +173,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             rooms.push(roomId);
             localStorage.setItem('joinedRooms', JSON.stringify(rooms));
         }
+    }
+
+    // 🚀 신규 추가: DB에 참여자 등록을 처리하는 핵심 함수
+    async function syncMemberDB(settlementId) {
+        if (!currentUser) return;
+        const providers = currentUser.app_metadata?.providers || [];
+        let provider = 'email';
+        if (providers.includes('google')) provider = 'google';
+        else if (providers.includes('apple')) provider = 'apple';
+
+        await supabaseClient.from('settlement_members').upsert({
+            settlement_id: settlementId,
+            user_id: currentUser.id,
+            email: currentUser.email,
+            provider: provider
+        }, { onConflict: 'settlement_id,user_id' });
     }
 
     function updateAuthUI() {
@@ -394,7 +415,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const joinModal = document.getElementById('join-modal');
         if(joinModal) joinModal.classList.add('hidden');
         
-        showToast('성공적으로 방에 참가했습니다!', 'success');
+        // 🚀 신규 추가: 코드로 방에 참여했을 때 DB에도 정보 연동
+        await syncMemberDB(data.id);
+
+        // 🚀 수정됨: 다국어 적용
+        showToast(getLocale('joinSuccess', '성공적으로 방에 참가했습니다!'), 'success');
+        
         await loadData();
         await loadSingleSettlement(data.id);
         setLoading(false);
@@ -442,6 +468,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (!getJoinedRooms().includes(guestRoomId)) {
                         saveJoinedRoom(guestRoomId);
                         showToast('정산 방에 자동 참가되었습니다.', 'success');
+                        // 🚀 신규 추가: 링크 타고 들어왔을 때 DB에도 참여자 자동 연동
+                        await syncMemberDB(guestRoomId);
                         await loadData(); 
                     }
                     if (joinRoomBtn) joinRoomBtn.classList.add('hidden');
@@ -462,6 +490,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         localStorage.removeItem('pendingJoinRoomId');
                         showToast('이전 방에 자동 참가되었습니다.', 'success');
                         window.history.replaceState({}, '', `${window.location.pathname}?id=${pendingId}`);
+                        // 🚀 신규 추가: 예약된 방 번호로 가입 후 진입 시 DB에도 참여자 연동
+                        await syncMemberDB(pendingId);
                         await loadData();
                         await loadSingleSettlement(pendingId);
                     } else {
@@ -502,7 +532,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             setTimeout(() => window.location.href = 'index.html', 2000); 
             return;
         }
-        selectSettlement(data);
+        await selectSettlement(data); // await 추가 (비동기 강퇴 체크 때문)
     }
 
     async function loadData() {
@@ -637,7 +667,38 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.title = titleText; 
     }
 
-    function selectSettlement(settlement) {
+    async function selectSettlement(settlement) {
+        
+        // 🚀 신규 추가: 방장이 손님을 강퇴시켰는지 확인하는 보안 로직
+        if (currentUser && settlement.user_id !== currentUser.id) {
+            // 내가 방장이 아닌 손님일 때만 검사
+            const { data: members } = await supabaseClient.from('settlement_members').select('user_id').eq('settlement_id', settlement.id);
+            
+            // 방에 참여자 기록이 최소 1명 이상 존재하는데, 내가 그 명단에 없다면 = 강퇴당한 것임!
+            if (members && members.length > 0) {
+                const amIMember = members.some(m => m.user_id === currentUser.id);
+                if (!amIMember) {
+                    showToast(getLocale('kickedAlert', '방장에 의해 내보내진 방입니다.'), 'error');
+                    
+                    // 내 목록에서 강제로 지우기
+                    let rooms = getJoinedRooms();
+                    rooms = rooms.filter(id => id != settlement.id);
+                    localStorage.setItem('joinedRooms', JSON.stringify(rooms));
+                    settlements = settlements.filter(s => s.id !== settlement.id);
+                    
+                    currentSettlement = null;
+                    if(calculatorView) calculatorView.classList.add('hidden'); 
+                    if(placeholderRightPane) placeholderRightPane.classList.remove('hidden');
+                    window.history.replaceState({}, '', window.location.pathname); 
+                    renderSettlementList();
+                    return; // 접근 차단
+                }
+            }
+        } else if (currentUser && settlement.user_id === currentUser.id) {
+            // 내가 방장일 때 오래된 방이라도 DB 명단에 등록되도록 백그라운드에서 동기화
+            syncMemberDB(settlement.id);
+        }
+
         currentSettlement = settlement;
         
         if(placeholderRightPane) placeholderRightPane.classList.add('hidden');
@@ -692,10 +753,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const paidByString = getLocale('paidBy', '{payer}님이 결제');
         const shareOfString = getLocale('shareOf', '{name}님 분담액');
 
-        if(itemPayerSelect) itemPayerSelect.innerHTML = participants.map(p => `<option value="${p}">${paidByString.replace('{payer}', p)}</option>`).join('');
+        // 🔥 오류 수정: 요소가 존재하는지 확인 후 innerHTML 업데이트
+        const addPayerSelect = document.getElementById('item-payer');
+        if(addPayerSelect) {
+            addPayerSelect.innerHTML = participants.map(p => `<option value="${p}">${paidByString.replace('{payer}', p)}</option>`).join('');
+        }
         if(editItemPayerSelect) editItemPayerSelect.innerHTML = participants.map(p => `<option value="${p}">${paidByString.replace('{payer}', p)}</option>`).join('');
 
-        // 🚀 UX 개선: 금액 직접 입력 시 눈에 띄는 안내 배너 추가
         const helperHtml = `<div style="grid-column: 1 / -1; font-size: 0.85rem; color: #4f46e5; margin-bottom: 0.8rem; background: #eef2ff; padding: 0.6rem; border-radius: 8px; text-align: center; border: 1px solid #c7d2fe;"><i class="fas fa-info-circle"></i> <span data-i18n="manualInputHelper">${getLocale('manualInputHelper', '👇 아래에 각자 쓴 금액을 입력하면 총액이 자동 계산됩니다.')}</span></div>`;
 
         if(splitAmountInputs) {
@@ -824,6 +888,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const newSettlement = data[0];
         newSettlement.is_host = true; 
         
+        // 🚀 신규 추가: 방을 만들자마자 DB에도 나를 참여자로 등록
+        await syncMemberDB(newSettlement.id);
+        
         settlements.push(newSettlement);
         settlements.sort((a, b) => new Date(b.date) - new Date(a.date));
         
@@ -854,7 +921,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const convertedAmount = originalAmount * rate;
         const participants = currentSettlement.participants;
-        const payer = itemPayerSelect.value;
+        const addPayerSelect = document.getElementById('item-payer');
+        const payer = addPayerSelect ? addPayerSelect.value : participants[0];
         const splitMethod = splitMethodSelect.value;
         let shares = {};
 
@@ -1025,6 +1093,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function leaveSettlement(settlementId) {
         if (await showConfirm(getLocale('leaveRoomConfirm', '정말 이 방에서 나가시겠습니까?'))) {
+            // 🚀 신규 추가: DB에서도 내 흔적 지우기
+            if (currentUser) {
+                await supabaseClient.from('settlement_members').delete().match({ settlement_id: settlementId, user_id: currentUser.id });
+            }
+
             let rooms = getJoinedRooms();
             rooms = rooms.filter(id => id != settlementId);
             localStorage.setItem('joinedRooms', JSON.stringify(rooms));
@@ -1290,7 +1363,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 🚀 복구 완: 입력 헷갈림 방지를 위한 직관적 UX 개선 기능
     function handleSplitMethodChange(selectEl, amountEl, splitInputsEl, isEdit = false) {
         if(!selectEl || !amountEl || !splitInputsEl) return;
         const isManualAmount = selectEl.value === 'amount';
@@ -1298,7 +1370,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         amountEl.readOnly = isManualAmount;
         
         if (isManualAmount) {
-            // 입력창 비활성화 시각 효과 및 문구 변경
             amountEl.style.backgroundColor = '#f8fafc'; 
             amountEl.style.color = '#94a3b8';
             amountEl.style.borderStyle = 'dashed'; 
@@ -1309,7 +1380,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const currency = isEdit ? document.getElementById('edit-item-currency').value : document.getElementById('item-currency').value;
             amountEl.value = formatNumber(sum, currency);
         } else {
-            // 원상 복구
             amountEl.style.backgroundColor = '';
             amountEl.style.color = '';
             amountEl.style.borderStyle = '';
@@ -1699,7 +1769,101 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal, document.getElementById('share-modal'), document.getElementById('join-modal'), document.getElementById('profile-modal'), editTitleModal, qrScannerModal].forEach(modal => {
+        // 🚀 신규 추가: 참여자 모달창 오픈 로직 및 강퇴 처리
+        if(viewParticipantsBtn) {
+            viewParticipantsBtn.addEventListener('click', async () => {
+                if (!currentSettlement) return;
+                setLoading(true);
+                const { data: members, error } = await supabaseClient
+                    .from('settlement_members')
+                    .select('*')
+                    .eq('settlement_id', currentSettlement.id)
+                    .order('joined_at', { ascending: true });
+                setLoading(false);
+
+                if (error) {
+                    showToast('목록을 불러오지 못했습니다.', 'error');
+                    return;
+                }
+
+                participantsModalList.innerHTML = '';
+                if (!members || members.length === 0) {
+                    participantsModalList.innerHTML = '<p class="text-muted" style="text-align:center;">아직 연동된 계정이 없습니다.</p>';
+                } else {
+                    const isMeHost = currentUser && currentSettlement.user_id === currentUser.id;
+                    
+                    members.forEach(m => {
+                        const isHost = m.user_id === currentSettlement.user_id;
+                        const isMe = currentUser && m.user_id === currentUser.id;
+                        
+                        let iconHtml = '<i class="fas fa-envelope" style="color: var(--primary);"></i>';
+                        if (m.provider === 'google') iconHtml = '<i class="fab fa-google" style="color: #EA4335;"></i>';
+                        else if (m.provider === 'apple') iconHtml = '<i class="fab fa-apple"></i>';
+
+                        let badges = '';
+                        if (isHost) badges += `<span class="badge badge-host" style="font-size:0.7rem; padding:0.2rem 0.4rem; margin-left:0.5rem;">${getLocale('badgeHost', '방장')}</span>`;
+                        if (isMe) badges += `<span class="badge" style="background:#e2e8f0; color:#475569; font-size:0.7rem; padding:0.2rem 0.4rem; margin-left:0.5rem;">${getLocale('badgeMe', '나')}</span>`;
+
+                        const itemDiv = document.createElement('div');
+                        itemDiv.style.display = 'flex';
+                        itemDiv.style.alignItems = 'center';
+                        itemDiv.style.justifyContent = 'space-between';
+                        itemDiv.style.padding = '0.8rem';
+                        itemDiv.style.border = '1px solid var(--border)';
+                        itemDiv.style.borderRadius = '8px';
+
+                        let emailDisplay = m.email || '';
+                        // 방장도 아니고 나 자신도 아니면 타인의 이메일 일부를 가려줍니다 (보안)
+                        if (!isMe && !isHost && isMeHost === false) {
+                            const parts = emailDisplay.split('@');
+                            if(parts.length === 2) emailDisplay = parts[0].substring(0, 3) + '***@' + parts[1];
+                        }
+
+                        let leftContent = `<div style="display:flex; align-items:center; gap:0.8rem;">
+                            <div style="width:32px; height:32px; border-radius:50%; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-size:1.1rem;">
+                                ${iconHtml}
+                            </div>
+                            <div style="display:flex; flex-direction:column;">
+                                <div style="display:flex; align-items:center;">
+                                    <span style="font-weight:600; font-size:0.9rem; color:var(--text-main);">${emailDisplay}</span>
+                                    ${badges}
+                                </div>
+                            </div>
+                        </div>`;
+
+                        let rightContent = '';
+                        // 내가 방장이고, 이 목록의 사람이 방장이 아니라면 강퇴 버튼을 표시!
+                        if (isMeHost && !isHost) {
+                            rightContent = `<button class="kick-btn" data-uid="${m.user_id}" style="background:none; border:none; color:var(--danger); cursor:pointer; padding:0.5rem; font-size:0.9rem;"><i class="fas fa-user-slash"></i> ${getLocale('kickUser', '내보내기')}</button>`;
+                        }
+
+                        itemDiv.innerHTML = leftContent + rightContent;
+                        participantsModalList.appendChild(itemDiv);
+                    });
+
+                    // 🚀 강퇴 버튼 동작 연결
+                    participantsModalList.querySelectorAll('.kick-btn').forEach(btn => {
+                        btn.addEventListener('click', async (e) => {
+                            if (await showConfirm(getLocale('kickConfirm', '정말로 이 사용자를 이 방에서 내보내시겠습니까?'))) {
+                                const targetUid = e.currentTarget.dataset.uid;
+                                setLoading(true);
+                                const { error: kickErr } = await supabaseClient.from('settlement_members').delete().match({ settlement_id: currentSettlement.id, user_id: targetUid });
+                                setLoading(false);
+                                if (kickErr) {
+                                    showToast('내보내기 실패', 'error');
+                                } else {
+                                    showToast('성공적으로 내보냈습니다.', 'success');
+                                    viewParticipantsBtn.click(); // 리스트 새로고침
+                                }
+                            }
+                        });
+                    });
+                }
+                participantsModal.classList.remove('hidden');
+            });
+        }
+
+        [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal, document.getElementById('share-modal'), document.getElementById('join-modal'), document.getElementById('profile-modal'), editTitleModal, qrScannerModal, participantsModal].forEach(modal => {
             if(modal) {
                 modal.addEventListener('click', (e) => { 
                     if (e.target === modal) {
