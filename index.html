@@ -25,7 +25,6 @@
     <script src="https://unpkg.com/html5-qrcode"></script>
 
     <style>
-        /* 캡쳐 시 보기 싫은 상단 버튼들을 숨겨줍니다 */
         .capture-mode #edit-settlement-title-btn,
         .capture-mode #view-participants-btn,
         .capture-mode #exchange-rate-info-btn { display: none !important; }
@@ -102,6 +101,7 @@
                     <div class="settlement-header">
                         <div class="header-title-group">
                             <h2 id="settlement-display"></h2>
+                            
                             <button id="edit-settlement-title-btn" class="btn-outline title-action-btn hidden" title="제목 수정">
                                 <i class="fas fa-edit"></i> <span class="btn-text" data-i18n="btnEditTitle">제목 수정</span>
                             </button>
@@ -157,6 +157,12 @@
                                     <option value="JPY">JPY</option>
                                     <option value="KRW">KRW</option>
                                     <option value="USD">USD</option>
+                                    <option value="CNY">CNY</option>
+                                    <option value="GBP">GBP</option>
+                                    <option value="CAD">CAD</option>
+                                    <option value="AUD">AUD</option>
+                                    <option value="HKD">HKD</option>
+                                    <option value="TWD">TWD</option>
                                 </select>
                             </div>
                             
@@ -237,6 +243,12 @@
                         <option value="JPY" data-i18n="currencyJPY">JPY (일본 엔)</option>
                         <option value="KRW" data-i18n="currencyKRW">KRW (한국 원)</option>
                         <option value="USD" data-i18n="currencyUSD">USD (미국 달러)</option>
+                        <option value="CNY" data-i18n="currencyCNY">CNY (중국 위안)</option>
+                        <option value="GBP" data-i18n="currencyGBP">GBP (영국 파운드)</option>
+                        <option value="CAD" data-i18n="currencyCAD">CAD (캐나다 달러)</option>
+                        <option value="AUD" data-i18n="currencyAUD">AUD (호주 달러)</option>
+                        <option value="HKD" data-i18n="currencyHKD">HKD (홍콩 달러)</option>
+                        <option value="TWD" data-i18n="currencyTWD">TWD (대만 달러)</option>
                     </select>
                 </div>
                 <button id="create-settlement-btn" data-i18n="create"></button>

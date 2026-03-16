@@ -10,8 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentUser = null; 
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
-    const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD'];
-    let kickSubscription = null; // 🚀 신규 추가: 실시간 강퇴 감지 리스너
+    const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD']; // 🚀 6개 통화 추가
 
     // --- Element References ---
     const languageSwitcher = document.getElementById('language-switcher');
@@ -93,6 +92,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const openQrScannerBtn = document.getElementById('open-qr-scanner-btn');
     const qrScannerModal = document.getElementById('qr-scanner-modal');
     const closeQrBtn = document.getElementById('close-qr-btn');
+    let kickSubscription = null; 
 
     const applyMobileUIFix = () => {
         const titleGroup = document.querySelector('.header-title-group');
@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (isNaN(num)) return '0';
         let decimals = 2;
         if (typeof decimalsOrCurrency === 'string') {
-            if (['KRW', 'JPY'].includes(decimalsOrCurrency)) decimals = 0;
+            if (['KRW', 'JPY', 'TWD'].includes(decimalsOrCurrency)) decimals = 0; // 🚀 대만 달러 소수점 제외 추가
             else decimals = 2;
         } else {
             decimals = decimalsOrCurrency;
@@ -235,7 +235,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, { onConflict: 'settlement_id,user_id' });
     }
 
-    // 🚀🚀 신규: Supabase Realtime을 이용한 실시간 강퇴 감지 🚀🚀
     function setupKickListener() {
         if (kickSubscription) {
             supabaseClient.removeChannel(kickSubscription);
@@ -249,12 +248,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 event: 'DELETE',
                 schema: 'public',
                 table: 'settlement_members',
-                filter: `user_id=eq.${currentUser.id}` // 내 계정이 삭제되었을 때만 발동!
+                filter: `user_id=eq.${currentUser.id}` 
             }, (payload) => {
                 const kickedRoomId = payload.old.settlement_id;
-                banRoom(kickedRoomId); // 영구 차단 목록 추가
+                banRoom(kickedRoomId); 
                 
-                // 만약 현재 보고 있던 방에서 쫓겨났다면 즉시 튕겨냄
                 if (currentSettlement && currentSettlement.id === kickedRoomId) {
                     showToast(getLocale('kickedAlert', '방장에 의해 내보내진 방입니다.'), 'error');
                     
@@ -265,13 +263,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if(placeholderRightPane) placeholderRightPane.classList.remove('hidden');
                     window.history.replaceState({}, '', window.location.pathname); 
                     
-                    // 떠있는 모달창이 있다면 닫기
                     document.querySelectorAll('.modal-content').forEach(m => {
                          const parent = m.parentElement;
                          if (parent && !parent.classList.contains('hidden')) parent.classList.add('hidden');
                     });
                 } else {
-                    // 뒤에서 쫓겨났으면 조용히 목록에서만 지움
                     settlements = settlements.filter(s => s.id !== kickedRoomId);
                 }
                 renderSettlementList();
@@ -580,7 +576,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const { data: { session } } = await supabaseClient.auth.getSession();
             currentUser = session ? session.user : null;
             
-            setupKickListener(); // 🚀 로그인하자마자 실시간 강퇴 감지 시작
+            setupKickListener(); 
 
             const browserLang = navigator.language.split('-')[0];
             setLanguage(localStorage.getItem('preferredLang') || (['ko', 'en', 'ja'].includes(browserLang) ? browserLang : 'en'));
@@ -643,7 +639,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else {
                     currentUser = session ? session.user : null;
                     updateAuthUI();
-                    setupKickListener(); // 🚀 로그인/로그아웃 시 리스너 재시작
+                    setupKickListener(); 
                 }
             });
 
@@ -1352,6 +1348,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { transfers, balances }; 
     }
 
+    // 🚀 수정: 언어 설정(currentLang)을 1순위로 평가하여 버튼을 표시하도록 완벽 수정
     function updateSummary() {
         if (!currentSettlement) return;
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
@@ -1375,12 +1372,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                     
                     let payButtons = '';
                     
-                    const linkAmount = (base_currency === 'KRW' || base_currency === 'JPY') ? Math.round(tr.amount) : tr.amount.toFixed(2);
+                    const linkAmount = (['KRW', 'JPY', 'TWD'].includes(base_currency)) ? Math.round(tr.amount) : tr.amount.toFixed(2);
 
-                    if (currentLang === 'en') {
-                        payButtons = '';
+                    if (currentLang === 'ja') {
+                        payButtons = `
+                            <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%; justify-content: flex-end;">
+                                <a href="paypay://" style="text-decoration:none; text-align:center; width:calc(50% - 0.25rem); font-size:0.9rem; font-weight:600; background-color:#FF0033; color:white; border-radius:8px; padding:0.6rem;">PayPay</a>
+                            </div>
+                        `;
                     } 
-                    else if (base_currency === 'KRW' || currentLang === 'ko') {
+                    else if (currentLang === 'ko') {
                         payButtons = `
                             <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%;">
                                 <a href="supertoss://send?amount=${linkAmount}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#3182f6; color:white; border-radius:8px; padding:0.6rem;"><i class="fas fa-paper-plane"></i> 토스 송금</a>
@@ -1388,19 +1389,31 @@ document.addEventListener('DOMContentLoaded', async () => {
                             </div>
                         `;
                     } 
-                    else if (base_currency === 'JPY' || currentLang === 'ja') {
-                        payButtons = `
-                            <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%; justify-content: flex-end;">
-                                <a href="paypay://" style="text-decoration:none; text-align:center; width:calc(50% - 0.25rem); font-size:0.9rem; font-weight:600; background-color:#FF0033; color:white; border-radius:8px; padding:0.6rem;">PayPay</a>
-                            </div>
-                        `;
-                    } else {
-                        payButtons = `
-                            <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%;">
-                                <a href="venmo://paycharge?txn=pay&amount=${linkAmount}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#008CFF; color:white; border-radius:8px; padding:0.6rem;">Venmo</a>
-                                <a href="https://www.paypal.com/myaccount/transfer/homepage" target="_blank" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#003087; color:white; border-radius:8px; padding:0.6rem;">PayPal</a>
-                            </div>
-                        `;
+                    else if (currentLang === 'en') {
+                        payButtons = '';
+                    } 
+                    else {
+                        if (base_currency === 'JPY') {
+                            payButtons = `
+                                <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%; justify-content: flex-end;">
+                                    <a href="paypay://" style="text-decoration:none; text-align:center; width:calc(50% - 0.25rem); font-size:0.9rem; font-weight:600; background-color:#FF0033; color:white; border-radius:8px; padding:0.6rem;">PayPay</a>
+                                </div>
+                            `;
+                        } else if (base_currency === 'KRW') {
+                            payButtons = `
+                                <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%;">
+                                    <a href="supertoss://send?amount=${linkAmount}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#3182f6; color:white; border-radius:8px; padding:0.6rem;"><i class="fas fa-paper-plane"></i> 토스 송금</a>
+                                    <a href="kakaotalk://kakaopay/home" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#FEE500; color:#191919; border-radius:8px; padding:0.6rem;"><i class="fas fa-comment-dollar"></i> 카카오페이</a>
+                                </div>
+                            `;
+                        } else {
+                            payButtons = `
+                                <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%;">
+                                    <a href="venmo://paycharge?txn=pay&amount=${linkAmount}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#008CFF; color:white; border-radius:8px; padding:0.6rem;">Venmo</a>
+                                    <a href="https://www.paypal.com/myaccount/transfer/homepage" target="_blank" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#003087; color:white; border-radius:8px; padding:0.6rem;">PayPal</a>
+                                </div>
+                            `;
+                        }
                     }
 
                     div.innerHTML = `
