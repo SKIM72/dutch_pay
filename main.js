@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD'];
+    let kickSubscription = null; // 🚀 신규 추가: 실시간 강퇴 감지 리스너
 
     // --- Element References ---
     const languageSwitcher = document.getElementById('language-switcher');
@@ -93,7 +94,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const qrScannerModal = document.getElementById('qr-scanner-modal');
     const closeQrBtn = document.getElementById('close-qr-btn');
 
-    // 🚀 수정 1: 모바일 UI 간격을 CSS에 의존하지 않고 JS로 강제 적용 (가장 확실한 방법)
     const applyMobileUIFix = () => {
         const titleGroup = document.querySelector('.header-title-group');
         if (titleGroup) {
@@ -170,12 +170,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
     }
 
-    // 🚀 수정 2: 재확인 모달창 겹침 방지를 위해 Z-index 강제 최상단 적용
     function showConfirm(message) {
         return new Promise((resolve) => {
             const modal = document.getElementById('custom-confirm-modal');
             if(!modal) { resolve(window.confirm(message)); return; } 
-            modal.style.zIndex = '999999'; // 무조건 맨 위로 강제
+            modal.style.zIndex = '999999'; 
             document.getElementById('confirm-message').textContent = message;
             modal.classList.remove('hidden');
             const confirmBtn = document.getElementById('confirm-yes-btn');
@@ -206,7 +205,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 🚀 수정 3: 고스트 액세스 차단을 위한 차단 목록 관리 기능
     function banRoom(roomId) {
         let banned = JSON.parse(localStorage.getItem('bannedRooms') || '[]');
         if (!banned.includes(String(roomId))) banned.push(String(roomId));
@@ -237,11 +235,54 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, { onConflict: 'settlement_id,user_id' });
     }
 
+    // 🚀🚀 신규: Supabase Realtime을 이용한 실시간 강퇴 감지 🚀🚀
+    function setupKickListener() {
+        if (kickSubscription) {
+            supabaseClient.removeChannel(kickSubscription);
+            kickSubscription = null;
+        }
+        if (!currentUser) return;
+
+        kickSubscription = supabaseClient
+            .channel('kick-listener')
+            .on('postgres_changes', {
+                event: 'DELETE',
+                schema: 'public',
+                table: 'settlement_members',
+                filter: `user_id=eq.${currentUser.id}` // 내 계정이 삭제되었을 때만 발동!
+            }, (payload) => {
+                const kickedRoomId = payload.old.settlement_id;
+                banRoom(kickedRoomId); // 영구 차단 목록 추가
+                
+                // 만약 현재 보고 있던 방에서 쫓겨났다면 즉시 튕겨냄
+                if (currentSettlement && currentSettlement.id === kickedRoomId) {
+                    showToast(getLocale('kickedAlert', '방장에 의해 내보내진 방입니다.'), 'error');
+                    
+                    settlements = settlements.filter(s => s.id !== kickedRoomId);
+                    currentSettlement = null;
+                    
+                    if(calculatorView) calculatorView.classList.add('hidden'); 
+                    if(placeholderRightPane) placeholderRightPane.classList.remove('hidden');
+                    window.history.replaceState({}, '', window.location.pathname); 
+                    
+                    // 떠있는 모달창이 있다면 닫기
+                    document.querySelectorAll('.modal-content').forEach(m => {
+                         const parent = m.parentElement;
+                         if (parent && !parent.classList.contains('hidden')) parent.classList.add('hidden');
+                    });
+                } else {
+                    // 뒤에서 쫓겨났으면 조용히 목록에서만 지움
+                    settlements = settlements.filter(s => s.id !== kickedRoomId);
+                }
+                renderSettlementList();
+            })
+            .subscribe();
+    }
+
     async function verifyMembership() {
         if (!currentSettlement || !currentUser) return true; 
         if (currentSettlement.user_id === currentUser.id) return true; 
 
-        // 이미 차단된 방이면 즉시 아웃
         if (isBanned(currentSettlement.id)) return false;
 
         const { data: members, error } = await supabaseClient
@@ -252,10 +293,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             
         if (error) return true; 
         
-        // DB 명단에 없으면 강퇴된 것! (영구 차단 목록에 추가)
         if (!members || members.length === 0) {
             showToast(getLocale('kickedAlert', '방장에 의해 내보내진 방입니다.'), 'error');
-            banRoom(currentSettlement.id); // 🚀 고스트 액세스 영구 차단
+            banRoom(currentSettlement.id); 
             
             settlements = settlements.filter(s => s.id !== currentSettlement.id);
             currentSettlement = null;
@@ -493,7 +533,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // 🚀 고스트 차단 검사
         if (isBanned(data.id)) {
             setLoading(false);
             showToast('접근이 차단된 방입니다.', 'error');
@@ -540,6 +579,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const { data: { session } } = await supabaseClient.auth.getSession();
             currentUser = session ? session.user : null;
+            
+            setupKickListener(); // 🚀 로그인하자마자 실시간 강퇴 감지 시작
 
             const browserLang = navigator.language.split('-')[0];
             setLanguage(localStorage.getItem('preferredLang') || (['ko', 'en', 'ja'].includes(browserLang) ? browserLang : 'en'));
@@ -552,7 +593,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const guestRoomId = urlParams.get('id');
 
             if (guestRoomId) {
-                // 🚀 고스트 차단 검사
                 if (isBanned(guestRoomId)) {
                     showToast('접근이 차단된 방입니다.', 'error');
                     window.location.replace('index.html');
@@ -603,6 +643,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else {
                     currentUser = session ? session.user : null;
                     updateAuthUI();
+                    setupKickListener(); // 🚀 로그인/로그아웃 시 리스너 재시작
                 }
             });
 
@@ -652,7 +693,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         let joinedIds = getJoinedRooms();
-        // 🚀 고스트 차단 목록 제외
         joinedIds = joinedIds.filter(id => !isBanned(id));
 
         if (joinedIds.length > 0) {
@@ -1556,7 +1596,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 🚀 수정 4: 강퇴 로직 부드러운 삭제 애니메이션 및 이중 DB 검증 추가
     async function renderParticipantsModal() {
         if (!currentSettlement) return;
         setLoading(true);
@@ -1625,7 +1664,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 participantsModalList.appendChild(itemDiv);
             });
 
-            // 강퇴 애니메이션 이벤트 리스너 추가
             participantsModalList.querySelectorAll('.kick-btn').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     const targetBtn = e.currentTarget;
@@ -1636,7 +1674,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         targetBtn.disabled = true;
                         targetBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-                        // 1차: 기본 delete 시도
                         let deleteError = null;
                         const { error: err1 } = await supabaseClient.from('settlement_members')
                             .delete()
@@ -1644,7 +1681,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         
                         deleteError = err1;
 
-                        // 2차: 실패 시 RPC 강제 호출 시도
                         if (err1) {
                             const { error: err2 } = await supabaseClient.rpc('kick_member', {
                                 p_settlement_id: currentSettlement.id,
@@ -1661,7 +1697,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         } else {
                             showToast('성공적으로 내보냈습니다.', 'success');
                             
-                            // 성공 시 우측으로 스르륵 사라지는 애니메이션
                             if (rowElement) {
                                 rowElement.style.transition = 'all 0.3s ease';
                                 rowElement.style.opacity = '0';
