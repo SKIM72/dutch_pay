@@ -38,7 +38,6 @@ header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-
 #left-pane h2 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 1rem; }
 #settlement-list-container { overflow-y: auto; flex: 1; padding-bottom: 0rem; }
 
-/* 초대 코드로 참가 버튼 추가 */
 .join-by-code-container { padding: 1rem 1.5rem; border-top: 1px solid var(--border); background: white; }
 #open-join-modal-btn { width: 100%; background: #eef2ff; color: var(--primary); border: 1px dashed var(--primary); padding: 0.75rem; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 0.5rem; transition: background 0.2s; }
 #open-join-modal-btn:hover { background: #e0e7ff; }
@@ -78,10 +77,11 @@ header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-
 #calculator { animation: fadeIn 0.5s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
+/* 🚀 수정됨: 간격과 중앙 정렬을 완벽하게 맞춘 헤더 및 제목 그룹 */
 .settlement-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid var(--app-bg); flex-wrap: wrap; gap: 1rem;}
-.header-title-group { display: flex; align-items: center; gap: 0.8rem; }
+.header-title-group { display: flex; align-items: center; gap: 0.5rem; justify-content: flex-start; flex-wrap: wrap; }
 .header-action-group { display: flex; gap: 0.5rem; flex-wrap: wrap;}
-#settlement-display { font-size: 1.75rem; font-weight: 800; margin-bottom: 0; }
+#settlement-display { font-size: 1.75rem; font-weight: 800; margin-bottom: 0; margin-right: 0.5rem; }
 
 .btn-outline { background: transparent; color: var(--text-main); border: 1px solid var(--border); padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; }
 .btn-outline:hover { background: #f8fafc; border-color: #cbd5e1; }
@@ -223,8 +223,13 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
     #main-container { flex-direction: column; }
     #right-pane { padding: 1.5rem; }
     
+    /* 🚀 수정됨: 기존에 버튼 간격을 벌리던 space-between 속성을 제거하고 타이트하게 붙임 */
     #calculator:not(.capture-mode) .settlement-header { flex-direction: column; align-items: flex-start; gap: 1rem;}
-    #calculator:not(.capture-mode) .header-title-group { width: 100%; justify-content: space-between; }
+    #calculator:not(.capture-mode) .header-title-group { 
+        width: 100%; 
+        justify-content: flex-start !important; 
+        gap: 0.4rem !important; 
+    }
     #calculator:not(.capture-mode) .header-action-group { width: 100%; display: grid; grid-template-columns: 1fr 1fr;}
     #calculator:not(.capture-mode) .header-action-group button { justify-content: center; }
     #calculator:not(.capture-mode) #summary-card { flex-direction: column; align-items: flex-start; }
@@ -285,7 +290,6 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 #join-room-btn:hover { background-color: var(--secondary-hover); }
 @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.03); } 100% { transform: scale(1); } }
 
-/* 공유/참가 모달 스타일 */
 .share-section { margin-bottom: 1.5rem; }
 .share-section label { display: block; font-size: 0.9rem; color: var(--text-muted); font-weight: 600; margin-bottom: 0.5rem; }
 .share-input-group { display: flex; gap: 0.5rem; }
@@ -308,18 +312,33 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 .divider:not(:empty)::before { margin-right: .8em; }
 .divider:not(:empty)::after { margin-left: .8em; }
 
-/* 참여자 목록 모달창 중앙 정렬 및 배경 블러 처리 */
+/* 🚀 모달 및 UI 개선 (겹침 방지 및 버튼 간격 최적화) */
 #participants-modal {
     position: fixed; 
-    top: 0; 
-    left: 0; 
-    right: 0; 
-    bottom: 0;
+    top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(15, 23, 42, 0.6); 
     backdrop-filter: blur(4px);
-    display: flex; 
-    justify-content: center; 
-    align-items: center;
-    z-index: 1000; 
-    padding: 1rem;
+    display: flex; justify-content: center; align-items: center;
+    z-index: 1000; padding: 1rem;
+}
+
+#custom-confirm-modal {
+    z-index: 10500 !important; /* 👈 참여자 모달(1000)보다 무조건 위에 오도록 강제 */
+}
+
+/* 제목 옆 액션 버튼 스타일 */
+.title-action-btn { 
+    display: flex; align-items: center; justify-content: center;
+    gap: 0.4rem; padding: 0.4rem 0.8rem; 
+    border-radius: 20px; font-size: 0.85rem; margin: 0;
+}
+
+@media (max-width: 768px) {
+    .title-action-btn .btn-text { display: none !important; }
+    .title-action-btn { 
+        padding: 0 !important; 
+        width: 34px !important; 
+        height: 34px !important; 
+        border-radius: 8px !important; 
+    }
 }

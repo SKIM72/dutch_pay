@@ -135,7 +135,10 @@ const locales = {
         kickedAlert: "방장에 의해 내보내진 방입니다.",
         badgeHost: "방장",
         badgeMe: "나",
-        joinSuccess: "성공적으로 방에 참가했습니다!"
+        joinSuccess: "성공적으로 방에 참가했습니다!",
+        btnEditTitle: "제목 수정",
+        btnViewParticipants: "참여 정보",
+        btnExchangeInfo: "환율 정보"
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -273,7 +276,10 @@ const locales = {
         kickedAlert: "You have been removed from this room by the host.",
         badgeHost: "Host",
         badgeMe: "Me",
-        joinSuccess: "Successfully joined the room!"
+        joinSuccess: "Successfully joined the room!",
+        btnEditTitle: "Edit Title",
+        btnViewParticipants: "View Accounts",
+        btnExchangeInfo: "Exchange Rates"
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -411,6 +417,9 @@ const locales = {
         kickedAlert: "ホストによって部屋から追放されました。",
         badgeHost: "ホスト",
         badgeMe: "自分",
-        joinSuccess: "正常に部屋に参加しました！"
+        joinSuccess: "正常に部屋に参加しました！",
+        btnEditTitle: "タイトル修正",
+        btnViewParticipants: "参加アカウント",
+        btnExchangeInfo: "為替レート情報"
     }
 };
