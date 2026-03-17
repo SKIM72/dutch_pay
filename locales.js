@@ -1,6 +1,6 @@
 const locales = {
     ko: {
-        appTitle: "Settle Up | 간편 정산 도우미",
+        appTitle: "Settle Up | 해외여행 다중환율 간편 정산",
         settlementHistory: "정산 내역 조회",
         selectOrCreateSettlement: "정산 건을 선택하거나 새로운 정산을 시작하세요.",
         settlementResult: "정산 결과",
