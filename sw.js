@@ -1,4 +1,4 @@
-const CACHE_NAME = 'settle-up-cache-v44'; // 코드가 변경될 때마다 버전 번호를 올려주세요!
+const CACHE_NAME = 'settle-up-cache-v46'; // 코드가 변경될 때마다 버전 번호를 올려주세요!
 const urlsToCache = [
   './',
   './index.html',
