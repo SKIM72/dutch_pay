@@ -10,12 +10,12 @@
         /* 채팅 전용 독립 CSS (기존 style.css 영향 안 받음) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        /* 🚀 1. 모바일 최적화: 위아래 잘림 방지 및 스크롤 고정 */
+        /* 모바일 최적화: 위아래 잘림 방지 및 스크롤 고정 */
         body, html { height: 100%; overflow: hidden; width: 100%; position: fixed; font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
         
         .chat-page-container { 
             display: flex; flex-direction: column; 
-            /* 🚀 JS에서 계산된 실제 높이 적용 (기본값 100vh) */
+            /* JS에서 계산된 실제 높이 적용 (기본값 100vh) */
             height: 100dvh; 
             width: 100vw;
             background: #fff; 
@@ -38,7 +38,7 @@
             display: flex; align-items: center; justify-content: space-between; 
             padding: 0.8rem 1.5rem; background: #6366f1; color: white; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10;
-            height: 60px; flex-shrink: 0;
+            height: 65px; flex-shrink: 0; /* 🚀 인원수 표시를 위해 헤더 높이 살짝 늘림 */
         }
         .chat-page-header h2 { margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 700;}
         .back-btn { background: none; border: none; color: white; font-size: 1.3rem; cursor: pointer; padding: 0.5rem; margin-left: -0.5rem; transition: opacity 0.2s; }
@@ -99,9 +99,7 @@
         }
         #send-chat-btn:hover { background: #4f46e5; transform: scale(1.05); }
 
-        /* ==========================================
-           🚀 2. [추가] 커스텀 모달 공통 스타일
-           ========================================== */
+        /* 커스텀 모달 공통 스타일 */
         .modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(15, 23, 42, 0.7);
@@ -160,7 +158,15 @@
     <div class="chat-page-container">
         <header class="chat-page-header">
             <button class="back-btn" id="chat-back-btn"><i class="fas fa-arrow-left"></i></button>
-            <h2><i class="fas fa-comments"></i> 채팅방</h2>
+            
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <h2><i class="fas fa-comments"></i> 채팅방</h2>
+                <span id="online-status" style="font-size: 0.75rem; opacity: 0.9; font-weight: normal; margin-top: 2px;">
+                    <i class="fas fa-circle" style="color: #4ade80; font-size: 0.5rem; margin-right: 4px; vertical-align: middle;"></i>
+                    <span id="online-count">1</span>명 접속중
+                </span>
+            </div>
+
             <div style="width: 32px;"></div> </header>
         
         <div id="chat-messages" class="chat-messages-container">
@@ -206,5 +212,5 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="chat.js?v=4"></script> </body>
+    <script src="chat.js?v=5"></script> </body>
 </html>
