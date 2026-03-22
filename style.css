@@ -223,7 +223,6 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
     #main-container { flex-direction: column; }
     #right-pane { padding: 1.5rem; }
     
-    /* 🚀 수정됨: 기존에 버튼 간격을 벌리던 space-between 속성을 제거하고 타이트하게 붙임 */
     #calculator:not(.capture-mode) .settlement-header { flex-direction: column; align-items: flex-start; gap: 1rem;}
     #calculator:not(.capture-mode) .header-title-group { 
         width: 100%; 
@@ -340,5 +339,51 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
         width: 34px !important; 
         height: 34px !important; 
         border-radius: 8px !important; 
+    }
+}
+
+/* ==========================================
+   [추가] 메인 화면 채팅 플로팅 버튼 스타일
+   ========================================== */
+#chat-fab {
+    position: fixed;
+    bottom: 6rem; /* 2rem(하단여백) + 48px(정산추가버튼높이) + 1rem(간격) */
+    right: 2.5rem; /* 정산 추가 버튼과 동일한 가로 여백 */
+    width: 48px; /* 정산 추가 버튼과 동일한 크기 */
+    height: 48px; /* 정산 추가 버튼과 동일한 크기 */
+    border-radius: 50%;
+    background-color: #3b82f6;
+    color: white;
+    border: none;
+    box-shadow: var(--shadow-md);
+    font-size: 1.3rem; /* 작아진 버튼 크기에 맞춰 폰트 크기 조정 */
+    cursor: pointer;
+    z-index: 998;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: transform 0.2s ease, background-color 0.2s;
+}
+#chat-fab:hover { transform: scale(1.08); background-color: #2563eb; }
+#chat-fab.hidden { display: none !important; }
+
+#chat-unread-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    background-color: #ef4444;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 12px;
+    min-width: 20px;
+    text-align: center;
+}
+
+/* 모바일 환경 채팅 플로팅 버튼 대응 */
+@media (max-width: 768px) {
+    #chat-fab {
+        right: 1.5rem; /* 모바일 정산 추가 버튼과 동일한 가로 여백 */
     }
 }

@@ -332,7 +332,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     iconHtml = `<i class="fas fa-envelope" style="color: var(--primary); font-size: 1rem;"></i>`;
                 }
                 
-                userInfoDisplay.innerHTML = `${iconHtml} <span id="user-email-text" style="display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;">${currentUser.email}</span>`;
+                // 이름 표시 로직: 닉네임이 있으면 닉네임, 없으면 이메일
+                const displayName = currentUser.nickname ? currentUser.nickname : currentUser.email;
+
+                userInfoDisplay.innerHTML = `${iconHtml} <span id="user-email-text" style="display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;">${displayName}</span>`;
                 userInfoDisplay.classList.remove('hidden'); 
             }
         } else {
@@ -575,6 +578,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             const { data: { session } } = await supabaseClient.auth.getSession();
             currentUser = session ? session.user : null;
+            
+            await checkAndRequireNickname(); 
             
             setupKickListener(); 
 
@@ -1798,11 +1803,58 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     }
                     
+                    // 🚀 [추가] 마이페이지 열릴 때 현재 닉네임 불러오기
+                    const profileNewNickname = document.getElementById('profile-new-nickname');
+                    const currentNicknameDisplay = document.getElementById('current-nickname-display');
+                    
+                    if (currentUser.nickname) {
+                        if (profileNewNickname) profileNewNickname.value = currentUser.nickname;
+                        if (currentNicknameDisplay) currentNicknameDisplay.textContent = currentUser.nickname;
+                    } else {
+                        if (profileNewNickname) profileNewNickname.value = '';
+                        if (currentNicknameDisplay) currentNicknameDisplay.textContent = '-';
+                    }
+
                     profileModal.classList.remove('hidden');
                 }
             });
         }
         
+        // 🚀 [추가] 마이페이지에서 닉네임 변경 버튼 클릭 시
+        const submitChangeNicknameBtn = document.getElementById('submit-change-nickname-btn');
+        if (submitChangeNicknameBtn) {
+            submitChangeNicknameBtn.addEventListener('click', async () => {
+                const profileNewNickname = document.getElementById('profile-new-nickname');
+                const newNickname = profileNewNickname ? profileNewNickname.value.trim() : '';
+                
+                if (!newNickname) {
+                    showToast(getLocale('invalidInput', '올바르게 입력해주세요.'), 'error');
+                    return;
+                }
+                
+                setLoading(true);
+                const { error } = await supabaseClient
+                    .from('profiles')
+                    .update({ nickname: newNickname })
+                    .eq('user_id', currentUser.id);
+                setLoading(false);
+                
+                if (error) {
+                    showToast('닉네임 변경에 실패했습니다.', 'error');
+                    console.error(error);
+                } else {
+                    showToast(getLocale('nicknameUpdated', '닉네임이 성공적으로 변경되었습니다.'), 'success');
+                    currentUser.nickname = newNickname; // 전역 변수 업데이트
+                    updateAuthUI(); // 화면 우측 상단 닉네임 반영
+                    
+                    const currentNicknameDisplay = document.getElementById('current-nickname-display');
+                    if (currentNicknameDisplay) {
+                        currentNicknameDisplay.textContent = newNickname;
+                    }
+                }
+            });
+        }
+
         const linkGoogleBtn = document.getElementById('link-google-btn');
         if(linkGoogleBtn) {
             linkGoogleBtn.addEventListener('click', async () => {
@@ -2272,6 +2324,76 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (refreshing) return;
             window.location.reload();
             refreshing = true;
+        });
+    }
+
+    // ==========================================
+    // [추가] 닉네임(프로필) 검사 및 저장 로직
+    // ==========================================
+
+    async function checkAndRequireNickname() {
+        if (!currentUser) return; // 비로그인 상태면 패스
+
+        // profiles 테이블에서 내 닉네임 조회
+        const { data, error } = await supabaseClient
+            .from('profiles')
+            .select('nickname')
+            .eq('user_id', currentUser.id)
+            .single();
+
+        const nicknameModal = document.getElementById('nickname-modal');
+
+        if (error || !data) {
+            // 프로필이 없으면 강제 모달 띄우기
+            if (nicknameModal) {
+                nicknameModal.classList.remove('hidden');
+            }
+        } else {
+            // 프로필이 있으면 내 닉네임을 전역 변수에 저장 (채팅할 때 사용)
+            currentUser.nickname = data.nickname;
+            updateAuthUI(); // 화면 상단 닉네임 즉시 반영
+        }
+    }
+
+    const submitNicknameBtn = document.getElementById('submit-nickname-btn');
+    const nicknameInput = document.getElementById('nickname-input');
+
+    if (submitNicknameBtn && nicknameInput) {
+        submitNicknameBtn.addEventListener('click', async () => {
+            const nickname = nicknameInput.value.trim();
+            if (!nickname) {
+                showToast(getLocale('invalidInput', '올바르게 입력해주세요.'), 'error');
+                return;
+            }
+
+            setLoading(true);
+
+            // profiles 테이블에 유저 아이디와 닉네임 저장
+            const { error } = await supabaseClient
+                .from('profiles')
+                .insert([{ user_id: currentUser.id, nickname: nickname }]);
+
+            setLoading(false);
+
+            if (error) {
+                showToast('닉네임 저장에 실패했습니다.', 'error');
+                console.error(error);
+            } else {
+                showToast(getLocale('nicknameUpdated', '반갑습니다! 닉네임이 설정되었습니다.'), 'success');
+                currentUser.nickname = nickname; 
+                updateAuthUI(); // 화면 우측 상단 닉네임 즉시 반영
+                
+                // 모달 닫기
+                const nicknameModal = document.getElementById('nickname-modal');
+                if (nicknameModal) {
+                    nicknameModal.classList.add('hidden');
+                }
+            }
+        });
+        
+        // 엔터키 지원
+        nicknameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') submitNicknameBtn.click();
         });
     }
 

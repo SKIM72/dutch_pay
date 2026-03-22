@@ -23,7 +23,7 @@
     <link rel="icon" href="icon.png" type="image/png">
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=41">
+    <link rel="stylesheet" href="style.css?v=45">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -403,6 +403,20 @@
                     </div>
                 </div>
 
+                <div id="nickname-change-section" class="form-grid-row" style="grid-template-columns: 1fr; margin-bottom: 1.5rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                    <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 600;" data-i18n="changeNickname">닉네임 변경</label>
+                    
+                    <div style="margin-bottom: 0.8rem; background: #f8fafc; padding: 0.6rem 0.8rem; border-radius: 8px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: var(--text-muted); font-size: 0.85rem; font-weight: 600;" data-i18n="currentNickname">현재 닉네임</span>
+                        <strong id="current-nickname-display" style="color: var(--primary); font-size: 0.95rem;"></strong>
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <input type="text" id="profile-new-nickname" data-i18n-placeholder="newNickname" style="flex: 1;">
+                        <button id="submit-change-nickname-btn" class="btn-outline" style="white-space: nowrap;" data-i18n="changeNickname">변경</button>
+                    </div>
+                </div>
+
                 <div id="password-change-section" class="form-grid-row" style="grid-template-columns: 1fr; margin-bottom: 1.5rem;">
                     <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 600;" data-i18n="changePassword">비밀번호 변경</label>
                     <input type="password" id="profile-new-password" data-i18n-placeholder="newPassword" style="margin-bottom: 0.5rem;">
@@ -447,6 +461,25 @@
             </div>
         </div>
 
+        <div id="nickname-modal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.8); display: flex; justify-content: center; align-items: center; z-index: 99999; backdrop-filter: blur(4px);">
+            <div class="modal-content card" style="max-width: 380px; text-align: center; padding: 2.5rem 2rem;">
+                <i class="fas fa-id-badge" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
+                <h2 style="margin-bottom: 0.5rem; font-size: 1.35rem; justify-content: center;" data-i18n="nicknameSetupTitle">프로필 설정</h2>
+                <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem; line-height: 1.5;" data-i18n="nicknameSetupDesc">
+                    채팅방에서 사용할<br>이름이나 닉네임을 입력해 주세요.
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <input type="text" id="nickname-input" data-i18n-placeholder="nicknamePlaceholder" placeholder="예: 사랑" style="text-align: center; font-size: 1.1rem; padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border);">
+                    <button id="submit-nickname-btn" style="width: 100%; padding: 0.85rem; font-size: 1rem; border-radius: 8px;" data-i18n="startBtn">시작하기</button>
+                </div>
+            </div>
+        </div>
+
+        <button id="chat-fab" class="hidden" title="채팅방 열기">
+            <i class="fas fa-comment-dots"></i>
+            <span id="chat-unread-badge" class="hidden">0</span>
+        </button>
+
     </div>
     
     <div id="global-loader" class="hidden"><div class="spinner"></div></div>
@@ -455,6 +488,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="main.js?v=41"></script>
+    <script src="main.js?v=45"></script>
+    <script src="chat.js?v=3"></script> 
 </body>
 </html>

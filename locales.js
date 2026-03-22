@@ -144,7 +144,15 @@ const locales = {
         joinSuccess: "성공적으로 방에 참가했습니다!",
         btnEditTitle: "제목 수정",
         btnViewParticipants: "참여 정보",
-        btnExchangeInfo: "환율 정보"
+        btnExchangeInfo: "환율 정보",
+        nicknameSetupTitle: "프로필 설정",
+        nicknameSetupDesc: "채팅방에서 사용할<br>이름이나 닉네임을 입력해 주세요.",
+        nicknamePlaceholder: "예: 사랑",
+        startBtn: "시작하기",
+        changeNickname: "닉네임 변경",
+        newNickname: "새 닉네임",
+        nicknameUpdated: "닉네임이 성공적으로 변경되었습니다.",
+        currentNickname: "현재 닉네임"
     },
     en: {
         appTitle: "Settle Up | Easy Split",
@@ -291,7 +299,15 @@ const locales = {
         joinSuccess: "Successfully joined the room!",
         btnEditTitle: "Edit Title",
         btnViewParticipants: "View Accounts",
-        btnExchangeInfo: "Exchange Rates"
+        btnExchangeInfo: "Exchange Rates",
+        nicknameSetupTitle: "Profile Setup",
+        nicknameSetupDesc: "Please enter a name or nickname<br>to use in the chat room.",
+        nicknamePlaceholder: "e.g. Alex",
+        startBtn: "Start",
+        changeNickname: "Change Nickname",
+        newNickname: "New Nickname",
+        nicknameUpdated: "Nickname updated successfully.",
+        currentNickname: "Current Nickname"
     },
     ja: {
         appTitle: "Settle Up | 簡単割り勘",
@@ -438,6 +454,14 @@ const locales = {
         joinSuccess: "正常に部屋に参加しました！",
         btnEditTitle: "タイトル修正",
         btnViewParticipants: "参加アカウント",
-        btnExchangeInfo: "為替レート情報"
+        btnExchangeInfo: "為替レート情報",
+        nicknameSetupTitle: "プロフィール設定",
+        nicknameSetupDesc: "チャットルームで使用する<br>名前やニックネームを入力してください。",
+        nicknamePlaceholder: "例：太郎",
+        startBtn: "始める",
+        changeNickname: "ニックネーム変更",
+        newNickname: "新しいニックネーム",
+        nicknameUpdated: "ニックネームが正常に変更されました。",
+        currentNickname: "現在のニックネーム"
     }
 };

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settle Up | 채팅방</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <style>
+        /* 채팅 전용 독립 CSS (기존 style.css 영향 안 받음) */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body, html { height: 100%; font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        
+        .chat-page-container { 
+            display: flex; flex-direction: column; height: 100vh; 
+            max-width: 600px; margin: 0 auto; background: #fff; 
+            box-shadow: 0 0 20px rgba(0,0,0,0.05); 
+        }
+        
+        /* 상단 헤더 */
+        .chat-page-header { 
+            display: flex; align-items: center; justify-content: space-between; 
+            padding: 1rem 1.5rem; background: #6366f1; color: white; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10;
+        }
+        .chat-page-header h2 { margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 0.5rem; }
+        .back-btn { background: none; border: none; color: white; font-size: 1.4rem; cursor: pointer; padding: 0.5rem; margin-left: -0.5rem; transition: opacity 0.2s; }
+        .back-btn:hover { opacity: 0.8; }
+        
+        /* 메시지 영역 */
+        .chat-messages-container { 
+            flex: 1; padding: 1.5rem; overflow-y: auto; 
+            display: flex; flex-direction: column; gap: 1rem; 
+            background: #f8fafc;
+        }
+        
+        .chat-msg-wrapper { display: flex; flex-direction: column; max-width: 75%; }
+        .chat-msg-wrapper.mine { align-self: flex-end; align-items: flex-end; }
+        .chat-msg-wrapper.other { align-self: flex-start; align-items: flex-start; }
+        
+        .chat-sender { font-size: 0.75rem; color: #64748b; margin-bottom: 4px; margin-left: 4px; font-weight: 600; }
+        .chat-bubble { padding: 0.7rem 0.9rem; border-radius: 14px; font-size: 0.95rem; line-height: 1.4; word-break: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .mine .chat-bubble { background: #6366f1; color: white; border-top-right-radius: 4px; }
+        .other .chat-bubble { background: white; color: #1e293b; border: 1px solid #e2e8f0; border-top-left-radius: 4px; }
+        .chat-time { font-size: 0.7rem; color: #94a3b8; margin-top: 4px; margin-right: 4px; }
+        
+        /* 하단 입력창 */
+        .chat-input-area { 
+            padding: 1rem; background: white; border-top: 1px solid #e2e8f0; 
+            display: flex; gap: 0.8rem; align-items: center;
+        }
+        #chat-input { 
+            flex: 1; padding: 0.85rem 1.2rem; border: 1px solid #cbd5e1; 
+            border-radius: 24px; font-size: 1rem; outline: none; background: #f8fafc; 
+            transition: all 0.2s;
+        }
+        #chat-input:focus { border-color: #6366f1; background: white; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+        #send-chat-btn { 
+            background: #6366f1; color: white; border: none; width: 46px; height: 46px; 
+            border-radius: 50%; display: flex; justify-content: center; align-items: center; 
+            cursor: pointer; box-shadow: 0 2px 4px rgba(99,102,241,0.3); font-size: 1.1rem;
+            transition: transform 0.1s, background 0.2s;
+        }
+        #send-chat-btn:hover { background: #4f46e5; transform: scale(1.05); }
+    </style>
+</head>
+<body>
+    <div class="chat-page-container">
+        <header class="chat-page-header">
+            <button class="back-btn" id="chat-back-btn"><i class="fas fa-arrow-left"></i></button>
+            <h2><i class="fas fa-comments"></i> 채팅방</h2>
+            <div style="width: 32px;"></div> </header>
+        
+        <div id="chat-messages" class="chat-messages-container">
+            </div>
+        
+        <div class="chat-input-area">
+            <input type="text" id="chat-input" placeholder="메시지를 입력하세요..." autocomplete="off">
+            <button id="send-chat-btn"><i class="fas fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
+    <script src="chat.js?v=2"></script> </body>
+</html>
