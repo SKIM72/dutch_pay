@@ -34,14 +34,33 @@
             background: #f8fafc;
         }
         
-        .chat-msg-wrapper { display: flex; flex-direction: column; max-width: 75%; }
+        .chat-msg-wrapper { display: flex; flex-direction: column; max-width: 75%; position: relative; }
         .chat-msg-wrapper.mine { align-self: flex-end; align-items: flex-end; }
         .chat-msg-wrapper.other { align-self: flex-start; align-items: flex-start; }
         
         .chat-sender { font-size: 0.75rem; color: #64748b; margin-bottom: 4px; margin-left: 4px; font-weight: 600; }
+        
+        /* 🚀 수정/삭제 기능 추가를 위한 가로 정렬 래퍼 */
+        .chat-content-wrapper { display: flex; align-items: flex-end; gap: 4px; }
+        
         .chat-bubble { padding: 0.7rem 0.9rem; border-radius: 14px; font-size: 0.95rem; line-height: 1.4; word-break: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .mine .chat-bubble { background: #6366f1; color: white; border-top-right-radius: 4px; }
         .other .chat-bubble { background: white; color: #1e293b; border: 1px solid #e2e8f0; border-top-left-radius: 4px; }
+        
+        /* 🚀 삭제된 메시지 및 수정됨 태그 스타일 */
+        .chat-bubble.deleted { background: #f1f5f9 !important; color: #94a3b8 !important; border: 1px solid #e2e8f0 !important; font-style: italic; }
+        .edited-tag { font-size: 0.7rem; opacity: 0.7; margin-left: 6px; }
+        
+        /* 🚀 수정/삭제 말풍선 메뉴 스타일 */
+        .msg-options-container { position: relative; display: flex; align-items: center; }
+        .msg-options-btn { background: none; border: none; color: #94a3b8; font-size: 0.9rem; cursor: pointer; padding: 4px 8px; opacity: 0; transition: opacity 0.2s; }
+        .chat-msg-wrapper.mine:hover .msg-options-btn { opacity: 1; }
+        .msg-options-menu { position: absolute; right: 100%; top: 50%; transform: translateY(-50%); background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); display: flex; flex-direction: column; z-index: 100; overflow: hidden; display: none; min-width: 60px; }
+        .msg-options-menu.show { display: flex; }
+        .msg-options-menu button { background: none; border: none; padding: 8px 12px; font-size: 0.85rem; cursor: pointer; text-align: center; color: #1e293b; transition: background 0.2s; font-family: 'Inter', sans-serif; font-weight: 500;}
+        .msg-options-menu button:hover { background: #f1f5f9; }
+        .msg-options-menu .delete-msg-btn { color: #ef4444; border-top: 1px solid #f1f5f9;}
+        
         .chat-time { font-size: 0.7rem; color: #94a3b8; margin-top: 4px; margin-right: 4px; }
         
         /* 하단 입력창 */
@@ -82,5 +101,5 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="chat.js?v=2"></script> </body>
+    <script src="chat.js?v=3"></script> </body>
 </html>

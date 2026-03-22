@@ -11,7 +11,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentUser = session ? session.user : null;
     });
 
-    // 💡 핵심: 현재 실행 중인 HTML 파일이 메인인지 채팅창인지 주소로 파악
+    // 💡 화면 밖 클릭 시 열려있는 말풍선 메뉴 닫기
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.msg-options-menu.show').forEach(menu => menu.classList.remove('show'));
+    });
+
     const isChatPage = window.location.pathname.includes('chat.html');
 
     if (isChatPage) {
@@ -27,7 +31,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // 상단 뒤로가기 버튼: 메인 페이지의 해당 정산방으로 리턴
         const backBtn = document.getElementById('chat-back-btn');
         if (backBtn) {
             backBtn.addEventListener('click', () => {
@@ -66,27 +69,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (!chatFab) return;
 
-        // 기존 모달 열기 대신, 클릭하면 chat.html 로 새 창(페이지) 이동
         chatFab.addEventListener('click', () => {
             if (currentSettlementId) {
                 window.location.href = `chat.html?id=${currentSettlementId}`;
             }
         });
 
-        // 방 이동 감지 (main.js에서 방을 바꿀 때 URL이 바뀌는 것을 캐치)
         const originalReplaceState = history.replaceState;
         history.replaceState = function(...args) {
             originalReplaceState.apply(this, args);
             checkRoomChange();
         };
         window.addEventListener('popstate', checkRoomChange);
-        setTimeout(checkRoomChange, 800); // 초기 로딩 후 최초 확인 딜레이
+        setTimeout(checkRoomChange, 800);
 
         function checkRoomChange() {
             const urlParams = new URLSearchParams(window.location.search);
             const roomId = urlParams.get('id');
 
-            // 새 방에 입장한 경우
             if (roomId && roomId !== currentSettlementId) {
                 currentSettlementId = roomId;
                 unreadCount = 0;
@@ -95,7 +95,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
                 
-                // 백그라운드에서 메시지가 오는지 감시하여 뱃지 숫자만 올림
                 chatSubscription = supabaseClient
                     .channel(`chat_badge_${currentSettlementId}`)
                     .on('postgres_changes', {
@@ -104,7 +103,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         table: 'chat_messages',
                         filter: `settlement_id=eq.${currentSettlementId}`
                     }, (payload) => {
-                        // 내가 보낸 메시지가 아닐 때만 알림
                         if (currentUser && payload.new.user_id !== currentUser.id) {
                             unreadCount++;
                             updateBadge();
@@ -112,7 +110,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }).subscribe();
                     
             } else if (!roomId) {
-                // 방에서 나간 경우 버튼 숨김
                 currentSettlementId = null;
                 chatFab.classList.add('hidden');
                 if (chatSubscription) {
@@ -133,12 +130,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ==========================================
+    // 🚀 [추가] DB에 메시지 수정 및 삭제 요청 함수
+    // ==========================================
+    async function editMessageInDB(msgId, newContent) {
+        const { error } = await supabaseClient
+            .from('chat_messages')
+            .update({ content: newContent, is_edited: true })
+            .eq('id', msgId);
+        
+        if (error) {
+            console.error(error);
+            alert('메시지 수정에 실패했습니다.');
+        }
+    }
+
+    async function deleteMessageInDB(msgId) {
+        const { error } = await supabaseClient
+            .from('chat_messages')
+            .update({ is_deleted: true })
+            .eq('id', msgId);
+            
+        if (error) {
+            console.error(error);
+            alert('메시지 삭제에 실패했습니다.');
+        }
+    }
+
+    // ==========================================
     // 공통 채팅 함수 (chat.html 전용)
     // ==========================================
     async function loadMessages(container) {
+        // 🚀 조회 쿼리에 is_edited, is_deleted 추가
         const { data, error } = await supabaseClient
             .from('chat_messages')
-            .select(`id, content, created_at, user_id, profiles(nickname)`)
+            .select(`id, content, created_at, user_id, is_edited, is_deleted, profiles(nickname)`)
             .eq('settlement_id', currentSettlementId)
             .order('created_at', { ascending: true });
 
@@ -152,6 +177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function subscribeToMessages(container) {
         supabaseClient
             .channel(`chat_room_view_${currentSettlementId}`)
+            // 1. 새로운 메시지가 달렸을 때 (INSERT)
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
@@ -159,18 +185,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                 filter: `settlement_id=eq.${currentSettlementId}`
             }, async (payload) => {
                 const newMsg = payload.new;
-                
-                // 닉네임 가져오기 (실시간으로 누군가 메시지를 썼을 때)
-                const { data: profile } = await supabaseClient
-                    .from('profiles')
-                    .select('nickname')
-                    .eq('user_id', newMsg.user_id)
-                    .single();
-                    
+                const { data: profile } = await supabaseClient.from('profiles').select('nickname').eq('user_id', newMsg.user_id).single();
                 newMsg.profiles = profile || { nickname: '알 수 없음' };
                 appendMessageUI(newMsg, container);
                 scrollToBottom(container);
-            }).subscribe();
+            })
+            // 🚀 2. [추가] 누군가 메시지를 수정하거나 삭제했을 때 (UPDATE)
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'chat_messages',
+                filter: `settlement_id=eq.${currentSettlementId}`
+            }, async (payload) => {
+                const updatedMsg = payload.new;
+                const msgDiv = document.querySelector(`.chat-msg-wrapper[data-id="${updatedMsg.id}"]`);
+                if (msgDiv) {
+                    const { data: profile } = await supabaseClient.from('profiles').select('nickname').eq('user_id', updatedMsg.user_id).single();
+                    updatedMsg.profiles = profile || { nickname: '알 수 없음' };
+                    // 기존 말풍선의 내용만 갈아끼움
+                    renderMessageContent(msgDiv, updatedMsg, container);
+                }
+            })
+            .subscribe();
     }
 
     async function sendMessage(inputEl) {
@@ -187,21 +223,91 @@ document.addEventListener('DOMContentLoaded', async () => {
         }]);
     }
 
+    // 🚀 수정/삭제를 위해 구조 분리 (DOM 렌더링)
     function appendMessageUI(msg, container) {
+        const isMine = msg.user_id === currentUser.id;
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-msg-wrapper ${isMine ? 'mine' : 'other'}`;
+        msgDiv.dataset.id = msg.id; // 업데이트를 위해 ID 부여
+        
+        renderMessageContent(msgDiv, msg, container);
+        container.appendChild(msgDiv);
+    }
+
+    // 🚀 말풍선 내부 컨텐츠만 다시 그리는 함수 (수정/삭제 시 재활용)
+    function renderMessageContent(msgDiv, msg, container) {
+        msgDiv.innerHTML = ''; // 기존 내용 초기화
+        
         const isMine = msg.user_id === currentUser.id;
         const nickname = msg.profiles?.nickname || '알 수 없음';
         const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `chat-msg-wrapper ${isMine ? 'mine' : 'other'}`;
         
+        let contentHtml = msg.content;
+        let bubbleClass = 'chat-bubble';
+        let editedHtml = (msg.is_edited && !msg.is_deleted) ? `<span class="edited-tag">(수정됨)</span>` : '';
+
+        // 삭제된 메시지일 경우 처리
+        if (msg.is_deleted) {
+            contentHtml = '🚫 삭제된 메시지입니다.';
+            bubbleClass += ' deleted';
+            editedHtml = '';
+        }
+
         let html = '';
         if (!isMine) html += `<div class="chat-sender">${nickname}</div>`;
-        html += `<div class="chat-bubble">${msg.content}</div>`;
+        
+        html += `<div class="chat-content-wrapper">`;
+        
+        // 내 메시지이고 삭제되지 않은 경우에만 '수정/삭제' 메뉴 추가
+        if (isMine && !msg.is_deleted) {
+            html += `
+                <div class="msg-options-container">
+                    <button class="msg-options-btn"><i class="fas fa-ellipsis-v"></i></button>
+                    <div class="msg-options-menu">
+                        <button class="edit-msg-btn">수정</button>
+                        <button class="delete-msg-btn">삭제</button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        html += `<div class="${bubbleClass}">${contentHtml}${editedHtml}</div>`;
+        html += `</div>`;
         html += `<div class="chat-time">${timeStr}</div>`;
         
         msgDiv.innerHTML = html;
-        container.appendChild(msgDiv);
+
+        // 수정/삭제 버튼 이벤트 연결
+        if (isMine && !msg.is_deleted) {
+            const optBtn = msgDiv.querySelector('.msg-options-btn');
+            const menu = msgDiv.querySelector('.msg-options-menu');
+            const editBtn = msgDiv.querySelector('.edit-msg-btn');
+            const deleteBtn = msgDiv.querySelector('.delete-msg-btn');
+
+            optBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // 문서 클릭 이벤트로 전달되지 않게 막음
+                // 다른 열려있는 메뉴 모두 닫기
+                document.querySelectorAll('.msg-options-menu.show').forEach(m => {
+                    if (m !== menu) m.classList.remove('show');
+                });
+                menu.classList.toggle('show');
+            });
+
+            editBtn.addEventListener('click', () => {
+                menu.classList.remove('show');
+                const newContent = prompt('메시지를 수정하세요:', msg.content);
+                if (newContent !== null && newContent.trim() !== '' && newContent !== msg.content) {
+                    editMessageInDB(msg.id, newContent.trim());
+                }
+            });
+
+            deleteBtn.addEventListener('click', () => {
+                menu.classList.remove('show');
+                if (confirm('이 메시지를 삭제하시겠습니까?')) {
+                    deleteMessageInDB(msg.id);
+                }
+            });
+        }
     }
 
     function scrollToBottom(container) {
