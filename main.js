@@ -192,7 +192,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(loader) { if (isLoading) loader.classList.remove('hidden'); else loader.classList.add('hidden'); }
     }
 
-    // 🚀 [버그 수정] 로그인한 유저별로 브라우저 저장소 키를 분리하여 계정 간 강퇴 기록 공유 방지
     function getStorageKey(baseKey) {
         return currentUser ? `${baseKey}_${currentUser.id}` : baseKey;
     }
@@ -642,12 +641,17 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
 
-            supabaseClient.auth.onAuthStateChange((event, session) => {
+            // 🚀 [수정됨] 세션 새로고침 이벤트 시 닉네임을 유실하지 않도록 재요청 처리
+            supabaseClient.auth.onAuthStateChange(async (event, session) => {
                 if (event === 'SIGNED_OUT' && !guestRoomId) {
                     window.location.replace('login.html');
                 } else {
                     currentUser = session ? session.user : null;
-                    updateAuthUI();
+                    if (currentUser) {
+                        await checkAndRequireNickname(); // 여기서 닉네임을 DB에서 다시 가져옴
+                    } else {
+                        updateAuthUI();
+                    }
                     setupKickListener(); 
                 }
             });
@@ -1219,7 +1223,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             let rooms = getJoinedRooms();
             rooms = rooms.filter(id => id != settlementId);
             
-            // 🚀 [버그 수정 적용됨]
             localStorage.setItem(getStorageKey('joinedRooms'), JSON.stringify(rooms));
 
             showToast('방에서 성공적으로 나갔습니다.', 'success');
