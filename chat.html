@@ -16,13 +16,13 @@
         /* 채팅 전용 독립 CSS (기존 style.css 영향 안 받음) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        /* 모바일 최적화: 위아래 잘림 방지 및 스크롤 고정 */
-        body, html { height: 100%; overflow: hidden; width: 100%; position: fixed; font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        /* 🚀 [수정] 모바일 가상 키보드 최적화: 스크롤 완벽 고정 */
+        body, html { height: 100%; overflow: hidden; width: 100%; position: fixed; font-family: 'Inter', sans-serif; background-color: #f1f5f9; touch-action: none; }
         
         .chat-page-container { 
             display: flex; flex-direction: column; 
-            /* JS에서 계산된 실제 높이 적용 (기본값 100vh) */
-            height: 100dvh; 
+            /* JS에서 실시간으로 꽂아주는 visualViewport 높이 사용 */
+            height: calc(var(--vh, 1vh) * 100); 
             width: 100vw;
             background: #fff; 
             position: relative;
@@ -36,7 +36,7 @@
                 box-shadow: 0 0 20px rgba(0,0,0,0.05); 
                 border-radius: 12px; margin-top: 1rem; margin-bottom: 1rem;
             }
-            body, html { position: static; overflow: visible; background-color: #e2e8f0;}
+            body, html { position: static; overflow: visible; background-color: #e2e8f0; touch-action: auto;}
         }
         
         /* 상단 헤더 (높이 고정) */
@@ -44,7 +44,7 @@
             display: flex; align-items: center; justify-content: space-between; 
             padding: 0.8rem 1.5rem; background: #6366f1; color: white; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10;
-            height: 65px; flex-shrink: 0; /* 🚀 인원수 표시를 위해 헤더 높이 살짝 늘림 */
+            height: 65px; flex-shrink: 0; 
         }
         .chat-page-header h2 { margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 700;}
         .back-btn { background: none; border: none; color: white; font-size: 1.3rem; cursor: pointer; padding: 0.5rem; margin-left: -0.5rem; transition: opacity 0.2s; }
@@ -52,10 +52,10 @@
         
         /* 메시지 영역 (자동 늘어남) */
         .chat-messages-container { 
-            flex: 1; padding: 1rem; overflow-y: auto; 
+            flex: 1; padding: 1rem; overflow-y: auto; overflow-x: hidden;
             display: flex; flex-direction: column; gap: 0.8rem; 
             background: #f8fafc;
-            -webkit-overflow-scrolling: touch; /* 모바일 부드러운 스크롤 */
+            -webkit-overflow-scrolling: touch; 
         }
         
         .chat-msg-wrapper { display: flex; flex-direction: column; max-width: 80%; position: relative; }
@@ -89,7 +89,6 @@
             padding: 0.7rem; background: white; border-top: 1px solid #e2e8f0; 
             display: flex; gap: 0.6rem; align-items: center;
             height: 60px; flex-shrink: 0;
-            padding-bottom: calc(0.7rem + env(safe-area-inset-bottom)); /* 모바일 하단 여백 대응 */
         }
         #chat-input { 
             flex: 1; padding: 0.65rem 1rem; border: 1px solid #e2e8f0; 
@@ -173,7 +172,8 @@
                 </span>
             </div>
 
-            <div style="width: 32px;"></div> </header>
+            <div style="width: 32px;"></div>
+        </header>
         
         <div id="chat-messages" class="chat-messages-container">
             </div>
@@ -218,6 +218,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="chat.js?v=5"></script>
+    <script src="chat.js?v=6"></script>
 </body>
 </html>

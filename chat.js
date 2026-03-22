@@ -11,21 +11,40 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentUser = session ? session.user : null;
     });
 
-    // 모바일 최적화 및 커스텀 모달 제어 전역 로직
+    const chatMessages = document.getElementById('chat-messages');
+
+    // ==========================================
+    // 🚀 [수정됨] 모바일 가상 키보드 최적화 로직 (visualViewport 사용)
+    // ==========================================
     const setVh = () => {
-        const vh = window.innerHeight * 0.01;
-        document.documentElement.style.setProperty('--vh', `${vh}px`);
+        // visualViewport가 지원되면 키보드 제외 실제 높이 사용, 아니면 기본 innerHeight 사용
+        const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        
+        // CSS var(--vh) 변수 실시간 업데이트
+        document.documentElement.style.setProperty('--vh', `${viewportHeight * 0.01}px`);
+        
         const container = document.querySelector('.chat-page-container');
         if(container && window.innerWidth <= 600) {
-            container.style.height = `calc(var(--vh, 1vh) * 100)`;
+            container.style.height = `${viewportHeight}px`; // 높이 즉시 동기화
         } else if(container) {
             container.style.height = '100vh'; 
         }
+        
+        // 화면이 줄어들 때(키보드가 올라올 때) 채팅창 마지막을 볼 수 있도록 즉시 아래로 스크롤
+        if (chatMessages) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
     };
-    window.addEventListener('resize', setVh);
+
+    // 최신 모바일 브라우저 대응 (가상 키보드 감지 특화)
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', setVh);
+    } else {
+        window.addEventListener('resize', setVh);
+    }
     setVh(); 
 
-    const chatMessages = document.getElementById('chat-messages');
+    // 모달 DOM 제어
     const editModal = document.getElementById('edit-modal');
     const deleteModal = document.getElementById('delete-confirm-modal');
     const editTextarea = document.getElementById('edit-modal-textarea');
@@ -73,7 +92,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // 🚀 [수정됨] index.html에서 버튼이 없어서 에러가 나지 않도록 if문(안전장치) 추가
     const submitEditBtn = document.getElementById('submit-edit-modal-btn');
     if (submitEditBtn) {
         submitEditBtn.addEventListener('click', () => {
@@ -85,7 +103,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // 🚀 [수정됨] index.html에서 버튼이 없어서 에러가 나지 않도록 if문(안전장치) 추가
     const submitDeleteBtn = document.getElementById('submit-delete-modal-btn');
     if (submitDeleteBtn) {
         submitDeleteBtn.addEventListener('click', () => {
@@ -348,7 +365,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         let html = '';
-        // 🚀 카카오톡처럼 내 메시지는 내 닉네임을 표시하지 않음
         if (!isMine) html += `<div class="chat-sender">${nickname}</div>`;
         
         html += `<div class="chat-content-wrapper">`;
