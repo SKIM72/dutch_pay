@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentUser = null; 
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
-    const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD']; // 🚀 6개 통화 추가
+    const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
 
     // --- Element References ---
     const languageSwitcher = document.getElementById('language-switcher');
@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (isNaN(num)) return '0';
         let decimals = 2;
         if (typeof decimalsOrCurrency === 'string') {
-            if (['KRW', 'JPY', 'TWD'].includes(decimalsOrCurrency)) decimals = 0; // 🚀 대만 달러 소수점 제외 추가
+            if (['KRW', 'JPY', 'TWD'].includes(decimalsOrCurrency)) decimals = 0; 
             else decimals = 2;
         } else {
             decimals = decimalsOrCurrency;
@@ -192,31 +192,36 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(loader) { if (isLoading) loader.classList.remove('hidden'); else loader.classList.add('hidden'); }
     }
 
+    // 🚀 [버그 수정] 로그인한 유저별로 브라우저 저장소 키를 분리하여 계정 간 강퇴 기록 공유 방지
+    function getStorageKey(baseKey) {
+        return currentUser ? `${baseKey}_${currentUser.id}` : baseKey;
+    }
+
     function getJoinedRooms() { 
-        try { return JSON.parse(localStorage.getItem('joinedRooms') || '[]'); } 
-        catch (e) { localStorage.removeItem('joinedRooms'); return []; }
+        try { return JSON.parse(localStorage.getItem(getStorageKey('joinedRooms')) || '[]'); } 
+        catch (e) { localStorage.removeItem(getStorageKey('joinedRooms')); return []; }
     }
     
     function saveJoinedRoom(roomId) {
         let rooms = getJoinedRooms();
         if (!rooms.includes(roomId)) {
             rooms.push(roomId);
-            localStorage.setItem('joinedRooms', JSON.stringify(rooms));
+            localStorage.setItem(getStorageKey('joinedRooms'), JSON.stringify(rooms));
         }
     }
 
     function banRoom(roomId) {
-        let banned = JSON.parse(localStorage.getItem('bannedRooms') || '[]');
+        let banned = JSON.parse(localStorage.getItem(getStorageKey('bannedRooms')) || '[]');
         if (!banned.includes(String(roomId))) banned.push(String(roomId));
-        localStorage.setItem('bannedRooms', JSON.stringify(banned));
+        localStorage.setItem(getStorageKey('bannedRooms'), JSON.stringify(banned));
         
         let rooms = getJoinedRooms();
         rooms = rooms.filter(id => String(id) !== String(roomId));
-        localStorage.setItem('joinedRooms', JSON.stringify(rooms));
+        localStorage.setItem(getStorageKey('joinedRooms'), JSON.stringify(rooms));
     }
 
     function isBanned(roomId) {
-        let banned = JSON.parse(localStorage.getItem('bannedRooms') || '[]');
+        let banned = JSON.parse(localStorage.getItem(getStorageKey('bannedRooms')) || '[]');
         return banned.includes(String(roomId));
     }
 
@@ -332,7 +337,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     iconHtml = `<i class="fas fa-envelope" style="color: var(--primary); font-size: 1rem;"></i>`;
                 }
                 
-                // 이름 표시 로직: 닉네임이 있으면 닉네임, 없으면 이메일
                 const displayName = currentUser.nickname ? currentUser.nickname : currentUser.email;
 
                 userInfoDisplay.innerHTML = `${iconHtml} <span id="user-email-text" style="display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;">${displayName}</span>`;
@@ -1214,7 +1218,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             let rooms = getJoinedRooms();
             rooms = rooms.filter(id => id != settlementId);
-            localStorage.setItem('joinedRooms', JSON.stringify(rooms));
+            
+            // 🚀 [버그 수정 적용됨]
+            localStorage.setItem(getStorageKey('joinedRooms'), JSON.stringify(rooms));
 
             showToast('방에서 성공적으로 나갔습니다.', 'success');
             
@@ -1353,7 +1359,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { transfers, balances }; 
     }
 
-    // 🚀 수정: 언어 설정(currentLang)을 1순위로 평가하여 버튼을 표시하도록 완벽 수정
     function updateSummary() {
         if (!currentSettlement) return;
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
@@ -1803,7 +1808,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     }
                     
-                    // 🚀 [추가] 마이페이지 열릴 때 현재 닉네임 불러오기
                     const profileNewNickname = document.getElementById('profile-new-nickname');
                     const currentNicknameDisplay = document.getElementById('current-nickname-display');
                     
@@ -1820,7 +1824,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         
-        // 🚀 [추가] 마이페이지에서 닉네임 변경 버튼 클릭 시
         const submitChangeNicknameBtn = document.getElementById('submit-change-nickname-btn');
         if (submitChangeNicknameBtn) {
             submitChangeNicknameBtn.addEventListener('click', async () => {
@@ -1844,8 +1847,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     console.error(error);
                 } else {
                     showToast(getLocale('nicknameUpdated', '닉네임이 성공적으로 변경되었습니다.'), 'success');
-                    currentUser.nickname = newNickname; // 전역 변수 업데이트
-                    updateAuthUI(); // 화면 우측 상단 닉네임 반영
+                    currentUser.nickname = newNickname; 
+                    updateAuthUI(); 
                     
                     const currentNicknameDisplay = document.getElementById('current-nickname-display');
                     if (currentNicknameDisplay) {
@@ -2328,13 +2331,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // ==========================================
-    // [추가] 닉네임(프로필) 검사 및 저장 로직
+    // 닉네임(프로필) 검사 및 저장 로직
     // ==========================================
 
     async function checkAndRequireNickname() {
-        if (!currentUser) return; // 비로그인 상태면 패스
+        if (!currentUser) return; 
 
-        // profiles 테이블에서 내 닉네임 조회
         const { data, error } = await supabaseClient
             .from('profiles')
             .select('nickname')
@@ -2344,14 +2346,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const nicknameModal = document.getElementById('nickname-modal');
 
         if (error || !data) {
-            // 프로필이 없으면 강제 모달 띄우기
             if (nicknameModal) {
                 nicknameModal.classList.remove('hidden');
             }
         } else {
-            // 프로필이 있으면 내 닉네임을 전역 변수에 저장 (채팅할 때 사용)
             currentUser.nickname = data.nickname;
-            updateAuthUI(); // 화면 상단 닉네임 즉시 반영
+            updateAuthUI(); 
         }
     }
 
@@ -2368,7 +2368,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             setLoading(true);
 
-            // profiles 테이블에 유저 아이디와 닉네임 저장
             const { error } = await supabaseClient
                 .from('profiles')
                 .insert([{ user_id: currentUser.id, nickname: nickname }]);
@@ -2381,9 +2380,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 showToast(getLocale('nicknameUpdated', '반갑습니다! 닉네임이 설정되었습니다.'), 'success');
                 currentUser.nickname = nickname; 
-                updateAuthUI(); // 화면 우측 상단 닉네임 즉시 반영
+                updateAuthUI(); 
                 
-                // 모달 닫기
                 const nicknameModal = document.getElementById('nickname-modal');
                 if (nicknameModal) {
                     nicknameModal.classList.add('hidden');
@@ -2391,7 +2389,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
         
-        // 엔터키 지원
         nicknameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') submitNicknameBtn.click();
         });
