@@ -47,6 +47,18 @@
         #qr-scanner-modal.hidden {
             display: none !important;
         }
+
+        /* 🚀 [추가] 관리자용 체크박스가 길쭉해지는 현상 방지 전용 CSS */
+        input[type="checkbox"].admin-check {
+            width: auto !important;
+            appearance: auto !important;
+            -webkit-appearance: auto !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            transform: scale(1.3);
+            cursor: pointer;
+            box-shadow: none !important;
+        }
     </style>
 </head>
 <body>
@@ -417,7 +429,31 @@
                     </div>
                 </div>
 
-                <div id="password-change-section" class="form-grid-row" style="grid-template-columns: 1fr; margin-bottom: 1.5rem;">
+                <div id="admin-settings-section" class="hidden" style="margin-bottom: 1.5rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                    <label style="color: var(--danger); font-size: 0.9rem; font-weight: 600; margin-bottom: 0.8rem; display: block;"><i class="fas fa-shield-alt"></i> 관리자(슈퍼 계정) 전용 설정</label>
+                    <div style="display: flex; flex-direction: column; gap: 1rem; text-align: left; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; color: var(--text-main);">
+                            <input type="checkbox" id="admin-hide-list-toggle" class="admin-check"> 정산건 목록 숨기기
+                        </label>
+                        
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; color: var(--text-main);">
+                            <input type="checkbox" id="admin-auto-lock-toggle" class="admin-check"> 채팅방 1분 미사용 시 잠금
+                        </label>
+                        
+                        <div style="margin-left: 1.5rem; display: flex; gap: 0.5rem; align-items: center;">
+                            <input type="password" id="admin-lock-pin-input" placeholder="잠금 해제용 PIN 설정" style="flex: 1; padding: 0.5rem; font-size: 0.85rem;">
+                            <button id="admin-lock-pin-save-btn" class="btn-outline" style="padding: 0.5rem; font-size: 0.85rem;">저장</button>
+                        </div>
+                        
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; color: var(--text-main); margin-top: 0.5rem;">
+                            <input type="checkbox" id="admin-disguise-push-toggle" class="admin-check"> 푸시 알림 'SETTLE UP'으로 표시
+                        </label>
+
+                    </div>
+                </div>
+
+                <div id="password-change-section" class="form-grid-row" style="grid-template-columns: 1fr; margin-bottom: 1.5rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
                     <label style="color: var(--text-muted); font-size: 0.9rem; font-weight: 600;" data-i18n="changePassword">비밀번호 변경</label>
                     <input type="password" id="profile-new-password" data-i18n-placeholder="newPassword" style="margin-bottom: 0.5rem;">
                     <button id="submit-change-password-btn" data-i18n="changePassword">비밀번호 변경</button>
@@ -488,7 +524,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="main.js?v=50"></script>
-    <script src="chat.js?v=8"></script> 
+    <script src="main.js?v=52"></script>
+    <script src="chat.js?v=12"></script> 
 </body>
 </html>

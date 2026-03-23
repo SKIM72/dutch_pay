@@ -575,10 +575,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 🚀 [수정 유지] 목록 불러오기 버그 수정된 버전
     async function initialize() {
         try {
             setLoading(true);
+
+            if ("Notification" in window && Notification.permission === "default") {
+                Notification.requestPermission();
+            }
 
             const { data: { session } } = await supabaseClient.auth.getSession();
             currentUser = session ? session.user : null;
@@ -613,7 +616,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         await syncMemberDB(guestRoomId);
                     }
                     
-                    await loadData(); // 방 입장 시에도 전체 목록 무조건 불러오기
+                    await loadData(); 
                     
                     if (joinRoomBtn) joinRoomBtn.classList.add('hidden');
                 } else {
@@ -730,6 +733,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function renderSettlementList() {
         if(!settlementListContainer) return;
+        
+        if (currentUser && currentUser.email === 'eowert72@gmail.com' && localStorage.getItem('adminHideList') === 'true') {
+            settlementListContainer.innerHTML = `<div style="padding: 2.5rem 1rem; text-align: center; color: var(--text-muted);"><i class="fas fa-eye-slash" style="font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.5;"></i><p style="font-size: 0.9rem; font-weight: 600;">목록이 숨김 처리되었습니다.</p></div>`;
+            return;
+        }
         
         const query = settlementSearchInput ? settlementSearchInput.value.toLowerCase().trim() : '';
         let displaySettlements = settlements;
@@ -1759,7 +1767,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const userInfoDisplay = document.getElementById('user-info-display');
         if(userInfoDisplay) {
             userInfoDisplay.title = getLocale('myPage', '마이페이지');
-            userInfoDisplay.addEventListener('click', () => {
+            userInfoDisplay.addEventListener('click', async () => {
                 const profileModal = document.getElementById('profile-modal');
                 if(profileModal && currentUser) {
                     const providerInfo = document.getElementById('login-provider-info');
@@ -1789,6 +1797,41 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if(pwSection) {
                         if(isEmailLogin) pwSection.classList.remove('hidden');
                         else pwSection.classList.add('hidden');
+                    }
+
+                    const adminSection = document.getElementById('admin-settings-section');
+                    if (adminSection) {
+                        if (currentUser.email === 'eowert72@gmail.com') {
+                            adminSection.classList.remove('hidden');
+                            const hideListToggle = document.getElementById('admin-hide-list-toggle');
+                            const autoLockToggle = document.getElementById('admin-auto-lock-toggle');
+                            const disguisePushToggle = document.getElementById('admin-disguise-push-toggle');
+                            if(hideListToggle) hideListToggle.checked = localStorage.getItem('adminHideList') === 'true';
+                            if(autoLockToggle) autoLockToggle.checked = localStorage.getItem('adminAutoLock') === 'true';
+                            if(disguisePushToggle) disguisePushToggle.checked = localStorage.getItem('adminDisguisePush') === 'true';
+                            
+                            const adminLockPinInput = document.getElementById('admin-lock-pin-input');
+                            const adminLockPinSaveBtn = document.getElementById('admin-lock-pin-save-btn');
+                            
+                            // 🚀 [수정] 데이터베이스에서 PIN 불러와서 표시하기
+                            const { data: profileData } = await supabaseClient.from('profiles').select('admin_pin').eq('user_id', currentUser.id).single();
+                            if(adminLockPinInput) adminLockPinInput.value = profileData?.admin_pin || '';
+                            
+                            // 🚀 [수정] 데이터베이스에 PIN 저장하기
+                            if(adminLockPinSaveBtn) {
+                                adminLockPinSaveBtn.onclick = async () => {
+                                    const newPin = adminLockPinInput.value;
+                                    const { error } = await supabaseClient.from('profiles').update({ admin_pin: newPin }).eq('user_id', currentUser.id);
+                                    if(error) {
+                                        showToast('PIN 저장에 실패했습니다.', 'error');
+                                    } else {
+                                        showToast('잠금용 PIN이 안전하게 저장되었습니다.', 'success');
+                                    }
+                                };
+                            }
+                        } else {
+                            adminSection.classList.add('hidden');
+                        }
                     }
 
                     const linkGoogleBtn = document.getElementById('link-google-btn');
@@ -1829,6 +1872,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         
+        const hideListToggle = document.getElementById('admin-hide-list-toggle');
+        if (hideListToggle) hideListToggle.addEventListener('change', (e) => { 
+            localStorage.setItem('adminHideList', e.target.checked); 
+            renderSettlementList(); 
+        });
+        
+        const autoLockToggle = document.getElementById('admin-auto-lock-toggle');
+        if (autoLockToggle) autoLockToggle.addEventListener('change', (e) => {
+            localStorage.setItem('adminAutoLock', e.target.checked);
+        });
+        
+        const disguisePushToggle = document.getElementById('admin-disguise-push-toggle');
+        if (disguisePushToggle) disguisePushToggle.addEventListener('change', (e) => {
+            localStorage.setItem('adminDisguisePush', e.target.checked);
+        });
+
         const submitChangeNicknameBtn = document.getElementById('submit-change-nickname-btn');
         if (submitChangeNicknameBtn) {
             submitChangeNicknameBtn.addEventListener('click', async () => {
@@ -2334,10 +2393,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             refreshing = true;
         });
     }
-
-    // ==========================================
-    // 닉네임(프로필) 검사 및 저장 로직
-    // ==========================================
 
     async function checkAndRequireNickname() {
         if (!currentUser) return; 

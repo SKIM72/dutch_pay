@@ -13,7 +13,34 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const chatMessages = document.getElementById('chat-messages');
 
-    // 모바일 가상 키보드 최적화 로직
+    let totalRoomMembers = 0;
+    let memberReadTimes = {}; 
+
+    async function triggerPushNotification(roomId) {
+        if (!("Notification" in window) || Notification.permission !== "granted") return;
+        
+        const inThisChat = window.location.pathname.includes('chat.html') && currentSettlementId === roomId;
+        if (inThisChat && !document.hidden) return;
+
+        const isAdmin = currentUser && currentUser.email === 'eowert72@gmail.com';
+        const disguise = isAdmin && localStorage.getItem('adminDisguisePush') === 'true';
+
+        let title = "SETTLE UP";
+        let body = "새로운 메시지가 도착했습니다.";
+
+        if (!disguise) {
+            const { data } = await supabaseClient.from('settlements').select('title').eq('id', roomId).single();
+            if (data) {
+                title = data.title;
+                body = `새로운 메시지가 있습니다.`;
+            }
+        } else {
+            body = ""; 
+        }
+
+        new Notification(title, { body: body, icon: 'icon.png' });
+    }
+
     const setVh = () => {
         const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         document.documentElement.style.setProperty('--vh', `${viewportHeight * 0.01}px`);
@@ -37,7 +64,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     setVh(); 
 
-    // 하단 스크롤 버튼 감지 로직
+    let inactivityTimer = null;
+    function resetInactivityTimer() {
+        const lockOverlay = document.getElementById('chat-lock-overlay');
+        if (lockOverlay && !lockOverlay.classList.contains('hidden')) return; 
+
+        if (inactivityTimer) clearTimeout(inactivityTimer);
+        const isAdmin = currentUser && currentUser.email === 'eowert72@gmail.com';
+        const autoLock = localStorage.getItem('adminAutoLock') === 'true';
+        
+        if (isAdmin && autoLock) {
+            inactivityTimer = setTimeout(() => {
+                if (lockOverlay) lockOverlay.classList.remove('hidden');
+            }, 60000); 
+        }
+    }
+
     const scrollBottomBtn = document.getElementById('scroll-bottom-btn');
     if (chatMessages && scrollBottomBtn) {
         chatMessages.addEventListener('scroll', () => {
@@ -47,19 +89,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 scrollBottomBtn.classList.add('hidden');
             }
+            
+            if (scrollHeight - scrollTop - clientHeight <= 50) {
+                updateMyReadTime();
+            }
         });
 
         scrollBottomBtn.addEventListener('click', () => {
             chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+            updateMyReadTime();
         });
     }
 
-    // 모달 DOM 제어
     const editModal = document.getElementById('edit-modal');
     const deleteModal = document.getElementById('delete-confirm-modal');
     const editTextarea = document.getElementById('edit-modal-textarea');
     
-    // 🚀 [추가] 관리자 모달 변수 설정
     const adminConfirmModal = document.getElementById('admin-confirm-modal');
     const adminConfirmMsgDesc = document.getElementById('admin-confirm-msg-desc');
     let adminActionCallback = null;
@@ -80,7 +125,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (deleteModal) deleteModal.classList.add('show');
     };
 
-    // 🚀 [추가] 관리자 모달 열기 함수
     const openAdminConfirmModal = (message, callback) => {
         if (adminConfirmMsgDesc) adminConfirmMsgDesc.innerHTML = message;
         adminActionCallback = callback;
@@ -91,7 +135,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show'));
         targetMessageId = null;
         originalMessageContent = null;
-        adminActionCallback = null; // 🚀 콜백 초기화
+        adminActionCallback = null; 
         if (editTextarea) {
             editTextarea.blur();
             editTextarea.value = '';
@@ -136,7 +180,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // 🚀 [추가] 관리자 모달 확인 버튼 리스너
     const submitAdminConfirmBtn = document.getElementById('submit-admin-confirm-btn');
     if (submitAdminConfirmBtn) {
         submitAdminConfirmBtn.addEventListener('click', () => {
@@ -148,6 +191,71 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.addEventListener('click', () => {
         document.querySelectorAll('.msg-options-menu.show').forEach(menu => menu.classList.remove('show'));
     });
+
+    async function initReadReceipts() {
+        if (!currentSettlementId) return;
+
+        const { data, error } = await supabaseClient
+            .from('settlement_members')
+            .select('user_id, last_read_at')
+            .eq('settlement_id', currentSettlementId);
+
+        if (data) {
+            totalRoomMembers = data.length;
+            data.forEach(m => {
+                memberReadTimes[m.user_id] = new Date(m.last_read_at || 0).getTime();
+            });
+        }
+
+        supabaseClient.channel(`reads_${currentSettlementId}`)
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'settlement_members', 
+                filter: `settlement_id=eq.${currentSettlementId}` 
+            }, (payload) => {
+                if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+                    memberReadTimes[payload.new.user_id] = new Date(payload.new.last_read_at || 0).getTime();
+                } else if (payload.eventType === 'DELETE') {
+                    delete memberReadTimes[payload.old.user_id];
+                    totalRoomMembers--;
+                }
+                if (payload.eventType === 'INSERT') totalRoomMembers++;
+                
+                updateAllUnreadCounts();
+            }).subscribe();
+    }
+
+    async function updateMyReadTime() {
+        if (!currentUser || !currentSettlementId) return;
+        memberReadTimes[currentUser.id] = Date.now();
+        await supabaseClient.from('settlement_members')
+            .update({ last_read_at: new Date().toISOString() })
+            .eq('settlement_id', currentSettlementId)
+            .eq('user_id', currentUser.id);
+    }
+
+    function getUnreadCount(msgTimeStr) {
+        const msgTime = new Date(msgTimeStr).getTime();
+        let readCount = 0;
+        for (const uid in memberReadTimes) {
+            if (memberReadTimes[uid] >= msgTime) {
+                readCount++;
+            }
+        }
+        const unread = totalRoomMembers - readCount;
+        return unread > 0 ? unread : 0;
+    }
+
+    function updateAllUnreadCounts() {
+        document.querySelectorAll('.chat-msg-wrapper').forEach(msgDiv => {
+            const unreadEl = msgDiv.querySelector('.unread-count');
+            if (unreadEl && msgDiv.dataset.time) {
+                const count = getUnreadCount(msgDiv.dataset.time);
+                unreadEl.textContent = count > 0 ? count : '';
+            }
+        });
+    }
 
     const isChatPage = window.location.pathname.includes('chat.html');
 
@@ -168,6 +276,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
+        const lockBackBtn = document.getElementById('lock-back-btn');
+        if (lockBackBtn) {
+            lockBackBtn.addEventListener('click', () => {
+                window.location.href = `index.html?id=${currentSettlementId}`;
+            });
+        }
+
         const chatInput = document.getElementById('chat-input');
         const sendChatBtn = document.getElementById('send-chat-btn');
 
@@ -176,14 +291,69 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.location.href = 'login.html';
             return;
         }
+        
+        window.addEventListener('mousemove', resetInactivityTimer);
+        window.addEventListener('keydown', resetInactivityTimer);
+        window.addEventListener('touchstart', resetInactivityTimer);
+        window.addEventListener('scroll', resetInactivityTimer);
+        
+        const isAdmin = currentUser.email === 'eowert72@gmail.com';
+        const autoLock = localStorage.getItem('adminAutoLock') === 'true';
+        let dbAdminPin = '';
+
+        // 🚀 DB에서 안전하게 PIN 가져오기
+        if (isAdmin) {
+            const { data: profile } = await supabaseClient.from('profiles').select('admin_pin').eq('user_id', currentUser.id).single();
+            dbAdminPin = profile?.admin_pin || '';
+        }
+        
+        // 🚀 처음 로드 시에만 메시지를 불러오는 통합 함수
+        async function startChatSession() {
+            if (chatMessages && chatMessages.innerHTML.trim() === '') {
+                await initReadReceipts();
+                await loadMessages(chatMessages);
+                subscribeToMessages(chatMessages);
+                await updateMyReadTime();
+            }
+            resetInactivityTimer();
+        }
+
+        const lockOverlay = document.getElementById('chat-lock-overlay');
+        const unlockBtn = document.getElementById('unlock-chat-btn');
+        const unlockInput = document.getElementById('unlock-password-input');
+        
+        if (unlockBtn && unlockInput) {
+            unlockBtn.addEventListener('click', () => {
+                const pwd = unlockInput.value;
+                if (!pwd) return;
+                
+                // 🚀 DB에 저장된 PIN과 검증
+                if (pwd === dbAdminPin) {
+                    if(lockOverlay) lockOverlay.classList.add('hidden');
+                    unlockInput.value = '';
+                    startChatSession(); // 해제 성공 시 메시지 표시
+                } else {
+                    alert('잠금 해제 PIN이 일치하지 않습니다.');
+                }
+            });
+            unlockInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') unlockBtn.click();
+            });
+        }
+
+        // 🚀 [핵심] 잠금 설정이 켜져 있으면 메시지를 불러오지 않고 잠금 화면부터 띄움 (찰나의 내용 유출 방지)
+        if (isAdmin && autoLock) {
+            if(lockOverlay) lockOverlay.classList.remove('hidden');
+        } else {
+            startChatSession(); // 잠금 설정이 꺼져있거나 일반 유저면 즉시 로드
+        }
 
         const adminClearBtn = document.getElementById('admin-clear-chat-btn');
-        if (currentUser.email === 'eowert72@gmail.com') {
+        if (isAdmin) {
             if (adminClearBtn) adminClearBtn.classList.remove('hidden');
         }
 
         if (adminClearBtn) {
-            // 🚀 [수정] confirm() 대신 커스텀 모달 호출
             adminClearBtn.addEventListener('click', () => {
                 openAdminConfirmModal(
                     '이 채팅방의 모든 대화 내역을 화면에서 즉시 삭제하시겠습니까?<br><span style="font-size:0.8rem; color:#64748b; font-weight:normal;">(데이터베이스에는 기록이 보존됩니다.)</span>',
@@ -203,9 +373,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 );
             });
         }
-
-        await loadMessages(chatMessages);
-        subscribeToMessages(chatMessages);
 
         const onlineCountEl = document.getElementById('online-count');
         const presenceChannel = supabaseClient.channel(`presence_room_${currentSettlementId}`);
@@ -241,7 +408,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
     } else {
-        // [기존 페이지] index.html 로직 (전체 유지)
         const chatFab = document.getElementById('chat-fab');
         const unreadBadge = document.getElementById('chat-unread-badge');
         let chatSubscription = null;
@@ -287,6 +453,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             if(!payload.new.is_hidden_admin) {
                                 unreadCount++;
                                 updateBadge();
+                                triggerPushNotification(payload.new.settlement_id);
                             }
                         }
                     }).subscribe();
@@ -311,10 +478,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // ==========================================
-    // 공통 함수 (전체 유지)
-    // ==========================================
-    
     async function editMessageInDB(msgId, newContent) {
         const { error } = await supabaseClient
             .from('chat_messages')
@@ -371,7 +534,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const { data: profile } = await supabaseClient.from('profiles').select('nickname').eq('user_id', newMsg.user_id).single();
                     newMsg.profiles = profile || { nickname: '알 수 없음' };
                     appendMessageUI(newMsg, container);
-                    scrollToBottom(container);
+                    
+                    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 100) {
+                        scrollToBottom(container);
+                        updateMyReadTime();
+                    }
+                    
+                    if (newMsg.user_id !== currentUser.id) {
+                        triggerPushNotification(newMsg.settlement_id);
+                    }
                 }
             })
             .on('postgres_changes', {
@@ -407,6 +578,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             user_id: currentUser.id,
             content: content
         }]);
+        
+        updateMyReadTime();
     }
 
     function appendMessageUI(msg, container) {
@@ -414,6 +587,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const msgDiv = document.createElement('div');
         msgDiv.className = `chat-msg-wrapper ${isMine ? 'mine' : 'other'}`;
         msgDiv.dataset.id = msg.id;
+        msgDiv.dataset.time = msg.created_at; 
         
         renderMessageContent(msgDiv, msg, container);
         container.appendChild(msgDiv);
@@ -435,6 +609,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             editedHtml = '';
         }
 
+        const unreadCount = getUnreadCount(msg.created_at);
+        const timeWrapperHtml = `
+            <div class="chat-time-wrapper" style="align-items: ${isMine ? 'flex-end' : 'flex-start'};">
+                <span class="unread-count">${unreadCount > 0 ? unreadCount : ''}</span>
+                <span class="chat-time" style="margin:0;">${timeStr}</span>
+            </div>
+        `;
+
         let html = '';
         if (!isMine) html += `<div class="chat-sender">${nickname}</div>`;
         
@@ -443,29 +625,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         const showMenuOptions = canEditOrDelete || isAdmin;
 
         html += `<div class="chat-content-wrapper">`;
-        if (showMenuOptions) {
-            html += `
-                <div class="msg-options-container">
-                    <div class="msg-options-menu">`;
-            
-            if (canEditOrDelete) {
-                html += `<button class="edit-msg-btn">수정</button>`;
-                html += `<button class="delete-msg-btn">삭제</button>`;
+        if (isMine) {
+            if (showMenuOptions) {
+                html += `<div class="msg-options-container"><div class="msg-options-menu">`;
+                if (canEditOrDelete) {
+                    html += `<button class="edit-msg-btn">수정</button><button class="delete-msg-btn">삭제</button>`;
+                }
+                if (isAdmin) {
+                    html += `<button class="admin-hide-msg-btn" style="color:#10b981; border-top:1px solid #f1f5f9;"><i class="fas fa-eye-slash"></i> 강제숨김</button>`;
+                }
+                html += `</div><button class="msg-options-btn"><i class="fas fa-ellipsis-v"></i></button></div>`;
             }
-            
-            if (isAdmin) {
-                html += `<button class="admin-hide-msg-btn" style="color:#10b981; border-top:1px solid #f1f5f9;"><i class="fas fa-eye-slash"></i> 강제숨김</button>`;
+            html += timeWrapperHtml;
+            html += `<div class="${bubbleClass}">${contentHtml}${editedHtml}</div>`;
+        } else {
+            html += `<div class="${bubbleClass}">${contentHtml}${editedHtml}</div>`;
+            html += timeWrapperHtml;
+            if (showMenuOptions) {
+                html += `<div class="msg-options-container"><div class="msg-options-menu">`;
+                if (canEditOrDelete) {
+                    html += `<button class="edit-msg-btn">수정</button><button class="delete-msg-btn">삭제</button>`;
+                }
+                if (isAdmin) {
+                    html += `<button class="admin-hide-msg-btn" style="color:#10b981; border-top:1px solid #f1f5f9;"><i class="fas fa-eye-slash"></i> 강제숨김</button>`;
+                }
+                html += `</div><button class="msg-options-btn"><i class="fas fa-ellipsis-v"></i></button></div>`;
             }
-
-            html += `</div>
-                    <button class="msg-options-btn"><i class="fas fa-ellipsis-v"></i></button>
-                </div>
-            `;
         }
-        
-        html += `<div class="${bubbleClass}">${contentHtml}${editedHtml}</div>`;
         html += `</div>`;
-        html += `<div class="chat-time">${timeStr}</div>`;
         
         msgDiv.innerHTML = html;
 
@@ -501,7 +688,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             if(adminHideBtn) {
-                // 🚀 [수정] confirm() 대신 커스텀 모달 호출
                 adminHideBtn.addEventListener('click', () => {
                     menu.classList.remove('show');
                     openAdminConfirmModal(

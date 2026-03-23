@@ -16,6 +16,9 @@
         /* 채팅 전용 독립 CSS (기존 style.css 영향 안 받음) */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
+        /* 🚀 [해결] 이 한 줄이 없어서 자바스크립트가 화면을 숨기지 못하고 있었습니다! */
+        .hidden { display: none !important; }
+        
         /* 모바일 최적화: 위아래 잘림 방지 및 스크롤 고정 */
         body, html { height: 100%; overflow: hidden; width: 100%; position: fixed; font-family: 'Inter', sans-serif; background-color: #f1f5f9; touch-action: none; }
         
@@ -84,7 +87,10 @@
         .msg-options-menu button:hover { background: #f1f5f9; }
         .msg-options-menu .delete-msg-btn { color: #ef4444; border-top: 1px solid #f1f5f9;}
         
-        .chat-time { font-size: 0.68rem; color: #cbd5e1; margin-top: 3px; margin-right: 4px; }
+        /* 읽음 표시 및 시간 그룹 CSS (카카오톡 스타일) */
+        .chat-time-wrapper { display: flex; flex-direction: column; margin: 0 4px; margin-bottom: 2px; }
+        .unread-count { font-size: 0.7rem; color: #facc15; font-weight: 700; height: 12px; }
+        .chat-time { font-size: 0.68rem; color: #cbd5e1; margin-top: 2px; }
         
         /* 하단 입력창 (높이 고정) */
         .chat-input-area { 
@@ -210,6 +216,15 @@
             <input type="text" id="chat-input" placeholder="메시지를 입력하세요..." autocomplete="off">
             <button id="send-chat-btn"><i class="fas fa-paper-plane"></i></button>
         </div>
+
+        <div id="chat-lock-overlay" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(241, 245, 249, 0.98); backdrop-filter: blur(10px); z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <button id="lock-back-btn" style="position: absolute; top: 1.5rem; left: 1.5rem; background: none; border: none; font-size: 1.5rem; color: #64748b; cursor: pointer; transition: color 0.2s;"><i class="fas fa-arrow-left"></i></button>
+            
+            <i class="fas fa-lock" style="font-size: 3.5rem; color: #6366f1; margin-bottom: 1.5rem;"></i>
+            <h2 style="margin-bottom: 1.5rem; color: #1e293b; font-size: 1.3rem;">채팅방 잠금</h2>
+            <input type="password" id="unlock-password-input" placeholder="잠금 해제 PIN을 입력하세요" style="width: 80%; max-width: 280px; padding: 0.8rem; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 1rem; text-align: center; font-size: 1rem; outline: none;">
+            <button id="unlock-chat-btn" style="width: 80%; max-width: 280px; padding: 0.8rem; background: #6366f1; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem;">잠금 해제</button>
+        </div>
     </div>
 
     <div id="edit-modal" class="modal-overlay">
@@ -261,6 +276,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="chat.js?v=8"></script>
+    <script src="chat.js?v=12"></script>
 </body>
 </html>
