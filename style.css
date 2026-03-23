@@ -77,7 +77,6 @@ header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-
 #calculator { animation: fadeIn 0.5s ease-out; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-/* 🚀 수정됨: 간격과 중앙 정렬을 완벽하게 맞춘 헤더 및 제목 그룹 */
 .settlement-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid var(--app-bg); flex-wrap: wrap; gap: 1rem;}
 .header-title-group { display: flex; align-items: center; gap: 0.5rem; justify-content: flex-start; flex-wrap: wrap; }
 .header-action-group { display: flex; gap: 0.5rem; flex-wrap: wrap;}
@@ -203,7 +202,15 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 .calc-result-numbers .text-primary-bold { color: var(--text-main); font-weight: 800; }
 
 .capture-mode { min-width: 800px !important; width: max-content !important; max-width: none !important; background: #ffffff !important; padding: 40px !important; box-sizing: border-box !important; }
-.capture-mode .header-action-group, .capture-mode #exchange-rate-info-btn, .capture-mode #expense-form-card, .capture-mode .card-header button, .capture-mode th:last-child, .capture-mode td:last-child { display: none !important; }
+/* 🚀 [수정됨] 이미지 저장 시 버튼들을 모두 숨기도록 선택자 추가 */
+.capture-mode .header-action-group, 
+.capture-mode #exchange-rate-info-btn, 
+.capture-mode #expense-form-card, 
+.capture-mode .card-header button, 
+.capture-mode th:last-child, 
+.capture-mode td:last-child, 
+.capture-mode #complete-settlement-btn, 
+.capture-mode .transfer-item > div:nth-child(2) { display: none !important; }
 .capture-mode i, .capture-mode .fas, .capture-mode .far, .capture-mode .fab { display: none !important; }
 .capture-mode .settlement-header { flex-direction: row !important; align-items: center !important; border-bottom: 2px solid #e2e8f0 !important; padding-bottom: 1.5rem !important; margin-bottom: 2rem !important; }
 .capture-mode #settlement-display { font-size: 2.2rem !important; white-space: nowrap !important; }
