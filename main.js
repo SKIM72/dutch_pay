@@ -575,6 +575,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // 🚀 [수정 유지] 목록 불러오기 버그 수정된 버전
     async function initialize() {
         try {
             setLoading(true);
@@ -610,8 +611,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         saveJoinedRoom(guestRoomId);
                         showToast('정산 방에 자동 참가되었습니다.', 'success');
                         await syncMemberDB(guestRoomId);
-                        await loadData(); 
                     }
+                    
+                    await loadData(); // 방 입장 시에도 전체 목록 무조건 불러오기
+                    
                     if (joinRoomBtn) joinRoomBtn.classList.add('hidden');
                 } else {
                     localStorage.setItem('pendingJoinRoomId', guestRoomId);
@@ -641,14 +644,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
 
-            // 🚀 [수정됨] 세션 새로고침 이벤트 시 닉네임을 유실하지 않도록 재요청 처리
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
                 if (event === 'SIGNED_OUT' && !guestRoomId) {
                     window.location.replace('login.html');
                 } else {
                     currentUser = session ? session.user : null;
                     if (currentUser) {
-                        await checkAndRequireNickname(); // 여기서 닉네임을 DB에서 다시 가져옴
+                        await checkAndRequireNickname(); 
                     } else {
                         updateAuthUI();
                     }
