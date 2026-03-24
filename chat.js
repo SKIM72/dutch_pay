@@ -13,12 +13,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const chatMessages = document.getElementById('chat-messages');
 
-    // 🚀 전역 변수 설정
-    let totalRoomMembers = 0;
+    // 🚀 전역 변수
+    let totalRoomMembers = 2; // 기본값, DB에서 정확히 덮어씀
     let memberReadTimes = {}; 
-    let presenceChannel = null; // 🚀 실시간 Broadcast 통신을 위한 채널 변수
+    let presenceChannel = null;
 
-    // 푸시 알림 기능 
     async function triggerPushNotification(roomId) {
         if (!("Notification" in window) || Notification.permission !== "granted") return;
         
@@ -197,10 +196,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.msg-options-menu.show').forEach(menu => menu.classList.remove('show'));
     });
 
-    // 🚀 [수정 완료] 읽음 정보 초기화 로직
+    // 🚀 [수정] 읽음 정보 초기화 로직: 방의 실제 참가자 명단(배열) 길이를 기준으로 완벽 계산
     async function initReadReceipts() {
         if (!currentSettlementId) return;
 
+        // 1. 방에 등록된 실제 참여자 수를 가져옴 (가장 정확)
+        const { data: settleData } = await supabaseClient.from('settlements').select('participants').eq('id', currentSettlementId).single();
+        if (settleData && settleData.participants) {
+            totalRoomMembers = settleData.participants.length;
+        }
+
+        // 2. 접속한 사람들의 마지막 읽은 시간 가져옴
         const { data, error } = await supabaseClient
             .from('settlement_members')
             .select('user_id, last_read_at')
@@ -214,10 +220,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     memberReadTimes[m.user_id] = newTime;
                 }
             });
-            totalRoomMembers = Object.keys(memberReadTimes).length;
         }
 
-        // DB 갱신 시 업데이트 (보조 역할)
+        // DB 갱신 시 업데이트
         supabaseClient.channel(`reads_db_${currentSettlementId}`)
             .on('postgres_changes', { 
                 event: '*', 
@@ -231,12 +236,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } else if (payload.eventType === 'DELETE') {
                     delete memberReadTimes[payload.old.user_id];
                 }
-                totalRoomMembers = Object.keys(memberReadTimes).length;
                 updateAllUnreadCounts();
             }).subscribe();
     }
 
-    // 🚀 [완벽 해결] Broadcast를 통해 읽음 처리를 0.1초만에 동기화
+    // 🚀 [수정] 내 읽음 시간 저장 시 무조건 밀어넣기(Upsert)로 저장 실패 원천 차단!
     async function updateMyReadTime() {
         if (!currentUser || !currentSettlementId) return;
         
@@ -251,7 +255,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const newReadTime = maxTime + 1000;
         memberReadTimes[currentUser.id] = newReadTime;
         
-        // 1. 같은 방에 접속해 있는 다른 기기로 '나 지금 메시지 읽음!' 신호 쏘기 (초고속)
         if (presenceChannel) {
             presenceChannel.send({
                 type: 'broadcast',
@@ -260,14 +263,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         
-        // 2. 내 화면 즉시 업데이트
         updateAllUnreadCounts();
 
-        // 3. 나중에 들어올 사람을 위해 DB에도 안전하게 저장
+        // 💡 가장 중요한 부분: DB에 강제 삽입(Upsert)하여 저장 누락 방지
         await supabaseClient.from('settlement_members')
-            .update({ last_read_at: new Date(newReadTime).toISOString() })
-            .eq('settlement_id', currentSettlementId)
-            .eq('user_id', currentUser.id);
+            .upsert({ 
+                settlement_id: currentSettlementId,
+                user_id: currentUser.id,
+                email: currentUser.email,
+                last_read_at: new Date(newReadTime).toISOString()
+            }, { onConflict: 'settlement_id,user_id' });
     }
 
     function getUnreadCount(msgTimeStr, senderId) {
@@ -275,9 +280,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         let readCount = 0;
         for (const uid in memberReadTimes) {
             if (uid === senderId) {
-                readCount++; // 보낸 사람은 무조건 읽음 처리
+                readCount++; 
             } else if (memberReadTimes[uid] >= msgTime) {
-                readCount++; // 남이 읽은 시간이 메시지 생성 시간 이후면 읽음 처리
+                readCount++; 
             }
         }
         const unread = totalRoomMembers - readCount;
@@ -285,12 +290,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function updateAllUnreadCounts() {
-        // 오직 '내'가 보낸 말풍선(mine)에만 숫자를 렌더링
-        document.querySelectorAll('.chat-msg-wrapper.mine').forEach(msgDiv => {
-            const unreadEl = msgDiv.querySelector('.unread-count');
-            if (unreadEl && msgDiv.dataset.time && msgDiv.dataset.uid) {
-                const count = getUnreadCount(msgDiv.dataset.time, msgDiv.dataset.uid);
-                unreadEl.textContent = count > 0 ? count : '';
+        document.querySelectorAll('.chat-msg-wrapper').forEach(msgDiv => {
+            if (msgDiv.classList.contains('mine')) {
+                const unreadEl = msgDiv.querySelector('.unread-count');
+                if (unreadEl && msgDiv.dataset.time && msgDiv.dataset.uid) {
+                    const count = getUnreadCount(msgDiv.dataset.time, msgDiv.dataset.uid);
+                    unreadEl.textContent = count > 0 ? count : '';
+                }
+            } else {
+                const unreadEl = msgDiv.querySelector('.unread-count');
+                if (unreadEl) unreadEl.textContent = '';
             }
         });
     }
@@ -307,16 +316,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        // 🚀 [수정] 뒤로가기 누를 때 반드시 내 읽음 처리를 DB에 완료하고 이동!
         const backBtn = document.getElementById('chat-back-btn');
         if (backBtn) {
-            backBtn.addEventListener('click', () => {
+            backBtn.addEventListener('click', async () => {
+                await updateMyReadTime(); 
                 window.location.href = `index.html?id=${currentSettlementId}`;
             });
         }
 
         const lockBackBtn = document.getElementById('lock-back-btn');
         if (lockBackBtn) {
-            lockBackBtn.addEventListener('click', () => {
+            lockBackBtn.addEventListener('click', async () => {
+                await updateMyReadTime();
                 window.location.href = `index.html?id=${currentSettlementId}`;
             });
         }
@@ -345,7 +357,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         
-        // 🚀 채널 초기화 (Presence + Broadcast 모두 허용)
         presenceChannel = supabaseClient.channel(`presence_room_${currentSettlementId}`, {
             config: { broadcast: { self: true } }
         });
@@ -435,14 +446,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                     onlineCountEl.textContent = uniqueUsers.size;
                 }
             })
-            // 🚀 [추가] 다른 기기에서 수신된 실시간 '읽음' Broadcast 처리!
             .on('broadcast', { event: 'read_update' }, (payload) => {
                 if (payload.payload && payload.payload.user_id) {
                     const { user_id, last_read_at } = payload.payload;
                     const existingTime = memberReadTimes[user_id] || 0;
                     if (last_read_at > existingTime) {
                         memberReadTimes[user_id] = last_read_at;
-                        updateAllUnreadCounts(); // 즉각적인 UI 반영
+                        updateAllUnreadCounts(); 
                     }
                 }
             })
@@ -618,11 +628,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     newMsg.profiles = profile || { nickname: '알 수 없음' };
                     appendMessageUI(newMsg, container);
                     
-                    // 🚀 [수정] 방 안에 있고 숨겨진 창이 아니면 무조건 내가 읽은 것으로 처리 후 신호 발송
-                    if (!document.hidden) {
+                    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 100) {
                         scrollToBottom(container);
                         updateMyReadTime();
-                    } else if (newMsg.user_id !== currentUser.id) {
+                    }
+                    
+                    if (newMsg.user_id !== currentUser.id) {
                         triggerPushNotification(newMsg.settlement_id);
                     }
                 }
