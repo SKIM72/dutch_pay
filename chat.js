@@ -13,9 +13,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const chatMessages = document.getElementById('chat-messages');
 
-    // 🚀 전역 변수
-    let totalRoomMembers = 2; // 기본값, DB에서 정확히 덮어씀
-    let memberReadTimes = {}; 
+    // 🚀 복잡했던 실시간 읽음 계산 전역 변수들(totalRoomMembers 등) 모두 깔끔하게 제거완료
     let presenceChannel = null;
 
     async function triggerPushNotification(roomId) {
@@ -196,112 +194,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.msg-options-menu.show').forEach(menu => menu.classList.remove('show'));
     });
 
-    // 🚀 [수정] 읽음 정보 초기화 로직: 방의 실제 참가자 명단(배열) 길이를 기준으로 완벽 계산
-    async function initReadReceipts() {
-        if (!currentSettlementId) return;
-
-        // 1. 방에 등록된 실제 참여자 수를 가져옴 (가장 정확)
-        const { data: settleData } = await supabaseClient.from('settlements').select('participants').eq('id', currentSettlementId).single();
-        if (settleData && settleData.participants) {
-            totalRoomMembers = settleData.participants.length;
-        }
-
-        // 2. 접속한 사람들의 마지막 읽은 시간 가져옴
-        const { data, error } = await supabaseClient
-            .from('settlement_members')
-            .select('user_id, last_read_at')
-            .eq('settlement_id', currentSettlementId);
-
-        if (data) {
-            data.forEach(m => {
-                const existingTime = memberReadTimes[m.user_id] || 0;
-                const newTime = new Date(m.last_read_at || 0).getTime();
-                if (newTime > existingTime) {
-                    memberReadTimes[m.user_id] = newTime;
-                }
-            });
-        }
-
-        // DB 갱신 시 업데이트
-        supabaseClient.channel(`reads_db_${currentSettlementId}`)
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'settlement_members', 
-                filter: `settlement_id=eq.${currentSettlementId}` 
-            }, (payload) => {
-                if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-                    const newTime = new Date(payload.new.last_read_at || 0).getTime();
-                    memberReadTimes[payload.new.user_id] = Math.max(memberReadTimes[payload.new.user_id] || 0, newTime);
-                } else if (payload.eventType === 'DELETE') {
-                    delete memberReadTimes[payload.old.user_id];
-                }
-                updateAllUnreadCounts();
-            }).subscribe();
-    }
-
-    // 🚀 [수정] 내 읽음 시간 저장 시 무조건 밀어넣기(Upsert)로 저장 실패 원천 차단!
+    // 🚀 메인 화면(바깥)의 알림 뱃지를 위해 '내 읽음 시간'만 간단하고 확실하게 DB에 저장
     async function updateMyReadTime() {
         if (!currentUser || !currentSettlementId) return;
         
-        let maxTime = Date.now();
-        document.querySelectorAll('.chat-msg-wrapper').forEach(msgDiv => {
-            if (msgDiv.dataset.time) {
-                const msgTime = new Date(msgDiv.dataset.time).getTime();
-                if (msgTime > maxTime) maxTime = msgTime;
-            }
-        });
-        
-        const newReadTime = maxTime + 1000;
-        memberReadTimes[currentUser.id] = newReadTime;
-        
-        if (presenceChannel) {
-            presenceChannel.send({
-                type: 'broadcast',
-                event: 'read_update',
-                payload: { user_id: currentUser.id, last_read_at: newReadTime }
-            });
-        }
-        
-        updateAllUnreadCounts();
-
-        // 💡 가장 중요한 부분: DB에 강제 삽입(Upsert)하여 저장 누락 방지
         await supabaseClient.from('settlement_members')
             .upsert({ 
                 settlement_id: currentSettlementId,
                 user_id: currentUser.id,
                 email: currentUser.email,
-                last_read_at: new Date(newReadTime).toISOString()
+                last_read_at: new Date().toISOString()
             }, { onConflict: 'settlement_id,user_id' });
-    }
-
-    function getUnreadCount(msgTimeStr, senderId) {
-        const msgTime = new Date(msgTimeStr).getTime();
-        let readCount = 0;
-        for (const uid in memberReadTimes) {
-            if (uid === senderId) {
-                readCount++; 
-            } else if (memberReadTimes[uid] >= msgTime) {
-                readCount++; 
-            }
-        }
-        const unread = totalRoomMembers - readCount;
-        return unread > 0 ? unread : 0;
-    }
-
-    function updateAllUnreadCounts() {
-        document.querySelectorAll('.chat-msg-wrapper').forEach(msgDiv => {
-            if (msgDiv.classList.contains('mine')) {
-                const unreadEl = msgDiv.querySelector('.unread-count');
-                if (unreadEl && msgDiv.dataset.time && msgDiv.dataset.uid) {
-                    const count = getUnreadCount(msgDiv.dataset.time, msgDiv.dataset.uid);
-                    unreadEl.textContent = count > 0 ? count : '';
-                }
-            } else {
-                const unreadEl = msgDiv.querySelector('.unread-count');
-                if (unreadEl) unreadEl.textContent = '';
-            }
-        });
     }
 
     const isChatPage = window.location.pathname.includes('chat.html');
@@ -316,7 +219,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        // 🚀 [수정] 뒤로가기 누를 때 반드시 내 읽음 처리를 DB에 완료하고 이동!
         const backBtn = document.getElementById('chat-back-btn');
         if (backBtn) {
             backBtn.addEventListener('click', async () => {
@@ -366,7 +268,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (isChatStarted) return;
             isChatStarted = true;
             if (chatMessages) {
-                await initReadReceipts();
                 await loadMessages(chatMessages);
                 subscribeToMessages(chatMessages);
                 await updateMyReadTime();
@@ -446,21 +347,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     onlineCountEl.textContent = uniqueUsers.size;
                 }
             })
-            .on('broadcast', { event: 'read_update' }, (payload) => {
-                if (payload.payload && payload.payload.user_id) {
-                    const { user_id, last_read_at } = payload.payload;
-                    const existingTime = memberReadTimes[user_id] || 0;
-                    if (last_read_at > existingTime) {
-                        memberReadTimes[user_id] = last_read_at;
-                        updateAllUnreadCounts(); 
-                    }
-                }
-            })
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
-                    await presenceChannel.track({
-                        user_id: currentUser.id
-                    });
+                    await presenceChannel.track({ user_id: currentUser.id });
+                    updateMyReadTime();
                 }
             });
 
@@ -704,11 +594,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             editedHtml = '';
         }
 
-        const unreadCount = getUnreadCount(msg.created_at, msg.user_id);
-        const displayUnread = (isMine && unreadCount > 0) ? unreadCount : '';
+        // 🚀 노란색 안 읽음 숫자 코드 완전 제거 (시간만 깔끔하게 표시)
         const timeWrapperHtml = `
             <div class="chat-time-wrapper" style="align-items: ${isMine ? 'flex-end' : 'flex-start'};">
-                <span class="unread-count">${displayUnread}</span>
                 <span class="chat-time" style="margin:0;">${timeStr}</span>
             </div>
         `;
