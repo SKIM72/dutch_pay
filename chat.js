@@ -13,8 +13,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const chatMessages = document.getElementById('chat-messages');
 
-    // 🚀 복잡했던 실시간 읽음 계산 전역 변수들(totalRoomMembers 등) 모두 깔끔하게 제거완료
+    // 전역 변수
+    let totalRoomMembers = 2; 
+    let memberReadTimes = {}; 
     let presenceChannel = null;
+    let isPresenceJoined = false; 
+
+    // 🚀 [추가] 타이핑 상태 관리를 위한 변수들
+    let currentlyTypingUsers = {};
+    let typingClearTimers = {};
+    let myTypingTimeout = null;
+    let isMeTyping = false;
+    let myNickname = '알 수 없음'; // 나중에 DB에서 가져와 저장
 
     async function triggerPushNotification(roomId) {
         if (!("Notification" in window) || Notification.permission !== "granted") return;
@@ -194,17 +204,123 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.msg-options-menu.show').forEach(menu => menu.classList.remove('show'));
     });
 
-    // 🚀 메인 화면(바깥)의 알림 뱃지를 위해 '내 읽음 시간'만 간단하고 확실하게 DB에 저장
+    // 🚀 [추가] 타이핑 UI 업데이트 함수
+    function updateTypingUI() {
+        const typingIndicator = document.getElementById('typing-indicator');
+        if (!typingIndicator) return;
+        
+        const names = Object.values(currentlyTypingUsers);
+        if (names.length === 0) {
+            typingIndicator.classList.add('hidden');
+            typingIndicator.textContent = '';
+        } else if (names.length === 1) {
+            typingIndicator.textContent = `${names[0]} 님이 채팅 입력중입니다...`;
+            typingIndicator.classList.remove('hidden');
+        } else {
+            typingIndicator.textContent = `${names.join(', ')} 님이 채팅 입력중입니다...`;
+            typingIndicator.classList.remove('hidden');
+        }
+    }
+
+    async function initReadReceipts() {
+        if (!currentSettlementId) return;
+
+        const { data: settleData } = await supabaseClient.from('settlements').select('participants').eq('id', currentSettlementId).single();
+        if (settleData && settleData.participants) {
+            totalRoomMembers = settleData.participants.length; 
+        }
+
+        const { data, error } = await supabaseClient
+            .from('settlement_members')
+            .select('user_id, last_read_at')
+            .eq('settlement_id', currentSettlementId);
+
+        if (data) {
+            data.forEach(m => {
+                const existingTime = memberReadTimes[m.user_id] || 0;
+                const newTime = new Date(m.last_read_at || 0).getTime();
+                if (newTime > existingTime) {
+                    memberReadTimes[m.user_id] = newTime;
+                }
+            });
+        }
+
+        supabaseClient.channel(`reads_db_${currentSettlementId}`)
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'settlement_members', 
+                filter: `settlement_id=eq.${currentSettlementId}` 
+            }, (payload) => {
+                if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+                    const newTime = new Date(payload.new.last_read_at || 0).getTime();
+                    memberReadTimes[payload.new.user_id] = Math.max(memberReadTimes[payload.new.user_id] || 0, newTime);
+                    updateAllUnreadCounts(); 
+                }
+            }).subscribe();
+    }
+
     async function updateMyReadTime() {
         if (!currentUser || !currentSettlementId) return;
         
+        let maxTime = Date.now();
+        document.querySelectorAll('.chat-msg-wrapper').forEach(msgDiv => {
+            if (msgDiv.dataset.time) {
+                const msgTime = new Date(msgDiv.dataset.time).getTime();
+                if (msgTime > maxTime) maxTime = msgTime;
+            }
+        });
+        
+        const newReadTime = maxTime + 1000;
+        memberReadTimes[currentUser.id] = newReadTime;
+        
+        if (isPresenceJoined && presenceChannel) {
+            presenceChannel.send({
+                type: 'broadcast',
+                event: 'read_update',
+                payload: { user_id: currentUser.id, last_read_at: newReadTime }
+            });
+        }
+        
+        updateAllUnreadCounts();
+
         await supabaseClient.from('settlement_members')
             .upsert({ 
                 settlement_id: currentSettlementId,
                 user_id: currentUser.id,
                 email: currentUser.email,
-                last_read_at: new Date().toISOString()
+                last_read_at: new Date(newReadTime).toISOString()
             }, { onConflict: 'settlement_id,user_id' });
+    }
+
+    function getUnreadCount(msgTimeStr, senderId) {
+        const msgTime = new Date(msgTimeStr).getTime();
+        let readCount = 0;
+        let senderCounted = false;
+
+        for (const uid in memberReadTimes) {
+            if (uid === senderId) {
+                readCount++; 
+                senderCounted = true;
+            } else if (memberReadTimes[uid] >= msgTime) {
+                readCount++; 
+            }
+        }
+        
+        if (!senderCounted) readCount++;
+
+        const unread = totalRoomMembers - readCount;
+        return unread > 0 ? unread : 0;
+    }
+
+    function updateAllUnreadCounts() {
+        document.querySelectorAll('.chat-msg-wrapper.mine').forEach(msgDiv => {
+            const unreadEl = msgDiv.querySelector('.unread-count');
+            if (unreadEl && msgDiv.dataset.time && msgDiv.dataset.uid) {
+                const count = getUnreadCount(msgDiv.dataset.time, msgDiv.dataset.uid);
+                unreadEl.textContent = count > 0 ? count : '';
+            }
+        });
     }
 
     const isChatPage = window.location.pathname.includes('chat.html');
@@ -252,10 +368,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isAdmin = currentUser.email.toLowerCase() === 'eowert72@gmail.com';
         const autoLock = localStorage.getItem('adminAutoLock') === 'true';
 
-        if (isAdmin) {
-            const { data: profile } = await supabaseClient.from('profiles').select('admin_pin').eq('user_id', currentUser.id).single();
-            if (profile && profile.admin_pin) {
-                dbAdminPin = profile.admin_pin;
+        // 🚀 [추가] 초기 로드 시 내 닉네임을 DB에서 가져와 타이핑 알림에 사용합니다.
+        const { data: myProfile } = await supabaseClient.from('profiles').select('nickname, admin_pin').eq('user_id', currentUser.id).single();
+        if (myProfile) {
+            myNickname = myProfile.nickname || currentUser.email.split('@')[0];
+            if (isAdmin && myProfile.admin_pin) {
+                dbAdminPin = myProfile.admin_pin;
             }
         }
         
@@ -268,6 +386,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (isChatStarted) return;
             isChatStarted = true;
             if (chatMessages) {
+                await initReadReceipts();
                 await loadMessages(chatMessages);
                 subscribeToMessages(chatMessages);
                 await updateMyReadTime();
@@ -347,14 +466,73 @@ document.addEventListener('DOMContentLoaded', async () => {
                     onlineCountEl.textContent = uniqueUsers.size;
                 }
             })
+            .on('broadcast', { event: 'read_update' }, (payload) => {
+                if (payload.payload && payload.payload.user_id) {
+                    const { user_id, last_read_at } = payload.payload;
+                    const existingTime = memberReadTimes[user_id] || 0;
+                    if (last_read_at > existingTime) {
+                        memberReadTimes[user_id] = last_read_at;
+                        updateAllUnreadCounts(); 
+                    }
+                }
+            })
+            // 🚀 [추가] 타이핑 Broadcast 수신부
+            .on('broadcast', { event: 'typing' }, (payload) => {
+                if (payload.payload && payload.payload.user_id) {
+                    const { user_id, nickname, is_typing } = payload.payload;
+                    if (user_id === currentUser.id) return; // 내가 치는 건 무시
+
+                    if (is_typing) {
+                        currentlyTypingUsers[user_id] = nickname;
+                        clearTimeout(typingClearTimers[user_id]);
+                        // 혹시라도 false 신호를 못 받았을 때를 대비한 3초 후 자동 제거 안전장치
+                        typingClearTimers[user_id] = setTimeout(() => {
+                            delete currentlyTypingUsers[user_id];
+                            updateTypingUI();
+                        }, 3000);
+                    } else {
+                        delete currentlyTypingUsers[user_id];
+                        clearTimeout(typingClearTimers[user_id]);
+                    }
+                    updateTypingUI();
+                }
+            })
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
+                    isPresenceJoined = true; 
                     await presenceChannel.track({ user_id: currentUser.id });
                     updateMyReadTime();
                 }
             });
 
         if (sendChatBtn && chatInput) {
+            // 🚀 [추가] 내가 타이핑을 시작하거나 멈출 때 이벤트 발생
+            chatInput.addEventListener('input', () => {
+                if (!isMeTyping) {
+                    isMeTyping = true;
+                    if (isPresenceJoined && presenceChannel) {
+                        presenceChannel.send({
+                            type: 'broadcast',
+                            event: 'typing',
+                            payload: { user_id: currentUser.id, nickname: myNickname, is_typing: true }
+                        });
+                    }
+                }
+                
+                // 타자 친 후 1.5초간 아무 입력이 없으면 타이핑 멈춤으로 간주
+                clearTimeout(myTypingTimeout);
+                myTypingTimeout = setTimeout(() => {
+                    isMeTyping = false;
+                    if (isPresenceJoined && presenceChannel) {
+                        presenceChannel.send({
+                            type: 'broadcast',
+                            event: 'typing',
+                            payload: { user_id: currentUser.id, nickname: myNickname, is_typing: false }
+                        });
+                    }
+                }, 1500); 
+            });
+
             sendChatBtn.addEventListener('click', () => sendMessage(chatInput));
             chatInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') sendMessage(chatInput);
@@ -555,6 +733,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         inputEl.value = '';
         inputEl.focus();
+        
+        // 🚀 [추가] 메시지를 보내면 즉시 '입력중 표시' 신호도 멈춤
+        if (isMeTyping) {
+            isMeTyping = false;
+            clearTimeout(myTypingTimeout);
+            if (isPresenceJoined && presenceChannel) {
+                presenceChannel.send({
+                    type: 'broadcast',
+                    event: 'typing',
+                    payload: { user_id: currentUser.id, nickname: myNickname, is_typing: false }
+                });
+            }
+        }
 
         await supabaseClient.from('chat_messages').insert([{
             settlement_id: currentSettlementId,
@@ -594,9 +785,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             editedHtml = '';
         }
 
-        // 🚀 노란색 안 읽음 숫자 코드 완전 제거 (시간만 깔끔하게 표시)
+        const unreadCount = getUnreadCount(msg.created_at, msg.user_id);
+        const displayUnread = (isMine && unreadCount > 0) ? unreadCount : '';
         const timeWrapperHtml = `
             <div class="chat-time-wrapper" style="align-items: ${isMine ? 'flex-end' : 'flex-start'};">
+                <span class="unread-count">${displayUnread}</span>
                 <span class="chat-time" style="margin:0;">${timeStr}</span>
             </div>
         `;

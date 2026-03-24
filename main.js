@@ -94,6 +94,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     const closeQrBtn = document.getElementById('close-qr-btn');
     let kickSubscription = null; 
 
+    // 🚀 [추가] 모바일 지원 푸시 알림 발송 함수 (main.js 메인 화면용)
+    async function triggerPushNotification(roomId) {
+        if (!("Notification" in window) || Notification.permission !== "granted") return;
+        
+        const inThisChat = window.location.pathname.includes('chat.html') && currentSettlementId === roomId;
+        if (inThisChat && !document.hidden) return;
+
+        const isAdmin = currentUser && currentUser.email.toLowerCase() === 'eowert72@gmail.com';
+        const disguise = isAdmin && localStorage.getItem('adminDisguisePush') === 'true';
+
+        let title = "SETTLE UP";
+        let body = "새로운 메시지가 도착했습니다.";
+
+        if (!disguise) {
+            const { data } = await supabaseClient.from('settlements').select('title').eq('id', roomId).single();
+            if (data) {
+                title = data.title;
+                body = `새로운 메시지가 있습니다.`;
+            }
+        } else {
+            body = ""; 
+        }
+
+        const options = { body: body, icon: 'icon.png' };
+        
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(function(registration) {
+                registration.showNotification(title, options);
+            }).catch(function() {
+                new Notification(title, options);
+            });
+        } else {
+            new Notification(title, options);
+        }
+    }
+
     const applyMobileUIFix = () => {
         const titleGroup = document.querySelector('.header-title-group');
         if (titleGroup) {
@@ -1813,11 +1849,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                             const adminLockPinInput = document.getElementById('admin-lock-pin-input');
                             const adminLockPinSaveBtn = document.getElementById('admin-lock-pin-save-btn');
                             
-                            // 🚀 [수정] 데이터베이스에서 PIN 불러와서 표시하기
                             const { data: profileData } = await supabaseClient.from('profiles').select('admin_pin').eq('user_id', currentUser.id).single();
                             if(adminLockPinInput) adminLockPinInput.value = profileData?.admin_pin || '';
                             
-                            // 🚀 [수정] 데이터베이스에 PIN 저장하기
                             if(adminLockPinSaveBtn) {
                                 adminLockPinSaveBtn.onclick = async () => {
                                     const newPin = adminLockPinInput.value;
