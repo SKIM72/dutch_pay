@@ -13,9 +13,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const chatMessages = document.getElementById('chat-messages');
 
-    // 읽음 표시 관리를 위한 전역 변수
+    // 🚀 전역 변수 설정
     let totalRoomMembers = 0;
     let memberReadTimes = {}; 
+    let presenceChannel = null; // 🚀 실시간 Broadcast 통신을 위한 채널 변수
 
     // 푸시 알림 기능 
     async function triggerPushNotification(roomId) {
@@ -43,7 +44,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         new Notification(title, { body: body, icon: 'icon.png' });
     }
 
-    // 모바일 가상 키보드 최적화 로직
     const setVh = () => {
         const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         document.documentElement.style.setProperty('--vh', `${viewportHeight * 0.01}px`);
@@ -197,6 +197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.msg-options-menu.show').forEach(menu => menu.classList.remove('show'));
     });
 
+    // 🚀 [수정 완료] 읽음 정보 초기화 로직
     async function initReadReceipts() {
         if (!currentSettlementId) return;
 
@@ -206,13 +207,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             .eq('settlement_id', currentSettlementId);
 
         if (data) {
-            totalRoomMembers = data.length;
             data.forEach(m => {
-                memberReadTimes[m.user_id] = new Date(m.last_read_at || 0).getTime();
+                const existingTime = memberReadTimes[m.user_id] || 0;
+                const newTime = new Date(m.last_read_at || 0).getTime();
+                if (newTime > existingTime) {
+                    memberReadTimes[m.user_id] = newTime;
+                }
             });
+            totalRoomMembers = Object.keys(memberReadTimes).length;
         }
 
-        supabaseClient.channel(`reads_${currentSettlementId}`)
+        // DB 갱신 시 업데이트 (보조 역할)
+        supabaseClient.channel(`reads_db_${currentSettlementId}`)
             .on('postgres_changes', { 
                 event: '*', 
                 schema: 'public', 
@@ -220,23 +226,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 filter: `settlement_id=eq.${currentSettlementId}` 
             }, (payload) => {
                 if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-                    memberReadTimes[payload.new.user_id] = new Date(payload.new.last_read_at || 0).getTime();
+                    const newTime = new Date(payload.new.last_read_at || 0).getTime();
+                    memberReadTimes[payload.new.user_id] = Math.max(memberReadTimes[payload.new.user_id] || 0, newTime);
                 } else if (payload.eventType === 'DELETE') {
                     delete memberReadTimes[payload.old.user_id];
-                    totalRoomMembers--;
                 }
-                if (payload.eventType === 'INSERT') totalRoomMembers++;
-                
+                totalRoomMembers = Object.keys(memberReadTimes).length;
                 updateAllUnreadCounts();
             }).subscribe();
     }
 
-    // 🚀 [수정] 클라이언트-서버 간 시차 문제를 완벽 해결하는 로직
+    // 🚀 [완벽 해결] Broadcast를 통해 읽음 처리를 0.1초만에 동기화
     async function updateMyReadTime() {
         if (!currentUser || !currentSettlementId) return;
         
         let maxTime = Date.now();
-        // 현재 화면에 렌더링된 모든 메시지의 시간을 스캔하여 가장 최신 시간을 추출
         document.querySelectorAll('.chat-msg-wrapper').forEach(msgDiv => {
             if (msgDiv.dataset.time) {
                 const msgTime = new Date(msgDiv.dataset.time).getTime();
@@ -244,27 +248,36 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
         
-        // 데이터베이스 시차 보정을 위해 가장 최신 메시지보다 +1초를 줘서 "확실하게 모두 읽음" 처리
-        memberReadTimes[currentUser.id] = maxTime + 1000;
+        const newReadTime = maxTime + 1000;
+        memberReadTimes[currentUser.id] = newReadTime;
         
+        // 1. 같은 방에 접속해 있는 다른 기기로 '나 지금 메시지 읽음!' 신호 쏘기 (초고속)
+        if (presenceChannel) {
+            presenceChannel.send({
+                type: 'broadcast',
+                event: 'read_update',
+                payload: { user_id: currentUser.id, last_read_at: newReadTime }
+            });
+        }
+        
+        // 2. 내 화면 즉시 업데이트
+        updateAllUnreadCounts();
+
+        // 3. 나중에 들어올 사람을 위해 DB에도 안전하게 저장
         await supabaseClient.from('settlement_members')
-            .update({ last_read_at: new Date(memberReadTimes[currentUser.id]).toISOString() })
+            .update({ last_read_at: new Date(newReadTime).toISOString() })
             .eq('settlement_id', currentSettlementId)
             .eq('user_id', currentUser.id);
-            
-        updateAllUnreadCounts();
     }
 
-    // 🚀 [수정] 발송자 판별 로직 추가 (보낸 사람은 무조건 +1)
     function getUnreadCount(msgTimeStr, senderId) {
         const msgTime = new Date(msgTimeStr).getTime();
         let readCount = 0;
         for (const uid in memberReadTimes) {
-            // 메시지를 보낸 본인은 당연히 읽은 상태이므로 카운트
             if (uid === senderId) {
-                readCount++;
+                readCount++; // 보낸 사람은 무조건 읽음 처리
             } else if (memberReadTimes[uid] >= msgTime) {
-                readCount++;
+                readCount++; // 남이 읽은 시간이 메시지 생성 시간 이후면 읽음 처리
             }
         }
         const unread = totalRoomMembers - readCount;
@@ -272,18 +285,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function updateAllUnreadCounts() {
-        document.querySelectorAll('.chat-msg-wrapper').forEach(msgDiv => {
-            // 오직 내가 보낸 메시지(mine)에만 읽음 숫자를 적용
-            if (msgDiv.classList.contains('mine')) {
-                const unreadEl = msgDiv.querySelector('.unread-count');
-                if (unreadEl && msgDiv.dataset.time && msgDiv.dataset.uid) {
-                    const count = getUnreadCount(msgDiv.dataset.time, msgDiv.dataset.uid);
-                    unreadEl.textContent = count > 0 ? count : '';
-                }
-            } else {
-                // 남이 보낸 메시지 영역은 항상 비워둠
-                const unreadEl = msgDiv.querySelector('.unread-count');
-                if (unreadEl) unreadEl.textContent = '';
+        // 오직 '내'가 보낸 말풍선(mine)에만 숫자를 렌더링
+        document.querySelectorAll('.chat-msg-wrapper.mine').forEach(msgDiv => {
+            const unreadEl = msgDiv.querySelector('.unread-count');
+            if (unreadEl && msgDiv.dataset.time && msgDiv.dataset.uid) {
+                const count = getUnreadCount(msgDiv.dataset.time, msgDiv.dataset.uid);
+                unreadEl.textContent = count > 0 ? count : '';
             }
         });
     }
@@ -337,6 +344,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 dbAdminPin = profile.admin_pin;
             }
         }
+        
+        // 🚀 채널 초기화 (Presence + Broadcast 모두 허용)
+        presenceChannel = supabaseClient.channel(`presence_room_${currentSettlementId}`, {
+            config: { broadcast: { self: true } }
+        });
         
         let isChatStarted = false;
         async function startChatSession() {
@@ -409,21 +421,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const onlineCountEl = document.getElementById('online-count');
-        const presenceChannel = supabaseClient.channel(`presence_room_${currentSettlementId}`);
         
         presenceChannel
             .on('presence', { event: 'sync' }, () => {
                 const newState = presenceChannel.presenceState();
-                
                 const uniqueUsers = new Set();
                 for (const key in newState) {
                     newState[key].forEach(user => {
                         uniqueUsers.add(user.user_id);
                     });
                 }
-                
                 if (onlineCountEl) {
                     onlineCountEl.textContent = uniqueUsers.size;
+                }
+            })
+            // 🚀 [추가] 다른 기기에서 수신된 실시간 '읽음' Broadcast 처리!
+            .on('broadcast', { event: 'read_update' }, (payload) => {
+                if (payload.payload && payload.payload.user_id) {
+                    const { user_id, last_read_at } = payload.payload;
+                    const existingTime = memberReadTimes[user_id] || 0;
+                    if (last_read_at > existingTime) {
+                        memberReadTimes[user_id] = last_read_at;
+                        updateAllUnreadCounts(); // 즉각적인 UI 반영
+                    }
                 }
             })
             .subscribe(async (status) => {
@@ -598,12 +618,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     newMsg.profiles = profile || { nickname: '알 수 없음' };
                     appendMessageUI(newMsg, container);
                     
-                    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 100) {
+                    // 🚀 [수정] 방 안에 있고 숨겨진 창이 아니면 무조건 내가 읽은 것으로 처리 후 신호 발송
+                    if (!document.hidden) {
                         scrollToBottom(container);
                         updateMyReadTime();
-                    }
-                    
-                    if (newMsg.user_id !== currentUser.id) {
+                    } else if (newMsg.user_id !== currentUser.id) {
                         triggerPushNotification(newMsg.settlement_id);
                     }
                 }
@@ -645,7 +664,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateMyReadTime();
     }
 
-    // 🚀 [수정] 렌더링 시 보낸 사람의 ID(uid)를 완벽하게 심어줌
     function appendMessageUI(msg, container) {
         const isMine = msg.user_id === currentUser.id;
         const msgDiv = document.createElement('div');
@@ -659,7 +677,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function renderMessageContent(msgDiv, msg, container) {
-        msgDiv.dataset.uid = msg.user_id; // 재렌더링 시 누락 방지용 확실한 갱신
+        msgDiv.dataset.uid = msg.user_id; 
         msgDiv.innerHTML = '';
         const isMine = msg.user_id === currentUser.id;
         const nickname = msg.profiles?.nickname || '알 수 없음';
@@ -675,7 +693,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             editedHtml = '';
         }
 
-        // 🚀 [수정] 렌더링 시 발송자 ID를 함께 넘겨 정확한 계산 수행
         const unreadCount = getUnreadCount(msg.created_at, msg.user_id);
         const displayUnread = (isMine && unreadCount > 0) ? unreadCount : '';
         const timeWrapperHtml = `
