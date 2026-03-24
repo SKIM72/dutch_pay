@@ -13,16 +13,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const chatMessages = document.getElementById('chat-messages');
 
+    // 읽음 표시 관리를 위한 전역 변수
     let totalRoomMembers = 0;
     let memberReadTimes = {}; 
 
+    // 푸시 알림 기능 
     async function triggerPushNotification(roomId) {
         if (!("Notification" in window) || Notification.permission !== "granted") return;
         
         const inThisChat = window.location.pathname.includes('chat.html') && currentSettlementId === roomId;
         if (inThisChat && !document.hidden) return;
 
-        const isAdmin = currentUser && currentUser.email === 'eowert72@gmail.com';
+        const isAdmin = currentUser && currentUser.email.toLowerCase() === 'eowert72@gmail.com';
         const disguise = isAdmin && localStorage.getItem('adminDisguisePush') === 'true';
 
         let title = "SETTLE UP";
@@ -41,6 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         new Notification(title, { body: body, icon: 'icon.png' });
     }
 
+    // 모바일 가상 키보드 최적화 로직
     const setVh = () => {
         const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
         document.documentElement.style.setProperty('--vh', `${viewportHeight * 0.01}px`);
@@ -64,16 +67,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     setVh(); 
 
+    let dbAdminPin = '';
     let inactivityTimer = null;
+
     function resetInactivityTimer() {
         const lockOverlay = document.getElementById('chat-lock-overlay');
         if (lockOverlay && !lockOverlay.classList.contains('hidden')) return; 
 
         if (inactivityTimer) clearTimeout(inactivityTimer);
-        const isAdmin = currentUser && currentUser.email === 'eowert72@gmail.com';
+        const isAdmin = currentUser && currentUser.email.toLowerCase() === 'eowert72@gmail.com';
         const autoLock = localStorage.getItem('adminAutoLock') === 'true';
         
-        if (isAdmin && autoLock) {
+        if (isAdmin && autoLock && dbAdminPin) {
             inactivityTimer = setTimeout(() => {
                 if (lockOverlay) lockOverlay.classList.remove('hidden');
             }, 60000); 
@@ -226,20 +231,39 @@ document.addEventListener('DOMContentLoaded', async () => {
             }).subscribe();
     }
 
+    // 🚀 [수정] 클라이언트-서버 간 시차 문제를 완벽 해결하는 로직
     async function updateMyReadTime() {
         if (!currentUser || !currentSettlementId) return;
-        memberReadTimes[currentUser.id] = Date.now();
+        
+        let maxTime = Date.now();
+        // 현재 화면에 렌더링된 모든 메시지의 시간을 스캔하여 가장 최신 시간을 추출
+        document.querySelectorAll('.chat-msg-wrapper').forEach(msgDiv => {
+            if (msgDiv.dataset.time) {
+                const msgTime = new Date(msgDiv.dataset.time).getTime();
+                if (msgTime > maxTime) maxTime = msgTime;
+            }
+        });
+        
+        // 데이터베이스 시차 보정을 위해 가장 최신 메시지보다 +1초를 줘서 "확실하게 모두 읽음" 처리
+        memberReadTimes[currentUser.id] = maxTime + 1000;
+        
         await supabaseClient.from('settlement_members')
-            .update({ last_read_at: new Date().toISOString() })
+            .update({ last_read_at: new Date(memberReadTimes[currentUser.id]).toISOString() })
             .eq('settlement_id', currentSettlementId)
             .eq('user_id', currentUser.id);
+            
+        updateAllUnreadCounts();
     }
 
-    function getUnreadCount(msgTimeStr) {
+    // 🚀 [수정] 발송자 판별 로직 추가 (보낸 사람은 무조건 +1)
+    function getUnreadCount(msgTimeStr, senderId) {
         const msgTime = new Date(msgTimeStr).getTime();
         let readCount = 0;
         for (const uid in memberReadTimes) {
-            if (memberReadTimes[uid] >= msgTime) {
+            // 메시지를 보낸 본인은 당연히 읽은 상태이므로 카운트
+            if (uid === senderId) {
+                readCount++;
+            } else if (memberReadTimes[uid] >= msgTime) {
                 readCount++;
             }
         }
@@ -249,10 +273,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function updateAllUnreadCounts() {
         document.querySelectorAll('.chat-msg-wrapper').forEach(msgDiv => {
-            const unreadEl = msgDiv.querySelector('.unread-count');
-            if (unreadEl && msgDiv.dataset.time) {
-                const count = getUnreadCount(msgDiv.dataset.time);
-                unreadEl.textContent = count > 0 ? count : '';
+            // 오직 내가 보낸 메시지(mine)에만 읽음 숫자를 적용
+            if (msgDiv.classList.contains('mine')) {
+                const unreadEl = msgDiv.querySelector('.unread-count');
+                if (unreadEl && msgDiv.dataset.time && msgDiv.dataset.uid) {
+                    const count = getUnreadCount(msgDiv.dataset.time, msgDiv.dataset.uid);
+                    unreadEl.textContent = count > 0 ? count : '';
+                }
+            } else {
+                // 남이 보낸 메시지 영역은 항상 비워둠
+                const unreadEl = msgDiv.querySelector('.unread-count');
+                if (unreadEl) unreadEl.textContent = '';
             }
         });
     }
@@ -297,19 +328,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.addEventListener('touchstart', resetInactivityTimer);
         window.addEventListener('scroll', resetInactivityTimer);
         
-        const isAdmin = currentUser.email === 'eowert72@gmail.com';
+        const isAdmin = currentUser.email.toLowerCase() === 'eowert72@gmail.com';
         const autoLock = localStorage.getItem('adminAutoLock') === 'true';
-        let dbAdminPin = '';
 
-        // 🚀 DB에서 안전하게 PIN 가져오기
         if (isAdmin) {
             const { data: profile } = await supabaseClient.from('profiles').select('admin_pin').eq('user_id', currentUser.id).single();
-            dbAdminPin = profile?.admin_pin || '';
+            if (profile && profile.admin_pin) {
+                dbAdminPin = profile.admin_pin;
+            }
         }
         
-        // 🚀 처음 로드 시에만 메시지를 불러오는 통합 함수
+        let isChatStarted = false;
         async function startChatSession() {
-            if (chatMessages && chatMessages.innerHTML.trim() === '') {
+            if (isChatStarted) return;
+            isChatStarted = true;
+            if (chatMessages) {
                 await initReadReceipts();
                 await loadMessages(chatMessages);
                 subscribeToMessages(chatMessages);
@@ -327,11 +360,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const pwd = unlockInput.value;
                 if (!pwd) return;
                 
-                // 🚀 DB에 저장된 PIN과 검증
                 if (pwd === dbAdminPin) {
                     if(lockOverlay) lockOverlay.classList.add('hidden');
                     unlockInput.value = '';
-                    startChatSession(); // 해제 성공 시 메시지 표시
+                    startChatSession(); 
                 } else {
                     alert('잠금 해제 PIN이 일치하지 않습니다.');
                 }
@@ -341,11 +373,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        // 🚀 [핵심] 잠금 설정이 켜져 있으면 메시지를 불러오지 않고 잠금 화면부터 띄움 (찰나의 내용 유출 방지)
-        if (isAdmin && autoLock) {
+        const isLockEnabled = isAdmin && autoLock && dbAdminPin;
+
+        if (isLockEnabled) {
             if(lockOverlay) lockOverlay.classList.remove('hidden');
         } else {
-            startChatSession(); // 잠금 설정이 꺼져있거나 일반 유저면 즉시 로드
+            if(lockOverlay) lockOverlay.classList.add('hidden'); 
+            startChatSession(); 
         }
 
         const adminClearBtn = document.getElementById('admin-clear-chat-btn');
@@ -429,7 +463,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         window.addEventListener('popstate', checkRoomChange);
         setTimeout(checkRoomChange, 800);
 
-        function checkRoomChange() {
+        async function checkRoomChange() {
             const urlParams = new URLSearchParams(window.location.search);
             const roomId = urlParams.get('id');
 
@@ -440,6 +474,35 @@ document.addEventListener('DOMContentLoaded', async () => {
                 chatFab.classList.remove('hidden');
 
                 if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
+                
+                if (!currentUser) {
+                    const { data: { session } } = await supabaseClient.auth.getSession();
+                    currentUser = session ? session.user : null;
+                }
+
+                if (currentUser) {
+                    const { data: memberData } = await supabaseClient
+                        .from('settlement_members')
+                        .select('last_read_at')
+                        .eq('settlement_id', currentSettlementId)
+                        .eq('user_id', currentUser.id)
+                        .single();
+                        
+                    const lastReadAt = memberData?.last_read_at || '1970-01-01T00:00:00Z';
+                    
+                    const { count } = await supabaseClient
+                        .from('chat_messages')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('settlement_id', currentSettlementId)
+                        .neq('user_id', currentUser.id)
+                        .neq('is_hidden_admin', true)
+                        .gt('created_at', lastReadAt);
+                        
+                    if (count !== null) {
+                        unreadCount = count;
+                        updateBadge();
+                    }
+                }
                 
                 chatSubscription = supabaseClient
                     .channel(`chat_badge_${currentSettlementId}`)
@@ -582,18 +645,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateMyReadTime();
     }
 
+    // 🚀 [수정] 렌더링 시 보낸 사람의 ID(uid)를 완벽하게 심어줌
     function appendMessageUI(msg, container) {
         const isMine = msg.user_id === currentUser.id;
         const msgDiv = document.createElement('div');
         msgDiv.className = `chat-msg-wrapper ${isMine ? 'mine' : 'other'}`;
         msgDiv.dataset.id = msg.id;
         msgDiv.dataset.time = msg.created_at; 
+        msgDiv.dataset.uid = msg.user_id; 
         
         renderMessageContent(msgDiv, msg, container);
         container.appendChild(msgDiv);
     }
 
     function renderMessageContent(msgDiv, msg, container) {
+        msgDiv.dataset.uid = msg.user_id; // 재렌더링 시 누락 방지용 확실한 갱신
         msgDiv.innerHTML = '';
         const isMine = msg.user_id === currentUser.id;
         const nickname = msg.profiles?.nickname || '알 수 없음';
@@ -609,10 +675,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             editedHtml = '';
         }
 
-        const unreadCount = getUnreadCount(msg.created_at);
+        // 🚀 [수정] 렌더링 시 발송자 ID를 함께 넘겨 정확한 계산 수행
+        const unreadCount = getUnreadCount(msg.created_at, msg.user_id);
+        const displayUnread = (isMine && unreadCount > 0) ? unreadCount : '';
         const timeWrapperHtml = `
             <div class="chat-time-wrapper" style="align-items: ${isMine ? 'flex-end' : 'flex-start'};">
-                <span class="unread-count">${unreadCount > 0 ? unreadCount : ''}</span>
+                <span class="unread-count">${displayUnread}</span>
                 <span class="chat-time" style="margin:0;">${timeStr}</span>
             </div>
         `;
@@ -620,7 +688,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let html = '';
         if (!isMine) html += `<div class="chat-sender">${nickname}</div>`;
         
-        const isAdmin = currentUser.email === 'eowert72@gmail.com';
+        const isAdmin = currentUser.email.toLowerCase() === 'eowert72@gmail.com';
         const canEditOrDelete = isMine && !msg.is_deleted;
         const showMenuOptions = canEditOrDelete || isAdmin;
 
