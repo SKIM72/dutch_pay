@@ -94,7 +94,41 @@ document.addEventListener('DOMContentLoaded', async () => {
     const closeQrBtn = document.getElementById('close-qr-btn');
     let kickSubscription = null; 
 
-    // 🚀 [추가] 모바일 지원 푸시 알림 발송 함수 (main.js 메인 화면용)
+    // 🚀 [핵심 추가] 인앱 브라우저 강제 탈출 및 CleanURL 적용 로직
+    function redirectToExternalBrowser(targetPage, isReplace = false) {
+        const userAgent = navigator.userAgent.toLowerCase();
+        
+        // 현재 도메인과 대상 페이지만 결합하여 카카오톡이 붙인 불필요한 찌꺼기 파라미터(CleanURL) 제거
+        let currentPath = window.location.pathname;
+        if(currentPath.endsWith('/')) currentPath += 'index.html'; 
+        const targetUrl = window.location.origin + currentPath.replace(/[^\/]*$/, targetPage);
+
+        if (userAgent.match(/kakaotalk|line|inapp|naver|instagram|facebook/i)) {
+            if (userAgent.match(/android/i)) {
+                // 안드로이드: 크롬 브라우저 강제 호출 (가장 확실함)
+                location.href = `intent://${targetUrl.replace(/^https?:\/\//i, '')}#Intent;scheme=https;package=com.android.chrome;end`;
+                return;
+            } else if (userAgent.match(/iphone|ipad|ipod/i)) {
+                if (userAgent.match(/kakaotalk/i)) {
+                    // iOS: 카카오톡 전용 외부 브라우저 호출 스킴 시도
+                    location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(targetUrl)}`;
+                    // 스킴이 작동하지 않을 경우를 대비한 수동 가이드 안내
+                    setTimeout(() => {
+                        showToast("구글 로그인을 위해 우측 하단 [ ⋮ ] 버튼을 눌러 'Safari로 열기'를 선택해 주세요.", "info");
+                    }, 1000);
+                    return;
+                }
+            }
+        }
+        
+        // 인앱 브라우저가 아니면 정상적으로 이동
+        if (isReplace) {
+            window.location.replace(targetPage);
+        } else {
+            window.location.href = targetPage;
+        }
+    }
+
     async function triggerPushNotification(roomId) {
         if (!("Notification" in window) || Notification.permission !== "granted") return;
         
@@ -384,16 +418,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // 🚀 [수정] 로그인 버튼 클릭 시 인앱브라우저 탈출 로직 적용
     async function handleAuthClick() {
         if (currentUser) { 
             if (await showConfirm(getLocale('logoutConfirm', '정말로 로그아웃 하시겠습니까?'))) {
                 setLoading(true); 
                 await supabaseClient.auth.signOut(); 
+                // 로그아웃은 현재 창에서 바로 처리
                 window.location.replace('login.html'); 
             }
         } 
         else { 
-            window.location.href = 'login.html'; 
+            redirectToExternalBrowser('login.html');
         }
     }
 
@@ -663,7 +699,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             } else {
                 if (!currentUser) {
-                    window.location.replace('login.html'); 
+                    // 🚀 [수정] 미로그인 상태에서 초기 로드 시 탈출 적용
+                    redirectToExternalBrowser('login.html', true); 
                     return; 
                 } else {
                     const pendingId = localStorage.getItem('pendingJoinRoomId');
@@ -685,7 +722,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
                 if (event === 'SIGNED_OUT' && !guestRoomId) {
-                    window.location.replace('login.html');
+                    // 🚀 [수정] 로그아웃 발생 시 탈출 적용
+                    redirectToExternalBrowser('login.html', true);
                 } else {
                     currentUser = session ? session.user : null;
                     if (currentUser) {
@@ -2019,6 +2057,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(mobileMenuBtn) mobileMenuBtn.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
         if(authBtn) authBtn.addEventListener('click', handleAuthClick); 
 
+        // 🚀 [추가] "무료로 시작하기" 버튼 등 다른 진입점에도 인앱 강제 탈출 적용
+        const landingStartBtn = document.getElementById('landing-start-btn') || document.querySelector('.landing-start-btn');
+        if (landingStartBtn) {
+            landingStartBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                redirectToExternalBrowser('login.html');
+            });
+        }
+
         if(settlementSearchInput) {
             settlementSearchInput.addEventListener('input', () => {
                 renderSettlementList();
@@ -2040,7 +2087,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!currentUser) { 
                 if (await showConfirm(getLocale('loginToSave', '내 목록에 저장하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?'))) {
                     localStorage.setItem('pendingJoinRoomId', currentSettlement.id);
-                    window.location.href = 'login.html';
+                    redirectToExternalBrowser('login.html');
                 }
                 return;
             }
