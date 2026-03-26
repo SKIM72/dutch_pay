@@ -13,18 +13,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const chatMessages = document.getElementById('chat-messages');
 
-    // 전역 변수
-    let totalRoomMembers = 2; 
-    let memberReadTimes = {}; 
     let presenceChannel = null;
     let isPresenceJoined = false; 
 
-    // 🚀 [추가] 타이핑 상태 관리를 위한 변수들
+    // 🚀 [복구 완료] 타이핑 상태 관리를 위한 변수들
     let currentlyTypingUsers = {};
     let typingClearTimers = {};
     let myTypingTimeout = null;
     let isMeTyping = false;
-    let myNickname = '알 수 없음'; // 나중에 DB에서 가져와 저장
+    let myNickname = '알 수 없음'; 
 
     async function triggerPushNotification(roomId) {
         if (!("Notification" in window) || Notification.permission !== "granted") return;
@@ -101,15 +98,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 scrollBottomBtn.classList.add('hidden');
             }
-            
-            if (scrollHeight - scrollTop - clientHeight <= 50) {
-                updateMyReadTime();
-            }
         });
 
         scrollBottomBtn.addEventListener('click', () => {
             chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
-            updateMyReadTime();
         });
     }
 
@@ -204,7 +196,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.msg-options-menu.show').forEach(menu => menu.classList.remove('show'));
     });
 
-    // 🚀 [추가] 타이핑 UI 업데이트 함수
+    // 🚀 [복구 완료] 타이핑 UI 업데이트 함수
     function updateTypingUI() {
         const typingIndicator = document.getElementById('typing-indicator');
         if (!typingIndicator) return;
@@ -222,105 +214,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    async function initReadReceipts() {
-        if (!currentSettlementId) return;
-
-        const { data: settleData } = await supabaseClient.from('settlements').select('participants').eq('id', currentSettlementId).single();
-        if (settleData && settleData.participants) {
-            totalRoomMembers = settleData.participants.length; 
-        }
-
-        const { data, error } = await supabaseClient
-            .from('settlement_members')
-            .select('user_id, last_read_at')
-            .eq('settlement_id', currentSettlementId);
-
-        if (data) {
-            data.forEach(m => {
-                const existingTime = memberReadTimes[m.user_id] || 0;
-                const newTime = new Date(m.last_read_at || 0).getTime();
-                if (newTime > existingTime) {
-                    memberReadTimes[m.user_id] = newTime;
-                }
-            });
-        }
-
-        supabaseClient.channel(`reads_db_${currentSettlementId}`)
-            .on('postgres_changes', { 
-                event: '*', 
-                schema: 'public', 
-                table: 'settlement_members', 
-                filter: `settlement_id=eq.${currentSettlementId}` 
-            }, (payload) => {
-                if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-                    const newTime = new Date(payload.new.last_read_at || 0).getTime();
-                    memberReadTimes[payload.new.user_id] = Math.max(memberReadTimes[payload.new.user_id] || 0, newTime);
-                    updateAllUnreadCounts(); 
-                }
-            }).subscribe();
-    }
-
+    // 메인 화면(바깥)의 알림 뱃지를 위해 '내 읽음 시간'만 간단하게 DB에 저장
     async function updateMyReadTime() {
         if (!currentUser || !currentSettlementId) return;
         
-        let maxTime = Date.now();
-        document.querySelectorAll('.chat-msg-wrapper').forEach(msgDiv => {
-            if (msgDiv.dataset.time) {
-                const msgTime = new Date(msgDiv.dataset.time).getTime();
-                if (msgTime > maxTime) maxTime = msgTime;
-            }
-        });
-        
-        const newReadTime = maxTime + 1000;
-        memberReadTimes[currentUser.id] = newReadTime;
-        
-        if (isPresenceJoined && presenceChannel) {
-            presenceChannel.send({
-                type: 'broadcast',
-                event: 'read_update',
-                payload: { user_id: currentUser.id, last_read_at: newReadTime }
-            });
-        }
-        
-        updateAllUnreadCounts();
-
         await supabaseClient.from('settlement_members')
             .upsert({ 
                 settlement_id: currentSettlementId,
                 user_id: currentUser.id,
                 email: currentUser.email,
-                last_read_at: new Date(newReadTime).toISOString()
+                last_read_at: new Date().toISOString()
             }, { onConflict: 'settlement_id,user_id' });
-    }
-
-    function getUnreadCount(msgTimeStr, senderId) {
-        const msgTime = new Date(msgTimeStr).getTime();
-        let readCount = 0;
-        let senderCounted = false;
-
-        for (const uid in memberReadTimes) {
-            if (uid === senderId) {
-                readCount++; 
-                senderCounted = true;
-            } else if (memberReadTimes[uid] >= msgTime) {
-                readCount++; 
-            }
-        }
-        
-        if (!senderCounted) readCount++;
-
-        const unread = totalRoomMembers - readCount;
-        return unread > 0 ? unread : 0;
-    }
-
-    function updateAllUnreadCounts() {
-        document.querySelectorAll('.chat-msg-wrapper.mine').forEach(msgDiv => {
-            const unreadEl = msgDiv.querySelector('.unread-count');
-            if (unreadEl && msgDiv.dataset.time && msgDiv.dataset.uid) {
-                const count = getUnreadCount(msgDiv.dataset.time, msgDiv.dataset.uid);
-                unreadEl.textContent = count > 0 ? count : '';
-            }
-        });
     }
 
     const isChatPage = window.location.pathname.includes('chat.html');
@@ -368,7 +272,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isAdmin = currentUser.email.toLowerCase() === 'eowert72@gmail.com';
         const autoLock = localStorage.getItem('adminAutoLock') === 'true';
 
-        // 🚀 [추가] 초기 로드 시 내 닉네임을 DB에서 가져와 타이핑 알림에 사용합니다.
+        // 🚀 [복구 완료] 초기 로드 시 내 닉네임을 DB에서 가져와 타이핑 알림에 사용
         const { data: myProfile } = await supabaseClient.from('profiles').select('nickname, admin_pin').eq('user_id', currentUser.id).single();
         if (myProfile) {
             myNickname = myProfile.nickname || currentUser.email.split('@')[0];
@@ -386,7 +290,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (isChatStarted) return;
             isChatStarted = true;
             if (chatMessages) {
-                await initReadReceipts();
                 await loadMessages(chatMessages);
                 subscribeToMessages(chatMessages);
                 await updateMyReadTime();
@@ -466,17 +369,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     onlineCountEl.textContent = uniqueUsers.size;
                 }
             })
-            .on('broadcast', { event: 'read_update' }, (payload) => {
-                if (payload.payload && payload.payload.user_id) {
-                    const { user_id, last_read_at } = payload.payload;
-                    const existingTime = memberReadTimes[user_id] || 0;
-                    if (last_read_at > existingTime) {
-                        memberReadTimes[user_id] = last_read_at;
-                        updateAllUnreadCounts(); 
-                    }
-                }
-            })
-            // 🚀 [추가] 타이핑 Broadcast 수신부
+            // 🚀 [복구 완료] 타이핑 Broadcast 수신부
             .on('broadcast', { event: 'typing' }, (payload) => {
                 if (payload.payload && payload.payload.user_id) {
                     const { user_id, nickname, is_typing } = payload.payload;
@@ -485,7 +378,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (is_typing) {
                         currentlyTypingUsers[user_id] = nickname;
                         clearTimeout(typingClearTimers[user_id]);
-                        // 혹시라도 false 신호를 못 받았을 때를 대비한 3초 후 자동 제거 안전장치
                         typingClearTimers[user_id] = setTimeout(() => {
                             delete currentlyTypingUsers[user_id];
                             updateTypingUI();
@@ -505,8 +397,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
 
+        // 🚀 [복구 완료] 채팅 입력 감지 및 Broadcast 발송부
         if (sendChatBtn && chatInput) {
-            // 🚀 [추가] 내가 타이핑을 시작하거나 멈출 때 이벤트 발생
             chatInput.addEventListener('input', () => {
                 if (!isMeTyping) {
                     isMeTyping = true;
@@ -519,7 +411,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 }
                 
-                // 타자 친 후 1.5초간 아무 입력이 없으면 타이핑 멈춤으로 간주
+                // 타자 친 후 1.5초간 아무 입력이 없으면 멈춤으로 간주
                 clearTimeout(myTypingTimeout);
                 myTypingTimeout = setTimeout(() => {
                     isMeTyping = false;
@@ -734,7 +626,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         inputEl.value = '';
         inputEl.focus();
         
-        // 🚀 [추가] 메시지를 보내면 즉시 '입력중 표시' 신호도 멈춤
+        // 🚀 [복구 완료] 메시지를 보내면 즉시 '입력중 표시' 신호 해제
         if (isMeTyping) {
             isMeTyping = false;
             clearTimeout(myTypingTimeout);
@@ -785,11 +677,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             editedHtml = '';
         }
 
-        const unreadCount = getUnreadCount(msg.created_at, msg.user_id);
-        const displayUnread = (isMine && unreadCount > 0) ? unreadCount : '';
         const timeWrapperHtml = `
             <div class="chat-time-wrapper" style="align-items: ${isMine ? 'flex-end' : 'flex-start'};">
-                <span class="unread-count">${displayUnread}</span>
                 <span class="chat-time" style="margin:0;">${timeStr}</span>
             </div>
         `;
