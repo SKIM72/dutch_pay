@@ -3,6 +3,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentUser = null;
     let currentSettlementId = null;
 
+    // 🚀 [추가] 다국어 지원 로직
+    let currentLang = localStorage.getItem('preferredLang') || 'ko';
+
+    function getLocale(key, fallbackText) {
+        if (typeof locales !== 'undefined' && locales[currentLang] && locales[currentLang][key]) {
+            return locales[currentLang][key];
+        }
+        return fallbackText || key;
+    }
+
+    function updateUI() {
+        if (typeof locales === 'undefined') return;
+        const translations = locales[currentLang] || {};
+        document.documentElement.lang = currentLang;
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (translations[key]) el.innerHTML = translations[key];
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+            const key = el.getAttribute('data-i18n-placeholder');
+            if (translations[key]) el.placeholder = translations[key];
+        });
+    }
+
+    updateUI(); 
+
     // 세션 초기화
     const { data: { session } } = await supabaseClient.auth.getSession();
     currentUser = session ? session.user : null;
@@ -21,7 +47,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let typingClearTimers = {};
     let myTypingTimeout = null;
     let isMeTyping = false;
-    let myNickname = '알 수 없음'; 
+    let myNickname = getLocale('unknownUser', '알 수 없음'); 
 
     async function triggerPushNotification(roomId) {
         if (!("Notification" in window) || Notification.permission !== "granted") return;
@@ -201,7 +227,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.msg-options-menu.show').forEach(menu => menu.classList.remove('show'));
     });
 
-    // 타이핑 UI 업데이트 함수
+    // 🚀 타이핑 UI 업데이트 함수 (다국어 호환)
     function updateTypingUI() {
         const typingIndicator = document.getElementById('typing-indicator');
         if (!typingIndicator) return;
@@ -211,22 +237,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             typingIndicator.classList.add('hidden');
             typingIndicator.textContent = '';
         } else if (names.length === 1) {
-            typingIndicator.textContent = `${names[0]} 님이 채팅 입력중입니다...`;
+            typingIndicator.textContent = getLocale('typingIndicatorSingle', '{name} 님이 채팅 입력중입니다...').replace('{name}', names[0]);
             typingIndicator.classList.remove('hidden');
         } else {
-            typingIndicator.textContent = `${names.join(', ')} 님이 채팅 입력중입니다...`;
+            typingIndicator.textContent = getLocale('typingIndicatorMultiple', '{names} 님이 채팅 입력중입니다...').replace('{names}', names.join(', '));
             typingIndicator.classList.remove('hidden');
         }
     }
 
-    // 🚀 [핵심 수정] 네트워크 취소를 대비해 로컬 스토리지(스마트폰 자체 캐시)에 즉시 저장
     async function updateMyReadTime() {
         if (!currentUser || !currentSettlementId) return;
         
         const newReadTime = Date.now() + 1000;
         const nowIso = new Date(newReadTime).toISOString();
         
-        // 💡 화면 밖으로 나갈 때 DB 통신이 끊겨도 이 값은 무조건 살아남음!
         localStorage.setItem(`read_time_${currentSettlementId}`, newReadTime.toString());
 
         await supabaseClient.from('settlement_members')
@@ -245,12 +269,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentSettlementId = urlParams.get('id');
 
         if (!currentSettlementId) {
-            alert('잘못된 접근입니다.');
+            alert(getLocale('invalidAccess', '잘못된 접근입니다.'));
             window.location.href = 'index.html';
             return;
         }
 
-        // 🚀 스마트폰 고유 뒤로가기(스와이프) 또는 화면 닫힘 시 무조건 읽음 처리
         window.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'hidden') {
                 updateMyReadTime();
@@ -277,7 +300,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const sendChatBtn = document.getElementById('send-chat-btn');
 
         if (!currentUser) {
-            alert('로그인이 필요합니다.');
+            alert(getLocale('loginRequired', '로그인이 필요합니다.'));
             window.location.href = 'login.html';
             return;
         }
@@ -328,7 +351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     unlockInput.value = '';
                     startChatSession(); 
                 } else {
-                    alert('잠금 해제 PIN이 일치하지 않습니다.');
+                    alert(getLocale('pinMismatch', '잠금 해제 PIN이 일치하지 않습니다.'));
                 }
             });
             unlockInput.addEventListener('keypress', (e) => {
@@ -353,7 +376,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (adminClearBtn) {
             adminClearBtn.addEventListener('click', () => {
                 openAdminConfirmModal(
-                    '이 채팅방의 모든 대화 내역을 화면에서 즉시 삭제하시겠습니까?<br><span style="font-size:0.8rem; color:#64748b; font-weight:normal;">(데이터베이스에는 기록이 보존됩니다.)</span>',
+                    getLocale('adminClearChatConfirm', '이 채팅방의 모든 대화 내역을 화면에서 즉시 삭제하시겠습니까?<br><span style="font-size:0.8rem; color:#64748b; font-weight:normal;">(데이터베이스에는 기록이 보존됩니다.)</span>'),
                     async () => {
                         const { error } = await supabaseClient
                             .from('chat_messages')
@@ -361,7 +384,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                             .eq('settlement_id', currentSettlementId);
                         
                         if (error) {
-                            alert('내역 비우기 실패: 권한 부족 (SQL 설정 확인 필요)');
+                            alert(getLocale('clearHistoryFail', '내역 비우기 실패: 권한 부족 (SQL 설정 확인 필요)'));
                             console.error(error);
                         } else {
                             if(chatMessages) chatMessages.innerHTML = '';
@@ -386,7 +409,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     onlineCountEl.textContent = uniqueUsers.size;
                 }
             })
-            // 타이핑 Broadcast 수신부
             .on('broadcast', { event: 'typing' }, (payload) => {
                 if (payload.payload && payload.payload.user_id) {
                     const { user_id, nickname, is_typing } = payload.payload;
@@ -467,7 +489,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
         window.addEventListener('popstate', checkRoomChange);
         
-        // 🚀 스마트폰 뒤로가기로 화면에 돌아왔을 때 무조건 안 읽은 숫자를 최신화
         window.addEventListener('pageshow', checkRoomChange);
         window.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') checkRoomChange();
@@ -496,7 +517,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         .eq('user_id', currentUser.id)
                         .single();
                         
-                    // 💡 [핵심 수정] DB 시간과 아까 폰에 강제로 박아둔 로컬 스토리지 시간 중 더 최신을 채택 (BFCache 및 DB 지연 원천 차단)
                     const dbReadTime = new Date(memberData?.last_read_at || '1970-01-01T00:00:00Z').getTime();
                     const localReadTime = parseInt(localStorage.getItem(`read_time_${currentSettlementId}`) || '0', 10);
                     const effectiveReadTime = Math.max(dbReadTime, localReadTime);
@@ -516,7 +536,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 }
                 
-                // 구독 중복 방지 처리
                 if (isNewRoom) {
                     if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
                     chatSubscription = supabaseClient
@@ -529,7 +548,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }, (payload) => {
                             if (currentUser && payload.new.user_id !== currentUser.id) {
                                 if(!payload.new.is_hidden_admin) {
-                                    // 💡 메시지가 폰 캐시보다 진짜로 나중에 온 건지 검증 후 뱃지 업데이트
                                     const localReadTime = parseInt(localStorage.getItem(`read_time_${currentSettlementId}`) || '0', 10);
                                     const msgTime = new Date(payload.new.created_at).getTime();
                                     if (msgTime > localReadTime) {
@@ -562,12 +580,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 수정 즉시 화면 렌더링 (Optimistic UI)
     async function editMessageInDB(msgId, newContent) {
         const msgDiv = document.querySelector(`.chat-msg-wrapper[data-id="${msgId}"]`);
         if (msgDiv) {
             const bubble = msgDiv.querySelector('.chat-bubble');
-            if (bubble) bubble.innerHTML = newContent + '<span class="edited-tag">(수정됨)</span>';
+            if (bubble) bubble.innerHTML = newContent + `<span class="edited-tag">${getLocale('editedTag', '(수정됨)')}</span>`;
         }
 
         const { error } = await supabaseClient
@@ -577,17 +594,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (error) {
             console.error(error);
-            alert('메시지 수정에 실패했습니다.');
+            alert(getLocale('msgSaveFail', '메시지 수정에 실패했습니다.'));
         }
     }
 
-    // 삭제 즉시 화면 렌더링 (Optimistic UI)
     async function deleteMessageInDB(msgId) {
         const msgDiv = document.querySelector(`.chat-msg-wrapper[data-id="${msgId}"]`);
         if (msgDiv) {
             const bubble = msgDiv.querySelector('.chat-bubble');
             if (bubble) {
-                bubble.innerHTML = '🚫 삭제된 메시지입니다.';
+                bubble.innerHTML = getLocale('deletedMessage', '🚫 삭제된 메시지입니다.');
                 bubble.className = 'chat-bubble deleted';
             }
         }
@@ -599,7 +615,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
         if (error) {
             console.error(error);
-            alert('메시지 삭제에 실패했습니다.');
+            alert(getLocale('msgDeleteFail', '메시지 삭제에 실패했습니다.'));
         }
     }
 
@@ -635,7 +651,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (document.querySelector(`.chat-msg-wrapper[data-id="${newMsg.id}"]`)) return;
 
                     const { data: profile } = await supabaseClient.from('profiles').select('nickname').eq('user_id', newMsg.user_id).single();
-                    newMsg.profiles = profile || { nickname: '알 수 없음' };
+                    newMsg.profiles = profile || { nickname: getLocale('unknownUser', '알 수 없음') };
                     appendMessageUI(newMsg, container);
                     
                     if (container.scrollTop + container.clientHeight >= container.scrollHeight - 100) {
@@ -662,14 +678,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } 
                 else if (msgDiv && updatedMsg.user_id !== currentUser.id) {
                     const { data: profile } = await supabaseClient.from('profiles').select('nickname').eq('user_id', updatedMsg.user_id).single();
-                    updatedMsg.profiles = profile || { nickname: '알 수 없음' };
+                    updatedMsg.profiles = profile || { nickname: getLocale('unknownUser', '알 수 없음') };
                     renderMessageContent(msgDiv, updatedMsg, container);
                 }
             })
             .subscribe();
     }
 
-    // 메시지 보내기 즉시 화면 렌더링 (Optimistic UI)
     async function sendMessage(inputEl) {
         const content = inputEl.value.trim();
         if (!content || !currentSettlementId || !currentUser) return;
@@ -732,15 +747,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         msgDiv.dataset.uid = msg.user_id; 
         msgDiv.innerHTML = '';
         const isMine = msg.user_id === currentUser.id;
-        const nickname = msg.profiles?.nickname || '알 수 없음';
+        const nickname = msg.profiles?.nickname || getLocale('unknownUser', '알 수 없음');
         const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
         
         let contentHtml = msg.content;
         let bubbleClass = 'chat-bubble';
-        let editedHtml = (msg.is_edited && !msg.is_deleted) ? `<span class="edited-tag">(수정됨)</span>` : '';
+        let editedHtml = (msg.is_edited && !msg.is_deleted) ? `<span class="edited-tag">${getLocale('editedTag', '(수정됨)')}</span>` : '';
 
         if (msg.is_deleted) {
-            contentHtml = '🚫 삭제된 메시지입니다.';
+            contentHtml = getLocale('deletedMessage', '🚫 삭제된 메시지입니다.');
             bubbleClass += ' deleted';
             editedHtml = '';
         }
@@ -763,10 +778,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (showMenuOptions) {
                 html += `<div class="msg-options-container"><div class="msg-options-menu">`;
                 if (canEditOrDelete) {
-                    html += `<button class="edit-msg-btn">수정</button><button class="delete-msg-btn">삭제</button>`;
+                    html += `<button class="edit-msg-btn">${getLocale('btnEdit', '수정')}</button><button class="delete-msg-btn">${getLocale('btnDeleteChat', '삭제')}</button>`;
                 }
                 if (isAdmin) {
-                    html += `<button class="admin-hide-msg-btn" style="color:#10b981; border-top:1px solid #f1f5f9;"><i class="fas fa-eye-slash"></i> 강제숨김</button>`;
+                    html += `<button class="admin-hide-msg-btn" style="color:#10b981; border-top:1px solid #f1f5f9;"><i class="fas fa-eye-slash"></i> ${getLocale('btnForceHide', '강제숨김')}</button>`;
                 }
                 html += `</div><button class="msg-options-btn"><i class="fas fa-ellipsis-v"></i></button></div>`;
             }
@@ -778,10 +793,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (showMenuOptions) {
                 html += `<div class="msg-options-container"><div class="msg-options-menu">`;
                 if (canEditOrDelete) {
-                    html += `<button class="edit-msg-btn">수정</button><button class="delete-msg-btn">삭제</button>`;
+                    html += `<button class="edit-msg-btn">${getLocale('btnEdit', '수정')}</button><button class="delete-msg-btn">${getLocale('btnDeleteChat', '삭제')}</button>`;
                 }
                 if (isAdmin) {
-                    html += `<button class="admin-hide-msg-btn" style="color:#10b981; border-top:1px solid #f1f5f9;"><i class="fas fa-eye-slash"></i> 강제숨김</button>`;
+                    html += `<button class="admin-hide-msg-btn" style="color:#10b981; border-top:1px solid #f1f5f9;"><i class="fas fa-eye-slash"></i> ${getLocale('btnForceHide', '강제숨김')}</button>`;
                 }
                 html += `</div><button class="msg-options-btn"><i class="fas fa-ellipsis-v"></i></button></div>`;
             }
@@ -825,13 +840,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 adminHideBtn.addEventListener('click', () => {
                     menu.classList.remove('show');
                     openAdminConfirmModal(
-                        '이 메시지를 화면에서 완전히 삭제하시겠습니까?<br><span style="font-size:0.8rem; color:#64748b; font-weight:normal;">(데이터베이스에는 기록이 보존됩니다.)</span>',
+                        getLocale('adminHideMsgConfirm', '이 메시지를 화면에서 완전히 삭제하시겠습니까?<br><span style="font-size:0.8rem; color:#64748b; font-weight:normal;">(데이터베이스에는 기록이 보존됩니다.)</span>'),
                         async () => {
                             const { error } = await supabaseClient
                                 .from('chat_messages')
                                 .update({ is_hidden_admin: true })
                                 .eq('id', msg.id);
-                            if(error) alert('숨기기 실패 (SQL 권한 확인): ' + error.message);
+                            if(error) alert(getLocale('hideFail', '숨기기 실패 (SQL 권한 확인): ') + error.message);
                         }
                     );
                 });

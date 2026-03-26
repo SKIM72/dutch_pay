@@ -191,10 +191,10 @@
             <button class="back-btn" id="chat-back-btn"><i class="fas fa-arrow-left"></i></button>
             
             <div style="display: flex; flex-direction: column; align-items: center;">
-                <h2><i class="fas fa-comments"></i> 채팅방</h2>
+                <h2><i class="fas fa-comments"></i> <span data-i18n="chatRoomTitle">채팅방</span></h2>
                 <span id="online-status" style="font-size: 0.75rem; opacity: 0.9; font-weight: normal; margin-top: 2px;">
                     <i class="fas fa-circle" style="color: #4ade80; font-size: 0.5rem; margin-right: 4px; vertical-align: middle;"></i>
-                    <span id="online-count">1</span>명 접속중
+                    <span id="online-count">1</span><span data-i18n="onlineCountText">명 접속중</span>
                 </span>
             </div>
 
@@ -213,7 +213,7 @@
         <div id="typing-indicator" class="hidden" style="padding: 0.2rem 1rem 0.5rem 1rem; font-size: 0.75rem; color: #64748b; background: transparent; font-style: italic; z-index: 10;"></div>
 
         <div class="chat-input-area">
-            <input type="text" id="chat-input" placeholder="메시지를 입력하세요..." autocomplete="off">
+            <input type="text" id="chat-input" data-i18n-placeholder="chatInputPlaceholder" placeholder="메시지를 입력하세요..." autocomplete="off">
             <button id="send-chat-btn"><i class="fas fa-paper-plane"></i></button>
         </div>
 
@@ -221,24 +221,24 @@
             <button id="lock-back-btn" style="position: absolute; top: 1.5rem; left: 1.5rem; background: none; border: none; font-size: 1.5rem; color: #64748b; cursor: pointer; transition: color 0.2s;"><i class="fas fa-arrow-left"></i></button>
             
             <i class="fas fa-lock" style="font-size: 3.5rem; color: #6366f1; margin-bottom: 1.5rem;"></i>
-            <h2 style="margin-bottom: 1.5rem; color: #1e293b; font-size: 1.3rem;">채팅방 잠금</h2>
-            <input type="password" id="unlock-password-input" placeholder="잠금 해제 PIN을 입력하세요" style="width: 80%; max-width: 280px; padding: 0.8rem; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 1rem; text-align: center; font-size: 1rem; outline: none;">
-            <button id="unlock-chat-btn" style="width: 80%; max-width: 280px; padding: 0.8rem; background: #6366f1; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem;">잠금 해제</button>
+            <h2 style="margin-bottom: 1.5rem; color: #1e293b; font-size: 1.3rem;"><span data-i18n="chatLockTitle">채팅방 잠금</span></h2>
+            <input type="password" id="unlock-password-input" data-i18n-placeholder="chatLockPlaceholder" placeholder="잠금 해제 PIN을 입력하세요" style="width: 80%; max-width: 280px; padding: 0.8rem; border-radius: 8px; border: 1px solid #cbd5e1; margin-bottom: 1rem; text-align: center; font-size: 1rem; outline: none;">
+            <button id="unlock-chat-btn" data-i18n="chatUnlockBtn" style="width: 80%; max-width: 280px; padding: 0.8rem; background: #6366f1; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem;">잠금 해제</button>
         </div>
     </div>
 
     <div id="edit-modal" class="modal-overlay">
         <div class="custom-modal">
             <div class="modal-header">
-                <h3><i class="fas fa-edit" style="color:#6366f1;"></i> 메시지 수정</h3>
+                <h3><i class="fas fa-edit" style="color:#6366f1;"></i> <span data-i18n="editMessageTitle">메시지 수정</span></h3>
                 <button class="close-modal-x close-modal-btn"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
-                <textarea id="edit-modal-textarea" placeholder="수정할 내용을 입력하세요..."></textarea>
+                <textarea id="edit-modal-textarea" data-i18n-placeholder="editMessagePlaceholder" placeholder="수정할 내용을 입력하세요..."></textarea>
             </div>
             <div class="modal-footer-btns">
-                <button class="modal-btn cancel close-modal-btn">취소</button>
-                <button id="submit-edit-modal-btn" class="modal-btn save"><i class="fas fa-check"></i> 저장</button>
+                <button class="modal-btn cancel close-modal-btn" data-i18n="btnCancel">취소</button>
+                <button id="submit-edit-modal-btn" class="modal-btn save"><i class="fas fa-check"></i> <span data-i18n="btnSave">저장</span></button>
             </div>
         </div>
     </div>
@@ -246,15 +246,15 @@
     <div id="delete-confirm-modal" class="modal-overlay">
         <div class="custom-modal">
             <div class="modal-header" style="justify-content: center;">
-                <h3><i class="fas fa-exclamation-triangle" style="color:#ef4444;"></i> 정말 삭제하시겠습니까?</h3>
+                <h3><i class="fas fa-exclamation-triangle" style="color:#ef4444;"></i> <span data-i18n="deleteConfirmTitle">정말 삭제하시겠습니까?</span></h3>
             </div>
             <div class="modal-body" style="text-align: center;">
-                <p class="confirm-msg-title">이 작업은 취소할 수 없습니다.</p>
-                <p class="confirm-msg-desc">메시지 내용이 '삭제된 메시지'로 변경되며,<br>대화방의 모든 사람에게 반영됩니다.</p>
+                <p class="confirm-msg-title" data-i18n="deleteConfirmWarning">이 작업은 취소할 수 없습니다.</p>
+                <p class="confirm-msg-desc" data-i18n="deleteConfirmDesc">메시지 내용이 '삭제된 메시지'로 변경되며,<br>대화방의 모든 사람에게 반영됩니다.</p>
             </div>
             <div class="modal-footer-btns">
-                <button class="modal-btn cancel close-modal-btn">취소</button>
-                <button id="submit-delete-modal-btn" class="modal-btn confirm"><i class="fas fa-trash-alt"></i> 삭제하기</button>
+                <button class="modal-btn cancel close-modal-btn" data-i18n="btnCancel">취소</button>
+                <button id="submit-delete-modal-btn" class="modal-btn confirm"><i class="fas fa-trash-alt"></i> <span data-i18n="btnDeleteMessage">삭제하기</span></button>
             </div>
         </div>
     </div>
@@ -262,20 +262,21 @@
     <div id="admin-confirm-modal" class="modal-overlay">
         <div class="custom-modal">
             <div class="modal-header" style="justify-content: center;">
-                <h3><i class="fas fa-shield-alt" style="color:#10b981;"></i> 관리자 권한 작업</h3>
+                <h3><i class="fas fa-shield-alt" style="color:#10b981;"></i> <span data-i18n="adminActionTitle">관리자 권한 작업</span></h3>
             </div>
             <div class="modal-body" style="text-align: center;">
                 <p id="admin-confirm-msg-desc" class="confirm-msg-desc" style="color:#1e293b; font-weight:500;"></p>
             </div>
             <div class="modal-footer-btns">
-                <button class="modal-btn cancel close-modal-btn">취소</button>
-                <button id="submit-admin-confirm-btn" class="modal-btn confirm" style="background:#10b981;">확인</button>
+                <button class="modal-btn cancel close-modal-btn" data-i18n="btnCancel">취소</button>
+                <button id="submit-admin-confirm-btn" class="modal-btn confirm" style="background:#10b981;" data-i18n="btnConfirm">확인</button>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="chat.js?v=26"></script>
+    <script src="locales.js?v=26"></script>
+    <script src="chat.js?v=28"></script>
 </body>
 </html>
