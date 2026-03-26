@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let presenceChannel = null;
     let isPresenceJoined = false; 
 
-    // 🚀 [복구 완료] 타이핑 상태 관리를 위한 변수들
+    // 타이핑 상태 관리를 위한 변수들
     let currentlyTypingUsers = {};
     let typingClearTimers = {};
     let myTypingTimeout = null;
@@ -98,10 +98,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 scrollBottomBtn.classList.add('hidden');
             }
+            
+            if (scrollHeight - scrollTop - clientHeight <= 50) {
+                updateMyReadTime();
+            }
         });
 
         scrollBottomBtn.addEventListener('click', () => {
             chatMessages.scrollTo({ top: chatMessages.scrollHeight, behavior: 'smooth' });
+            updateMyReadTime();
         });
     }
 
@@ -196,7 +201,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.msg-options-menu.show').forEach(menu => menu.classList.remove('show'));
     });
 
-    // 🚀 [복구 완료] 타이핑 UI 업데이트 함수
+    // 타이핑 UI 업데이트 함수
     function updateTypingUI() {
         const typingIndicator = document.getElementById('typing-indicator');
         if (!typingIndicator) return;
@@ -272,7 +277,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isAdmin = currentUser.email.toLowerCase() === 'eowert72@gmail.com';
         const autoLock = localStorage.getItem('adminAutoLock') === 'true';
 
-        // 🚀 [복구 완료] 초기 로드 시 내 닉네임을 DB에서 가져와 타이핑 알림에 사용
         const { data: myProfile } = await supabaseClient.from('profiles').select('nickname, admin_pin').eq('user_id', currentUser.id).single();
         if (myProfile) {
             myNickname = myProfile.nickname || currentUser.email.split('@')[0];
@@ -369,7 +373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     onlineCountEl.textContent = uniqueUsers.size;
                 }
             })
-            // 🚀 [복구 완료] 타이핑 Broadcast 수신부
+            // 타이핑 Broadcast 수신부
             .on('broadcast', { event: 'typing' }, (payload) => {
                 if (payload.payload && payload.payload.user_id) {
                     const { user_id, nickname, is_typing } = payload.payload;
@@ -397,7 +401,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             });
 
-        // 🚀 [복구 완료] 채팅 입력 감지 및 Broadcast 발송부
         if (sendChatBtn && chatInput) {
             chatInput.addEventListener('input', () => {
                 if (!isMeTyping) {
@@ -411,7 +414,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 }
                 
-                // 타자 친 후 1.5초간 아무 입력이 없으면 멈춤으로 간주
                 clearTimeout(myTypingTimeout);
                 myTypingTimeout = setTimeout(() => {
                     isMeTyping = false;
@@ -531,7 +533,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // 🚀 [완벽 수정] 수정 즉시 화면 렌더링 (Optimistic UI)
     async function editMessageInDB(msgId, newContent) {
+        const msgDiv = document.querySelector(`.chat-msg-wrapper[data-id="${msgId}"]`);
+        if (msgDiv) {
+            const bubble = msgDiv.querySelector('.chat-bubble');
+            if (bubble) bubble.innerHTML = newContent + '<span class="edited-tag">(수정됨)</span>';
+        }
+
         const { error } = await supabaseClient
             .from('chat_messages')
             .update({ content: newContent, is_edited: true })
@@ -543,7 +552,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // 🚀 [완벽 수정] 삭제 즉시 화면 렌더링 (Optimistic UI)
     async function deleteMessageInDB(msgId) {
+        const msgDiv = document.querySelector(`.chat-msg-wrapper[data-id="${msgId}"]`);
+        if (msgDiv) {
+            const bubble = msgDiv.querySelector('.chat-bubble');
+            if (bubble) {
+                bubble.innerHTML = '🚫 삭제된 메시지입니다.';
+                bubble.className = 'chat-bubble deleted';
+            }
+        }
+
         const { error } = await supabaseClient
             .from('chat_messages')
             .update({ is_deleted: true })
@@ -584,6 +603,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, async (payload) => {
                 const newMsg = payload.new;
                 if (!newMsg.is_hidden_admin) {
+                    // 🚀 [완벽 수정] 내가 이미 화면에 그려둔 메시지면 중복 추가 방지 (Optimistic UI 호환)
+                    if (document.querySelector(`.chat-msg-wrapper[data-id="${newMsg.id}"]`)) return;
+
                     const { data: profile } = await supabaseClient.from('profiles').select('nickname').eq('user_id', newMsg.user_id).single();
                     newMsg.profiles = profile || { nickname: '알 수 없음' };
                     appendMessageUI(newMsg, container);
@@ -610,7 +632,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (updatedMsg.is_hidden_admin) {
                     if (msgDiv) msgDiv.remove();
                 } 
-                else if (msgDiv) {
+                else if (msgDiv && updatedMsg.user_id !== currentUser.id) {
+                    // 내 메시지는 내가 낙관적 UI로 처리했으므로, 다른 사람이 수정한 경우만 화면 갱신
                     const { data: profile } = await supabaseClient.from('profiles').select('nickname').eq('user_id', updatedMsg.user_id).single();
                     updatedMsg.profiles = profile || { nickname: '알 수 없음' };
                     renderMessageContent(msgDiv, updatedMsg, container);
@@ -619,6 +642,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             .subscribe();
     }
 
+    // 🚀 [완벽 수정] 메시지 보내기 즉시 화면 렌더링 (Optimistic UI)
     async function sendMessage(inputEl) {
         const content = inputEl.value.trim();
         if (!content || !currentSettlementId || !currentUser) return;
@@ -626,7 +650,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         inputEl.value = '';
         inputEl.focus();
         
-        // 🚀 [복구 완료] 메시지를 보내면 즉시 '입력중 표시' 신호 해제
         if (isMeTyping) {
             isMeTyping = false;
             clearTimeout(myTypingTimeout);
@@ -639,11 +662,32 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        await supabaseClient.from('chat_messages').insert([{
+        // 1. 내 화면에 0초 만에 즉시 렌더링
+        const tempId = 'temp-' + Date.now();
+        const tempMsg = {
+            id: tempId,
+            user_id: currentUser.id,
+            content: content,
+            created_at: new Date().toISOString(),
+            is_edited: false,
+            is_deleted: false,
+            profiles: { nickname: myNickname }
+        };
+        appendMessageUI(tempMsg, chatMessages);
+        scrollToBottom(chatMessages);
+
+        // 2. 조용히 백그라운드 DB 저장
+        const { data, error } = await supabaseClient.from('chat_messages').insert([{
             settlement_id: currentSettlementId,
             user_id: currentUser.id,
             content: content
-        }]);
+        }]).select('id').single();
+        
+        // 3. 서버 저장이 완료되면 임시 ID를 진짜 ID로 슬쩍 교체
+        if (!error && data) {
+            const tempDiv = document.querySelector(`.chat-msg-wrapper[data-id="${tempId}"]`);
+            if (tempDiv) tempDiv.dataset.id = data.id; 
+        }
         
         updateMyReadTime();
     }
