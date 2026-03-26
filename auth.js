@@ -3,6 +3,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
     let currentLang = 'ko';
 
+    // 🚀 [추가됨] 인앱 브라우저 강제 탈출 로직 (CleanURL 적용)
+    function redirectToExternalBrowser(targetPage) {
+        const userAgent = navigator.userAgent.toLowerCase();
+        let currentPath = window.location.pathname;
+        if(currentPath.endsWith('/')) currentPath += 'login.html'; 
+        const targetUrl = window.location.origin + currentPath.replace(/[^\/]*$/, targetPage);
+
+        if (userAgent.match(/kakaotalk|line|inapp|naver|instagram|facebook/i)) {
+            if (userAgent.match(/android/i)) {
+                // 안드로이드: 크롬 브라우저 강제 호출
+                location.href = `intent://${targetUrl.replace(/^https?:\/\//i, '')}#Intent;scheme=https;package=com.android.chrome;end`;
+                return true;
+            } else if (userAgent.match(/iphone|ipad|ipod/i)) {
+                if (userAgent.match(/kakaotalk/i)) {
+                    // iOS: 카카오톡 외부 브라우저 호출 스킴
+                    location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(targetUrl)}`;
+                    setTimeout(() => {
+                        alert("구글/애플 로그인을 위해 우측 하단 [ ⋮ ] 버튼을 눌러 'Safari로 열기'를 선택해 주세요.");
+                    }, 1000);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     // --- Elements ---
     const languageSwitcher = document.getElementById('language-switcher');
     const loginView = document.getElementById('login-view');
@@ -40,12 +66,20 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (navLoginBtn) navLoginBtn.style.display = 'none';
     };
 
-    // 이벤트 리스너 연결
+    // 🚀 [추가됨] 클릭 시 인앱 탈출을 먼저 확인하는 핸들러
+    const handleAuthBtnClick = (e) => {
+        if (e) e.preventDefault();
+        // 인앱 브라우저면 외부로 튕겨내고 함수 종료
+        if (redirectToExternalBrowser('login.html')) return; 
+        showAuthForm();
+    };
+
+    // 이벤트 리스너 연결 (수정됨: showAuthForm 대신 handleAuthBtnClick 연결)
     const navLoginBtn = document.getElementById('nav-login-btn');
-    if(navLoginBtn) navLoginBtn.addEventListener('click', showAuthForm);
+    if(navLoginBtn) navLoginBtn.addEventListener('click', handleAuthBtnClick);
     
     const heroStartBtn = document.getElementById('hero-start-btn');
-    if(heroStartBtn) heroStartBtn.addEventListener('click', showAuthForm);
+    if(heroStartBtn) heroStartBtn.addEventListener('click', handleAuthBtnClick);
 
 
     // 비밀번호 재설정 링크를 타고 왔는지 확인
@@ -118,6 +152,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 소셜 로그인 처리 로직
     const handleOAuthLogin = async (provider) => {
+        // 🚀 [추가됨] 구글/애플 버튼 직접 클릭 시에도 인앱 탈출 방어막 작동
+        if (redirectToExternalBrowser('login.html')) return;
+
         const { data, error } = await supabaseClient.auth.signInWithOAuth({
             provider: provider,
             options: {
