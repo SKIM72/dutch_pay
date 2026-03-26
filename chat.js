@@ -219,16 +219,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 메인 화면(바깥)의 알림 뱃지를 위해 '내 읽음 시간'만 간단하게 DB에 저장
+    // 🚀 [핵심 수정] 네트워크 취소를 대비해 로컬 스토리지(스마트폰 자체 캐시)에 즉시 저장
     async function updateMyReadTime() {
         if (!currentUser || !currentSettlementId) return;
         
+        const newReadTime = Date.now() + 1000;
+        const nowIso = new Date(newReadTime).toISOString();
+        
+        // 💡 화면 밖으로 나갈 때 DB 통신이 끊겨도 이 값은 무조건 살아남음!
+        localStorage.setItem(`read_time_${currentSettlementId}`, newReadTime.toString());
+
         await supabaseClient.from('settlement_members')
             .upsert({ 
                 settlement_id: currentSettlementId,
                 user_id: currentUser.id,
                 email: currentUser.email,
-                last_read_at: new Date().toISOString()
+                last_read_at: nowIso
             }, { onConflict: 'settlement_id,user_id' });
     }
 
@@ -243,6 +249,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.location.href = 'index.html';
             return;
         }
+
+        // 🚀 스마트폰 고유 뒤로가기(스와이프) 또는 화면 닫힘 시 무조건 읽음 처리
+        window.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                updateMyReadTime();
+            }
+        });
 
         const backBtn = document.getElementById('chat-back-btn');
         if (backBtn) {
@@ -377,7 +390,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             .on('broadcast', { event: 'typing' }, (payload) => {
                 if (payload.payload && payload.payload.user_id) {
                     const { user_id, nickname, is_typing } = payload.payload;
-                    if (user_id === currentUser.id) return; // 내가 치는 건 무시
+                    if (user_id === currentUser.id) return; 
 
                     if (is_typing) {
                         currentlyTypingUsers[user_id] = nickname;
@@ -453,20 +466,23 @@ document.addEventListener('DOMContentLoaded', async () => {
             checkRoomChange();
         };
         window.addEventListener('popstate', checkRoomChange);
+        
+        // 🚀 스마트폰 뒤로가기로 화면에 돌아왔을 때 무조건 안 읽은 숫자를 최신화
+        window.addEventListener('pageshow', checkRoomChange);
+        window.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') checkRoomChange();
+        });
         setTimeout(checkRoomChange, 800);
 
         async function checkRoomChange() {
             const urlParams = new URLSearchParams(window.location.search);
             const roomId = urlParams.get('id');
 
-            if (roomId && roomId !== currentSettlementId) {
+            if (roomId) {
+                const isNewRoom = roomId !== currentSettlementId;
                 currentSettlementId = roomId;
-                unreadCount = 0;
-                updateBadge();
                 chatFab.classList.remove('hidden');
 
-                if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
-                
                 if (!currentUser) {
                     const { data: { session } } = await supabaseClient.auth.getSession();
                     currentUser = session ? session.user : null;
@@ -480,7 +496,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                         .eq('user_id', currentUser.id)
                         .single();
                         
-                    const lastReadAt = memberData?.last_read_at || '1970-01-01T00:00:00Z';
+                    // 💡 [핵심 수정] DB 시간과 아까 폰에 강제로 박아둔 로컬 스토리지 시간 중 더 최신을 채택 (BFCache 및 DB 지연 원천 차단)
+                    const dbReadTime = new Date(memberData?.last_read_at || '1970-01-01T00:00:00Z').getTime();
+                    const localReadTime = parseInt(localStorage.getItem(`read_time_${currentSettlementId}`) || '0', 10);
+                    const effectiveReadTime = Math.max(dbReadTime, localReadTime);
+                    const lastReadAt = new Date(effectiveReadTime).toISOString();
                     
                     const { count } = await supabaseClient
                         .from('chat_messages')
@@ -496,24 +516,33 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 }
                 
-                chatSubscription = supabaseClient
-                    .channel(`chat_badge_${currentSettlementId}`)
-                    .on('postgres_changes', {
-                        event: 'INSERT',
-                        schema: 'public',
-                        table: 'chat_messages',
-                        filter: `settlement_id=eq.${currentSettlementId}`
-                    }, (payload) => {
-                        if (currentUser && payload.new.user_id !== currentUser.id) {
-                            if(!payload.new.is_hidden_admin) {
-                                unreadCount++;
-                                updateBadge();
-                                triggerPushNotification(payload.new.settlement_id);
+                // 구독 중복 방지 처리
+                if (isNewRoom) {
+                    if (chatSubscription) supabaseClient.removeChannel(chatSubscription);
+                    chatSubscription = supabaseClient
+                        .channel(`chat_badge_${currentSettlementId}`)
+                        .on('postgres_changes', {
+                            event: 'INSERT',
+                            schema: 'public',
+                            table: 'chat_messages',
+                            filter: `settlement_id=eq.${currentSettlementId}`
+                        }, (payload) => {
+                            if (currentUser && payload.new.user_id !== currentUser.id) {
+                                if(!payload.new.is_hidden_admin) {
+                                    // 💡 메시지가 폰 캐시보다 진짜로 나중에 온 건지 검증 후 뱃지 업데이트
+                                    const localReadTime = parseInt(localStorage.getItem(`read_time_${currentSettlementId}`) || '0', 10);
+                                    const msgTime = new Date(payload.new.created_at).getTime();
+                                    if (msgTime > localReadTime) {
+                                        unreadCount++;
+                                        updateBadge();
+                                        triggerPushNotification(payload.new.settlement_id);
+                                    }
+                                }
                             }
-                        }
-                    }).subscribe();
+                        }).subscribe();
+                }
                     
-            } else if (!roomId) {
+            } else {
                 currentSettlementId = null;
                 chatFab.classList.add('hidden');
                 if (chatSubscription) {
@@ -533,7 +562,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 🚀 [완벽 수정] 수정 즉시 화면 렌더링 (Optimistic UI)
+    // 수정 즉시 화면 렌더링 (Optimistic UI)
     async function editMessageInDB(msgId, newContent) {
         const msgDiv = document.querySelector(`.chat-msg-wrapper[data-id="${msgId}"]`);
         if (msgDiv) {
@@ -552,7 +581,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 🚀 [완벽 수정] 삭제 즉시 화면 렌더링 (Optimistic UI)
+    // 삭제 즉시 화면 렌더링 (Optimistic UI)
     async function deleteMessageInDB(msgId) {
         const msgDiv = document.querySelector(`.chat-msg-wrapper[data-id="${msgId}"]`);
         if (msgDiv) {
@@ -603,7 +632,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, async (payload) => {
                 const newMsg = payload.new;
                 if (!newMsg.is_hidden_admin) {
-                    // 🚀 [완벽 수정] 내가 이미 화면에 그려둔 메시지면 중복 추가 방지 (Optimistic UI 호환)
                     if (document.querySelector(`.chat-msg-wrapper[data-id="${newMsg.id}"]`)) return;
 
                     const { data: profile } = await supabaseClient.from('profiles').select('nickname').eq('user_id', newMsg.user_id).single();
@@ -633,7 +661,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (msgDiv) msgDiv.remove();
                 } 
                 else if (msgDiv && updatedMsg.user_id !== currentUser.id) {
-                    // 내 메시지는 내가 낙관적 UI로 처리했으므로, 다른 사람이 수정한 경우만 화면 갱신
                     const { data: profile } = await supabaseClient.from('profiles').select('nickname').eq('user_id', updatedMsg.user_id).single();
                     updatedMsg.profiles = profile || { nickname: '알 수 없음' };
                     renderMessageContent(msgDiv, updatedMsg, container);
@@ -642,7 +669,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             .subscribe();
     }
 
-    // 🚀 [완벽 수정] 메시지 보내기 즉시 화면 렌더링 (Optimistic UI)
+    // 메시지 보내기 즉시 화면 렌더링 (Optimistic UI)
     async function sendMessage(inputEl) {
         const content = inputEl.value.trim();
         if (!content || !currentSettlementId || !currentUser) return;
@@ -662,7 +689,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        // 1. 내 화면에 0초 만에 즉시 렌더링
         const tempId = 'temp-' + Date.now();
         const tempMsg = {
             id: tempId,
@@ -676,14 +702,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         appendMessageUI(tempMsg, chatMessages);
         scrollToBottom(chatMessages);
 
-        // 2. 조용히 백그라운드 DB 저장
         const { data, error } = await supabaseClient.from('chat_messages').insert([{
             settlement_id: currentSettlementId,
             user_id: currentUser.id,
             content: content
         }]).select('id').single();
         
-        // 3. 서버 저장이 완료되면 임시 ID를 진짜 ID로 슬쩍 교체
         if (!error && data) {
             const tempDiv = document.querySelector(`.chat-msg-wrapper[data-id="${tempId}"]`);
             if (tempDiv) tempDiv.dataset.id = data.id; 
