@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentUser = null;
     let currentSettlementId = null;
 
-    // 🚀 [추가] 다국어 지원 로직
+    // 다국어 지원 로직
     let currentLang = localStorage.getItem('preferredLang') || 'ko';
 
     function getLocale(key, fallbackText) {
@@ -41,6 +41,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let presenceChannel = null;
     let isPresenceJoined = false; 
+
+    // 🚀 [추가] 무한 스크롤(페이징) 상태 관리를 위한 변수들
+    let currentOffset = 0;
+    const MESSAGES_PER_PAGE = 50;
+    let hasMoreMessages = true;
+    let isFetchingMessages = false;
 
     // 타이핑 상태 관리를 위한 변수들
     let currentlyTypingUsers = {};
@@ -119,6 +125,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (chatMessages && scrollBottomBtn) {
         chatMessages.addEventListener('scroll', () => {
             const { scrollTop, scrollHeight, clientHeight } = chatMessages;
+            
+            // 기존: 맨 아래로 가기 버튼 로직
             if (scrollHeight - scrollTop - clientHeight > 100) {
                 scrollBottomBtn.classList.remove('hidden');
             } else {
@@ -127,6 +135,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             if (scrollHeight - scrollTop - clientHeight <= 50) {
                 updateMyReadTime();
+            }
+
+            // 🚀 [추가] 스크롤이 천장(50px 이내)에 닿았을 때 과거 메시지 로딩 트리거
+            if (scrollTop < 50 && hasMoreMessages && !isFetchingMessages) {
+                loadOlderMessages(chatMessages);
             }
         });
 
@@ -227,7 +240,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.querySelectorAll('.msg-options-menu.show').forEach(menu => menu.classList.remove('show'));
     });
 
-    // 🚀 타이핑 UI 업데이트 함수 (다국어 호환)
     function updateTypingUI() {
         const typingIndicator = document.getElementById('typing-indicator');
         if (!typingIndicator) return;
@@ -330,7 +342,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (isChatStarted) return;
             isChatStarted = true;
             if (chatMessages) {
-                await loadMessages(chatMessages);
+                // 🚀 [수정] 무한스크롤: 처음엔 loadInitialMessages를 호출
+                await loadInitialMessages(chatMessages);
                 subscribeToMessages(chatMessages);
                 await updateMyReadTime();
             }
@@ -619,22 +632,79 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    async function loadMessages(container) {
+    // 🚀 [추가 및 수정] 처음 접속 시 최신 50개의 메시지만 불러오는 페이징 기능
+    async function loadInitialMessages(container) {
+        isFetchingMessages = true;
         const { data, error } = await supabaseClient
             .from('chat_messages')
             .select(`id, content, created_at, user_id, is_edited, is_deleted, is_hidden_admin, profiles(nickname)`)
             .eq('settlement_id', currentSettlementId)
-            .order('created_at', { ascending: true });
+            .order('created_at', { ascending: false }) // 최신순 정렬
+            .range(0, MESSAGES_PER_PAGE - 1);
 
         if (data) {
             container.innerHTML = '';
-            data.forEach(msg => {
+            if (data.length < MESSAGES_PER_PAGE) hasMoreMessages = false;
+            currentOffset = data.length;
+
+            // 출력은 위에서 아래로(시간 역순) 되어야 하므로 다시 뒤집어줌
+            const chronologicalData = data.reverse();
+            chronologicalData.forEach(msg => {
                 if (!msg.is_hidden_admin) {
                     appendMessageUI(msg, container);
                 }
             });
             scrollToBottom(container);
         }
+        isFetchingMessages = false;
+    }
+
+    // 🚀 [추가] 스크롤을 위로 올렸을 때 과거 메시지 50개를 불러오는 함수
+    async function loadOlderMessages(container) {
+        if (isFetchingMessages || !hasMoreMessages) return;
+        isFetchingMessages = true;
+
+        // 과거 내용을 위에 추가하면 화면이 튕기는 현상을 막기 위해 현재 높이를 저장해둠
+        const oldScrollHeight = container.scrollHeight;
+
+        const { data, error } = await supabaseClient
+            .from('chat_messages')
+            .select(`id, content, created_at, user_id, is_edited, is_deleted, is_hidden_admin, profiles(nickname)`)
+            .eq('settlement_id', currentSettlementId)
+            .order('created_at', { ascending: false })
+            .range(currentOffset, currentOffset + MESSAGES_PER_PAGE - 1);
+
+        if (data && data.length > 0) {
+            if (data.length < MESSAGES_PER_PAGE) hasMoreMessages = false;
+            currentOffset += data.length;
+
+            const chronologicalData = data.reverse();
+            const fragment = document.createDocumentFragment();
+
+            chronologicalData.forEach(msg => {
+                if (!msg.is_hidden_admin) {
+                    const isMine = msg.user_id === currentUser.id;
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = `chat-msg-wrapper ${isMine ? 'mine' : 'other'}`;
+                    msgDiv.dataset.id = msg.id;
+                    msgDiv.dataset.time = msg.created_at; 
+                    msgDiv.dataset.uid = msg.user_id; 
+                    
+                    renderMessageContent(msgDiv, msg, fragment);
+                    fragment.appendChild(msgDiv);
+                }
+            });
+
+            // 화면 제일 위쪽(과거)에 추가
+            container.insertBefore(fragment, container.firstChild);
+
+            // 추가된 높이만큼 스크롤을 내려서 사용자가 보고 있던 화면 위치를 부드럽게 유지
+            const newScrollHeight = container.scrollHeight;
+            container.scrollTop = newScrollHeight - oldScrollHeight;
+        } else {
+            hasMoreMessages = false;
+        }
+        isFetchingMessages = false;
     }
 
     function subscribeToMessages(container) {
@@ -652,7 +722,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     const { data: profile } = await supabaseClient.from('profiles').select('nickname').eq('user_id', newMsg.user_id).single();
                     newMsg.profiles = profile || { nickname: getLocale('unknownUser', '알 수 없음') };
+                    
                     appendMessageUI(newMsg, container);
+                    currentOffset++; // 🚀 새 메시지가 추가되면 오프셋 증가 보정
                     
                     if (container.scrollTop + container.clientHeight >= container.scrollHeight - 100) {
                         scrollToBottom(container);
@@ -715,6 +787,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             profiles: { nickname: myNickname }
         };
         appendMessageUI(tempMsg, chatMessages);
+        currentOffset++; // 🚀 내가 메시지를 보내도 오프셋 증가 보정
         scrollToBottom(chatMessages);
 
         const { data, error } = await supabaseClient.from('chat_messages').insert([{
