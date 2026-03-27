@@ -5,7 +5,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Global State ---
     let settlements = [];
     let currentSettlement = null;
-    let currentLang = 'ko';
+    // 🚀 수정됨: 초기 로드 시점부터 바로 언어 값을 가져오도록 변경 (모달창 한글 고정 버그 픽스)
+    const _browserLang = navigator.language.split('-')[0];
+    let currentLang = localStorage.getItem('preferredLang') || (['ko', 'en', 'ja'].includes(_browserLang) ? _browserLang : 'en');
     let currentEditingExpenseId = null;
     let currentUser = null; 
     let mySelectedRole = null; 
@@ -246,9 +248,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(!modal) { resolve(window.confirm(message)); return; } 
             modal.style.zIndex = '999999'; 
             document.getElementById('confirm-message').textContent = message;
-            modal.classList.remove('hidden');
+            
             const confirmBtn = document.getElementById('confirm-yes-btn');
             const cancelBtn = document.getElementById('confirm-no-btn');
+            
+            // 🚀 수정됨: 모달창이 뜰 때 버튼 텍스트도 현재 언어에 맞게 강제 업데이트
+            if(confirmBtn) confirmBtn.textContent = getLocale('btnConfirm', '확인');
+            if(cancelBtn) cancelBtn.textContent = getLocale('btnCancel', '취소');
+
+            modal.classList.remove('hidden');
+            
             const cleanup = () => { modal.classList.add('hidden'); confirmBtn.removeEventListener('click', handleYes); cancelBtn.removeEventListener('click', handleNo); };
             const handleYes = () => { cleanup(); resolve(true); };
             const handleNo = () => { cleanup(); resolve(false); };
