@@ -1,23 +1,27 @@
 document.addEventListener('DOMContentLoaded', async () => {
 
-    // 🚀 [추가 및 수정됨] Supabase 통신 좀비 상태 방지용 커스텀 Fetch
+    // 🚀 [강력한 네트워크 복구 로직] OS의 통신 좀비 상태를 뚫고 강제로 새 연결을 생성하는 커스텀 Fetch
     const customFetch = async (url, options) => {
-        // 1. 기기가 오프라인 상태면 통신 시도조차 하지 않고 즉시 차단
+        // 기기가 오프라인이면 통신 시도조차 하지 않음
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
-            throw new Error('Network is offline');
+            throw new Error('OFFLINE');
         }
         
-        // 2. 10초 이상 응답이 없으면 통신 자체를 물리적으로 끊어버림(Abort)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); 
+        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6초 한계선
 
         try {
-            const response = await fetch(url, { ...options, signal: controller.signal });
+            const response = await fetch(url, { 
+                ...options, 
+                signal: controller.signal,
+                cache: 'no-store',      // 캐시된 죽은 소켓 사용 방지
+                keepalive: false        // TCP 연결 유지 해제 (무조건 새 연결 강제)
+            });
             clearTimeout(timeoutId);
             return response;
         } catch (err) {
             clearTimeout(timeoutId);
-            throw err; // 에러를 뱉어야 로딩 스피너도 정상적으로 꺼지고 다음 클릭이 먹힘
+            throw err; // 에러를 발생시켜야 다음 클릭 시 새 통신을 시도함
         }
     };
 
@@ -25,7 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         global: { fetch: customFetch }
     });
 
-    // 3. 잠금 화면에서 돌아왔을 때 멈춰있던 인증 세션과 소켓을 강제로 깨워줌
+    // 잠금 화면에서 돌아왔을 때 멈춰있던 인증 세션과 소켓 강제 기상
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && navigator.onLine) {
             supabaseClient.auth.getSession();
@@ -33,10 +37,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // 🚀 [UI 무한로딩 2중 방어벽] DB 통신이 7초 이상 걸리면 무조건 에러를 뱉고 UI 잠금을 풀어줌
+    const safeDB = (promise) => {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('TIMEOUT_DB')), 7000);
+            promise.then(res => { clearTimeout(timer); resolve(res); })
+                   .catch(err => { clearTimeout(timer); reject(err); });
+        });
+    };
+
     // --- Global State ---
     let settlements = [];
     let currentSettlement = null;
-    // 🚀 수정됨: 초기 로드 시점부터 바로 언어 값을 가져오도록 변경 (모달창 한글 고정 버그 픽스)
     const _browserLang = navigator.language.split('-')[0];
     let currentLang = localStorage.getItem('preferredLang') || (['ko', 'en', 'ja'].includes(_browserLang) ? _browserLang : 'en');
     let currentEditingExpenseId = null;
@@ -127,7 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const closeQrBtn = document.getElementById('close-qr-btn');
     let kickSubscription = null; 
 
-    // 🚀 [핵심 추가] 인앱 브라우저 강제 탈출 및 CleanURL 적용 로직
+    // 인앱 브라우저 강제 탈출 및 CleanURL 적용 로직
     function redirectToExternalBrowser(targetPage, isReplace = false) {
         const userAgent = navigator.userAgent.toLowerCase();
         
@@ -291,30 +303,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // 🚀 [추가됨] 통신 두절 대비 무한 로딩 강제 종료 로직
+    // 🚀 [안전장치 3] 15초 최후통첩 로딩 타이머 (시각적 해제)
     let loadingTimeout = null;
     function setLoading(isLoading) { 
         const loader = document.getElementById('global-loader');
         if(loader) { 
             if (isLoading) { 
                 loader.classList.remove('hidden'); 
-                
-                // 기존 타이머가 있다면 초기화
                 if (loadingTimeout) clearTimeout(loadingTimeout);
-                
-                // 15초(15000ms) 후에도 로딩이 안 끝나면 강제 해제 (화면 꺼짐, 네트워크 끊김 등 무한 로딩 방지)
                 loadingTimeout = setTimeout(() => {
                     loader.classList.add('hidden');
-                    // 중복 알림 방지 처리 후 안내 메시지 띄움
-                    const toastContainer = document.getElementById('toast-container');
-                    if (toastContainer && !toastContainer.innerHTML.includes('응답 지연')) {
-                        showToast('네트워크 응답 지연으로 로딩을 강제로 종료합니다.', 'error');
-                    }
                 }, 15000);
-
             } else { 
                 loader.classList.add('hidden'); 
-                // 작업이 정상적으로 끝나면 강제 종료 타이머 해제
                 if (loadingTimeout) clearTimeout(loadingTimeout);
             } 
         }
@@ -359,12 +360,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (providers.includes('google')) provider = 'google';
         else if (providers.includes('apple')) provider = 'apple';
 
-        await supabaseClient.from('settlement_members').upsert({
-            settlement_id: settlementId,
-            user_id: currentUser.id,
-            email: currentUser.email,
-            provider: provider
-        }, { onConflict: 'settlement_id,user_id' });
+        try {
+            await safeDB(supabaseClient.from('settlement_members').upsert({
+                settlement_id: settlementId,
+                user_id: currentUser.id,
+                email: currentUser.email,
+                provider: provider
+            }, { onConflict: 'settlement_id,user_id' }));
+        } catch (e) {
+            console.error('Member sync failed:', e);
+        }
     }
 
     function setupKickListener() {
@@ -413,34 +418,38 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (isBanned(currentSettlement.id)) return false;
 
-        const { data: members, error } = await supabaseClient
-            .from('settlement_members')
-            .select('user_id')
-            .eq('settlement_id', currentSettlement.id)
-            .eq('user_id', currentUser.id);
+        try {
+            const { data: members, error } = await safeDB(supabaseClient
+                .from('settlement_members')
+                .select('user_id')
+                .eq('settlement_id', currentSettlement.id)
+                .eq('user_id', currentUser.id));
+                
+            if (error) return true; 
             
-        if (error) return true; 
-        
-        if (!members || members.length === 0) {
-            showToast(getLocale('kickedAlert', '방장에 의해 내보내진 방입니다.'), 'error');
-            banRoom(currentSettlement.id); 
-            
-            settlements = settlements.filter(s => s.id !== currentSettlement.id);
-            currentSettlement = null;
-            
-            if(calculatorView) calculatorView.classList.add('hidden'); 
-            if(placeholderRightPane) placeholderRightPane.classList.remove('hidden');
-            window.history.replaceState({}, '', window.location.pathname); 
-            renderSettlementList();
-            
-            document.querySelectorAll('.modal-content').forEach(m => {
-                 const parent = m.parentElement;
-                 if (parent && !parent.classList.contains('hidden')) parent.classList.add('hidden');
-            });
-            
-            return false;
+            if (!members || members.length === 0) {
+                showToast(getLocale('kickedAlert', '방장에 의해 내보내진 방입니다.'), 'error');
+                banRoom(currentSettlement.id); 
+                
+                settlements = settlements.filter(s => s.id !== currentSettlement.id);
+                currentSettlement = null;
+                
+                if(calculatorView) calculatorView.classList.add('hidden'); 
+                if(placeholderRightPane) placeholderRightPane.classList.remove('hidden');
+                window.history.replaceState({}, '', window.location.pathname); 
+                renderSettlementList();
+                
+                document.querySelectorAll('.modal-content').forEach(m => {
+                     const parent = m.parentElement;
+                     if (parent && !parent.classList.contains('hidden')) parent.classList.add('hidden');
+                });
+                
+                return false;
+            }
+            return true;
+        } catch(e) {
+            return true; // 에러 발생 시 무단 강퇴 방지
         }
-        return true;
     }
 
     function updateAuthUI() {
@@ -483,6 +492,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 try {
                     await supabaseClient.auth.signOut(); 
                     window.location.replace('login.html'); 
+                } catch(e) {
+                    window.location.replace('login.html');
                 } finally {
                     setLoading(false);
                 }
@@ -642,21 +653,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         setLoading(true);
         try {
-            let { data, error } = await supabaseClient
+            let { data, error } = await safeDB(supabaseClient
                 .from('settlements')
                 .select('id')
                 .eq('invite_code', codeInput)
                 .is('deleted_at', null) 
-                .single();
+                .single());
                 
             if ((error || !data) && /^\d+$/.test(codeInput)) {
                 const numericId = parseInt(codeInput, 10);
-                const { data: idData, error: idError } = await supabaseClient
+                const { data: idData, error: idError } = await safeDB(supabaseClient
                     .from('settlements')
                     .select('id')
                     .eq('id', numericId)
                     .is('deleted_at', null) 
-                    .single();
+                    .single());
                 
                 data = idData;
                 error = idError;
@@ -688,13 +699,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             await loadSingleSettlement(data.id);
         } catch(e) {
             console.error(e);
-            showToast('에러가 발생했습니다.', 'error');
+            if (e.message === 'TIMEOUT_DB' || e.name === 'AbortError' || e.message === 'OFFLINE') showToast('네트워크가 불안정합니다. 다시 버튼을 눌러주세요.', 'error');
+            else showToast('에러가 발생했습니다.', 'error');
         } finally {
             setLoading(false);
         }
     }
 
-    // 🚀 [수정됨] 환율 로드 로직 최신 API로 변경, 예외처리 개선
     async function getExchangeRate(date, base, target) {
         if (base === target) return 1;
         const cacheKey = `${date}_${base}_${target}`;
@@ -846,37 +857,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function loadSingleSettlement(roomId) {
         if (window.innerWidth > 768 && sidebar) sidebar.classList.add('collapsed'); 
         
-        const { data, error } = await supabaseClient
-            .from('settlements')
-            .select(`*, expenses (*)`)
-            .eq('id', roomId)
-            .is('deleted_at', null) 
-            .single();
-            
-        if (error || !data) {
-            showToast('존재하지 않거나 삭제된 정산건입니다.', 'error');
-            setTimeout(() => window.location.href = 'index.html', 2000); 
-            return;
+        try {
+            const { data, error } = await safeDB(supabaseClient
+                .from('settlements')
+                .select(`*, expenses (*)`)
+                .eq('id', roomId)
+                .is('deleted_at', null) 
+                .single());
+                
+            if (error || !data) {
+                showToast('존재하지 않거나 삭제된 정산건입니다.', 'error');
+                setTimeout(() => window.location.href = 'index.html', 2000); 
+                return;
+            }
+            await selectSettlement(data); 
+        } catch(e) {
+            console.error(e);
+            showToast('데이터를 불러오지 못했습니다.', 'error');
         }
-        await selectSettlement(data); 
     }
 
     async function loadData() {
         let allRooms = [];
         if (currentUser) {
-            const { data, error } = await supabaseClient
-                .from('settlements')
-                .select(`* , expenses (*)`)
-                .eq('user_id', currentUser.id)
-                .is('deleted_at', null); 
-                
-            if (error) {
-                console.error("데이터 로드 에러:", error);
-                return;
-            }
-            if (data) {
-                data.forEach(room => room.is_host = true);
-                allRooms = [...allRooms, ...data];
+            try {
+                const { data, error } = await safeDB(supabaseClient
+                    .from('settlements')
+                    .select(`* , expenses (*)`)
+                    .eq('user_id', currentUser.id)
+                    .is('deleted_at', null)); 
+                    
+                if (error) {
+                    console.error("데이터 로드 에러:", error);
+                } else if (data) {
+                    data.forEach(room => room.is_host = true);
+                    allRooms = [...allRooms, ...data];
+                }
+            } catch(e) {
+                console.error(e);
             }
         }
 
@@ -884,19 +902,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         joinedIds = joinedIds.filter(id => !isBanned(id));
 
         if (joinedIds.length > 0) {
-            const { data: guestData } = await supabaseClient
-                .from('settlements')
-                .select(`* , expenses (*)`)
-                .in('id', joinedIds)
-                .is('deleted_at', null); 
-                
-            if (guestData) {
-                guestData.forEach(room => {
-                    if (!allRooms.find(r => r.id === room.id)) {
-                        room.is_host = false; 
-                        allRooms.push(room);
-                    }
-                });
+            try {
+                const { data: guestData } = await safeDB(supabaseClient
+                    .from('settlements')
+                    .select(`* , expenses (*)`)
+                    .in('id', joinedIds)
+                    .is('deleted_at', null)); 
+                    
+                if (guestData) {
+                    guestData.forEach(room => {
+                        if (!allRooms.find(r => r.id === room.id)) {
+                            room.is_host = false; 
+                            allRooms.push(room);
+                        }
+                    });
+                }
+            } catch(e) {
+                console.error(e);
             }
         }
 
@@ -1180,15 +1202,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         setLoading(true);
         try {
-            const { data, error } = await supabaseClient.from('settlements').insert([{ 
+            const { data, error } = await safeDB(supabaseClient.from('settlements').insert([{ 
                 title, date, participants: participants, base_currency: baseCurrency, is_settled: false, 
                 user_id: currentUser ? currentUser.id : null, invite_code: inviteCode
-            }]).select('*, expenses (*)');
+            }]).select('*, expenses (*)'));
             
-            if (error) { 
-                showToast('정산 생성에 실패했습니다.', 'error'); 
-                console.error(error); return; 
-            }
+            if (error) throw error;
             
             showToast('새로운 정산이 생성되었습니다.', 'success');
             const newSettlement = data[0];
@@ -1205,7 +1224,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(newSettlementTitleInput) newSettlementTitleInput.value = ''; 
         } catch(e) {
             console.error(e);
-            showToast('에러가 발생했습니다.', 'error');
+            if (e.message === 'TIMEOUT_DB' || e.name === 'AbortError' || e.message === 'OFFLINE') showToast('네트워크가 불안정합니다. 잠시 후 다시 시도해주세요.', 'error');
+            else showToast('정산 생성에 실패했습니다.', 'error');
         } finally {
             setLoading(false);
         }
@@ -1252,23 +1272,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         setLoading(true);
         try {
-            const { data, error } = await supabaseClient.from('expenses').insert([{ 
+            const { data, error } = await safeDB(supabaseClient.from('expenses').insert([{ 
                 settlement_id: currentSettlement.id, expense_date: expenseDate, name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
-            }]).select();
+            }]).select());
 
-            if (error) { showToast('기록에 실패했습니다.', 'error'); return; }
+            if (error) throw error;
             
             showToast('지출이 기록되었습니다.', 'success');
             currentSettlement.expenses.push(data[0]);
 
             if (currentSettlement.is_settled) {
                 currentSettlement.is_settled = false;
-                await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
+                await safeDB(supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id));
             }
             render(); clearInputs();
         } catch(e) {
             console.error(e);
-            showToast('에러가 발생했습니다.', 'error');
+            if (e.message === 'TIMEOUT_DB' || e.name === 'AbortError' || e.message === 'OFFLINE') showToast('네트워크가 불안정합니다. 다시 버튼을 눌러주세요.', 'error');
+            else showToast('에러가 발생했습니다.', 'error');
         } finally {
             setLoading(false);
         }
@@ -1352,11 +1373,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         setLoading(true);
         try {
-            const { data, error } = await supabaseClient.from('expenses').update({ 
+            const { data, error } = await safeDB(supabaseClient.from('expenses').update({ 
                 expense_date: expenseDate, name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
-            }).eq('id', currentEditingExpenseId).select();
+            }).eq('id', currentEditingExpenseId).select());
 
-            if (error) { showToast('저장에 실패했습니다.', 'error'); return; }
+            if (error) throw error;
             showToast('성공적으로 수정되었습니다.', 'success');
             
             const expenseIndex = currentSettlement.expenses.findIndex(e => e.id === currentEditingExpenseId);
@@ -1364,7 +1385,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (currentSettlement.is_settled) {
                 currentSettlement.is_settled = false;
-                await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
+                await safeDB(supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id));
             }
             
             render(); 
@@ -1372,7 +1393,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentEditingExpenseId = null;
         } catch(e) {
             console.error(e);
-            showToast('에러가 발생했습니다.', 'error');
+            if (e.message === 'TIMEOUT_DB' || e.name === 'AbortError' || e.message === 'OFFLINE') showToast('네트워크가 불안정합니다. 다시 버튼을 눌러주세요.', 'error');
+            else showToast('에러가 발생했습니다.', 'error');
         } finally {
             setLoading(false);
         }
@@ -1384,18 +1406,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             setLoading(true);
             try {
-                const { error } = await supabaseClient.from('expenses').delete().eq('id', expenseId);
-                if (error) { showToast('삭제에 실패했습니다.', 'error'); return; }
+                const { error } = await safeDB(supabaseClient.from('expenses').delete().eq('id', expenseId));
+                if (error) throw error;
                 showToast('삭제되었습니다.', 'success');
                 currentSettlement.expenses = currentSettlement.expenses.filter(exp => exp.id !== expenseId);
                 if (currentSettlement.is_settled) {
                     currentSettlement.is_settled = false;
-                    await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
+                    await safeDB(supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id));
                 }
                 render(); 
             } catch(e) {
                 console.error(e);
-                showToast('에러가 발생했습니다.', 'error');
+                if (e.message === 'TIMEOUT_DB' || e.name === 'AbortError' || e.message === 'OFFLINE') showToast('네트워크가 불안정합니다. 다시 버튼을 눌러주세요.', 'error');
+                else showToast('에러가 발생했습니다.', 'error');
             } finally {
                 setLoading(false);
             }
@@ -1406,10 +1429,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (await showConfirm(getLocale('deleteSettlementConfirm', '정말 방을 삭제하시겠습니까?'))) {
             setLoading(true);
             try {
-                const { error: settlementError } = await supabaseClient
+                const { error: settlementError } = await safeDB(supabaseClient
                     .from('settlements')
                     .update({ deleted_at: new Date().toISOString() }) 
-                    .eq('id', settlementId);
+                    .eq('id', settlementId));
 
                 if (settlementError) { showToast('삭제에 실패했습니다. (방장만 삭제 가능합니다)', 'error'); return; }
                 showToast('성공적으로 삭제되었습니다.', 'success');
@@ -1423,7 +1446,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 renderSettlementList();
             } catch(e) {
                 console.error(e);
-                showToast('에러가 발생했습니다.', 'error');
+                if (e.message === 'TIMEOUT_DB' || e.name === 'AbortError' || e.message === 'OFFLINE') showToast('네트워크가 불안정합니다. 다시 버튼을 눌러주세요.', 'error');
+                else showToast('에러가 발생했습니다.', 'error');
             } finally {
                 setLoading(false);
             }
@@ -1433,7 +1457,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function leaveSettlement(settlementId) {
         if (await showConfirm(getLocale('leaveRoomConfirm', '정말 이 방에서 나가시겠습니까?'))) {
             if (currentUser) {
-                await supabaseClient.from('settlement_members').delete().match({ settlement_id: settlementId, user_id: currentUser.id });
+                try {
+                    await safeDB(supabaseClient.from('settlement_members').delete().match({ settlement_id: settlementId, user_id: currentUser.id }));
+                } catch (e) { console.error(e); }
             }
 
             let rooms = getJoinedRooms();
@@ -1845,11 +1871,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentSettlement) return;
         setLoading(true);
         try {
-            const { data: members, error } = await supabaseClient
+            const { data: members, error } = await safeDB(supabaseClient
                 .from('settlement_members')
                 .select('*')
                 .eq('settlement_id', currentSettlement.id)
-                .order('joined_at', { ascending: true });
+                .order('joined_at', { ascending: true }));
 
             if (error) {
                 showToast('목록을 불러오지 못했습니다.', 'error');
@@ -1920,40 +1946,46 @@ document.addEventListener('DOMContentLoaded', async () => {
                             targetBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
                             let deleteError = null;
-                            const { error: err1 } = await supabaseClient.from('settlement_members')
-                                .delete()
-                                .match({ settlement_id: currentSettlement.id, user_id: targetUid });
-                            
-                            deleteError = err1;
+                            try {
+                                const { error: err1 } = await safeDB(supabaseClient.from('settlement_members')
+                                    .delete()
+                                    .match({ settlement_id: currentSettlement.id, user_id: targetUid }));
+                                
+                                deleteError = err1;
 
-                            if (err1) {
-                                const { error: err2 } = await supabaseClient.rpc('kick_member', {
-                                    p_settlement_id: currentSettlement.id,
-                                    p_target_uid: targetUid
-                                });
-                                deleteError = err2;
-                            }
+                                if (err1) {
+                                    const { error: err2 } = await safeDB(supabaseClient.rpc('kick_member', {
+                                        p_settlement_id: currentSettlement.id,
+                                        p_target_uid: targetUid
+                                    }));
+                                    deleteError = err2;
+                                }
 
-                            if (deleteError) {
+                                if (deleteError) {
+                                    targetBtn.disabled = false;
+                                    targetBtn.innerHTML = `<i class="fas fa-user-slash"></i>`;
+                                    showToast('권한 부족: Supabase SQL을 확인해주세요.', 'error');
+                                    console.error(deleteError);
+                                } else {
+                                    showToast('성공적으로 내보냈습니다.', 'success');
+                                    
+                                    if (rowElement) {
+                                        rowElement.style.transition = 'all 0.3s ease';
+                                        rowElement.style.opacity = '0';
+                                        rowElement.style.transform = 'translateX(20px)';
+                                        
+                                        setTimeout(() => {
+                                            rowElement.remove();
+                                            if (participantsModalList.children.length === 0) {
+                                                participantsModalList.innerHTML = '<p class="text-muted" style="text-align:center;">아직 연동된 계정이 없습니다.</p>';
+                                            }
+                                        }, 300);
+                                    }
+                                }
+                            } catch(e) {
                                 targetBtn.disabled = false;
                                 targetBtn.innerHTML = `<i class="fas fa-user-slash"></i>`;
-                                showToast('권한 부족: Supabase SQL을 확인해주세요.', 'error');
-                                console.error(deleteError);
-                            } else {
-                                showToast('성공적으로 내보냈습니다.', 'success');
-                                
-                                if (rowElement) {
-                                    rowElement.style.transition = 'all 0.3s ease';
-                                    rowElement.style.opacity = '0';
-                                    rowElement.style.transform = 'translateX(20px)';
-                                    
-                                    setTimeout(() => {
-                                        rowElement.remove();
-                                        if (participantsModalList.children.length === 0) {
-                                            participantsModalList.innerHTML = '<p class="text-muted" style="text-align:center;">아직 연동된 계정이 없습니다.</p>';
-                                        }
-                                    }, 300);
-                                }
+                                showToast('네트워크 통신 에러가 발생했습니다.', 'error');
                             }
                         }
                     });
@@ -2027,17 +2059,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                             const adminLockPinInput = document.getElementById('admin-lock-pin-input');
                             const adminLockPinSaveBtn = document.getElementById('admin-lock-pin-save-btn');
                             
-                            const { data: profileData } = await supabaseClient.from('profiles').select('admin_pin').eq('user_id', currentUser.id).single();
-                            if(adminLockPinInput) adminLockPinInput.value = profileData?.admin_pin || '';
+                            try {
+                                const { data: profileData } = await safeDB(supabaseClient.from('profiles').select('admin_pin').eq('user_id', currentUser.id).single());
+                                if(adminLockPinInput) adminLockPinInput.value = profileData?.admin_pin || '';
+                            } catch(e) { console.error(e); }
                             
                             if(adminLockPinSaveBtn) {
                                 adminLockPinSaveBtn.onclick = async () => {
                                     const newPin = adminLockPinInput.value;
-                                    const { error } = await supabaseClient.from('profiles').update({ admin_pin: newPin }).eq('user_id', currentUser.id);
-                                    if(error) {
-                                        showToast('PIN 저장에 실패했습니다.', 'error');
-                                    } else {
-                                        showToast('잠금용 PIN이 안전하게 저장되었습니다.', 'success');
+                                    try {
+                                        const { error } = await safeDB(supabaseClient.from('profiles').update({ admin_pin: newPin }).eq('user_id', currentUser.id));
+                                        if(error) {
+                                            showToast('PIN 저장에 실패했습니다.', 'error');
+                                        } else {
+                                            showToast('잠금용 PIN이 안전하게 저장되었습니다.', 'success');
+                                        }
+                                    } catch(e) {
+                                        showToast('네트워크 에러가 발생했습니다.', 'error');
                                     }
                                 };
                             }
@@ -2113,10 +2151,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 setLoading(true);
                 try {
-                    const { error } = await supabaseClient
+                    const { error } = await safeDB(supabaseClient
                         .from('profiles')
                         .update({ nickname: newNickname })
-                        .eq('user_id', currentUser.id);
+                        .eq('user_id', currentUser.id));
                     
                     if (error) {
                         showToast('닉네임 변경에 실패했습니다.', 'error');
@@ -2133,6 +2171,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 } catch(e) {
                     console.error(e);
+                    showToast('네트워크 통신 에러가 발생했습니다.', 'error');
                 } finally {
                     setLoading(false);
                 }
@@ -2190,7 +2229,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (await showConfirm(getLocale('deleteAccountConfirm', '정말로 탈퇴하시겠습니까? 복구할 수 없습니다.'))) {
                 setLoading(true);
                 try {
-                    const { error } = await supabaseClient.rpc('delete_user');
+                    const { error } = await safeDB(supabaseClient.rpc('delete_user'));
                     
                     if (error) {
                         showToast('회원 탈퇴 실패 (관리자가 SQL 설정을 했는지 확인해주세요)', 'error');
@@ -2202,6 +2241,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 } catch(e) {
                     console.error(e);
+                    showToast('네트워크 통신 에러가 발생했습니다.', 'error');
                 } finally {
                     setLoading(false);
                 }
@@ -2355,7 +2395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                 setLoading(true);
                 try {
-                    const { error } = await supabaseClient.from('settlements').update({ title: newTitle }).eq('id', currentSettlement.id);
+                    const { error } = await safeDB(supabaseClient.from('settlements').update({ title: newTitle }).eq('id', currentSettlement.id));
 
                     if(error) {
                         showToast('제목 수정에 실패했습니다.', 'error');
@@ -2374,6 +2414,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if(editTitleModal) editTitleModal.classList.add('hidden');
                 } catch(e) {
                     console.error(e);
+                    if (e.message === 'TIMEOUT_DB' || e.name === 'AbortError' || e.message === 'OFFLINE') showToast('네트워크가 불안정합니다. 다시 버튼을 눌러주세요.', 'error');
+                    else showToast('에러가 발생했습니다.', 'error');
                 } finally {
                     setLoading(false);
                 }
@@ -2471,7 +2513,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 setLoading(true);
                 try {
                     currentSettlement.is_settled = !currentSettlement.is_settled;
-                    const { error } = await supabaseClient.from('settlements').update({ is_settled: currentSettlement.is_settled }).eq('id', currentSettlement.id);
+                    const { error } = await safeDB(supabaseClient.from('settlements').update({ is_settled: currentSettlement.is_settled }).eq('id', currentSettlement.id));
                     if (error) { 
                         showToast('상태 업데이트 실패', 'error'); 
                     } else { 
@@ -2481,6 +2523,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     renderSettlementList(); 
                 } catch(e) {
                     console.error(e);
+                    if (e.message === 'TIMEOUT_DB' || e.name === 'AbortError' || e.message === 'OFFLINE') showToast('네트워크가 불안정합니다. 다시 버튼을 눌러주세요.', 'error');
+                    else showToast('에러가 발생했습니다.', 'error');
                 } finally {
                     setLoading(false);
                 }
@@ -2643,21 +2687,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function checkAndRequireNickname() {
         if (!currentUser) return; 
 
-        const { data, error } = await supabaseClient
-            .from('profiles')
-            .select('nickname')
-            .eq('user_id', currentUser.id)
-            .single();
+        try {
+            const { data, error } = await safeDB(supabaseClient
+                .from('profiles')
+                .select('nickname')
+                .eq('user_id', currentUser.id)
+                .single());
 
-        const nicknameModal = document.getElementById('nickname-modal');
+            const nicknameModal = document.getElementById('nickname-modal');
 
-        if (error || !data) {
-            if (nicknameModal) {
-                nicknameModal.classList.remove('hidden');
+            if (error || !data) {
+                if (nicknameModal) {
+                    nicknameModal.classList.remove('hidden');
+                }
+            } else {
+                currentUser.nickname = data.nickname;
+                updateAuthUI(); 
             }
-        } else {
-            currentUser.nickname = data.nickname;
-            updateAuthUI(); 
+        } catch(e) {
+            console.error(e);
         }
     }
 
@@ -2674,9 +2722,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             setLoading(true);
             try {
-                const { error } = await supabaseClient
+                const { error } = await safeDB(supabaseClient
                     .from('profiles')
-                    .insert([{ user_id: currentUser.id, nickname: nickname }]);
+                    .insert([{ user_id: currentUser.id, nickname: nickname }]));
 
                 if (error) {
                     showToast('닉네임 저장에 실패했습니다.', 'error');
@@ -2693,6 +2741,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             } catch(e) {
                 console.error(e);
+                showToast('네트워크 에러가 발생했습니다.', 'error');
             } finally {
                 setLoading(false);
             }
