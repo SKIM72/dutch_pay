@@ -100,21 +100,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     function redirectToExternalBrowser(targetPage, isReplace = false) {
         const userAgent = navigator.userAgent.toLowerCase();
         
-        // 현재 도메인과 대상 페이지만 결합하여 카카오톡이 붙인 불필요한 찌꺼기 파라미터(CleanURL) 제거
         let currentPath = window.location.pathname;
         if(currentPath.endsWith('/')) currentPath += 'index.html'; 
         const targetUrl = window.location.origin + currentPath.replace(/[^\/]*$/, targetPage);
 
         if (userAgent.match(/kakaotalk|line|inapp|naver|instagram|facebook/i)) {
             if (userAgent.match(/android/i)) {
-                // 안드로이드: 크롬 브라우저 강제 호출 (가장 확실함)
                 location.href = `intent://${targetUrl.replace(/^https?:\/\//i, '')}#Intent;scheme=https;package=com.android.chrome;end`;
                 return;
             } else if (userAgent.match(/iphone|ipad|ipod/i)) {
                 if (userAgent.match(/kakaotalk/i)) {
-                    // iOS: 카카오톡 전용 외부 브라우저 호출 스킴 시도
                     location.href = `kakaotalk://web/openExternal?url=${encodeURIComponent(targetUrl)}`;
-                    // 스킴이 작동하지 않을 경우를 대비한 수동 가이드 안내
                     setTimeout(() => {
                         showToast("구글 로그인을 위해 우측 하단 [ ⋮ ] 버튼을 눌러 'Safari로 열기'를 선택해 주세요.", "info");
                     }, 1000);
@@ -123,7 +119,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         
-        // 인앱 브라우저가 아니면 정상적으로 이동
         if (isReplace) {
             window.location.replace(targetPage);
         } else {
@@ -252,7 +247,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const confirmBtn = document.getElementById('confirm-yes-btn');
             const cancelBtn = document.getElementById('confirm-no-btn');
             
-            // 🚀 수정됨: 모달창이 뜰 때 버튼 텍스트도 현재 언어에 맞게 강제 업데이트
             if(confirmBtn) confirmBtn.textContent = getLocale('btnConfirm', '확인');
             if(cancelBtn) cancelBtn.textContent = getLocale('btnCancel', '취소');
 
@@ -427,14 +421,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 🚀 [수정] 로그인 버튼 클릭 시 인앱브라우저 탈출 로직 적용
     async function handleAuthClick() {
         if (currentUser) { 
             if (await showConfirm(getLocale('logoutConfirm', '정말로 로그아웃 하시겠습니까?'))) {
                 setLoading(true); 
-                await supabaseClient.auth.signOut(); 
-                // 로그아웃은 현재 창에서 바로 처리
-                window.location.replace('login.html'); 
+                try {
+                    await supabaseClient.auth.signOut(); 
+                    window.location.replace('login.html'); 
+                } finally {
+                    setLoading(false);
+                }
             }
         } 
         else { 
@@ -590,68 +586,110 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(!codeInput) { showToast('코드를 입력해주세요.', 'error'); return; }
 
         setLoading(true);
-        let { data, error } = await supabaseClient
-            .from('settlements')
-            .select('id')
-            .eq('invite_code', codeInput)
-            .is('deleted_at', null) 
-            .single();
-            
-        if ((error || !data) && /^\d+$/.test(codeInput)) {
-            const numericId = parseInt(codeInput, 10);
-            const { data: idData, error: idError } = await supabaseClient
+        try {
+            let { data, error } = await supabaseClient
                 .from('settlements')
                 .select('id')
-                .eq('id', numericId)
+                .eq('invite_code', codeInput)
                 .is('deleted_at', null) 
                 .single();
+                
+            if ((error || !data) && /^\d+$/.test(codeInput)) {
+                const numericId = parseInt(codeInput, 10);
+                const { data: idData, error: idError } = await supabaseClient
+                    .from('settlements')
+                    .select('id')
+                    .eq('id', numericId)
+                    .is('deleted_at', null) 
+                    .single();
+                
+                data = idData;
+                error = idError;
+            }
+                
+            if(error || !data) {
+                showToast('유효하지 않은 코드이거나 방을 찾을 수 없습니다.', 'error');
+                return;
+            }
+
+            if (isBanned(data.id)) {
+                showToast('접근이 차단된 방입니다.', 'error');
+                const joinModal = document.getElementById('join-modal');
+                if (joinModal) joinModal.classList.add('hidden');
+                return;
+            }
+
+            saveJoinedRoom(data.id);
+            if (joinCodeInput) joinCodeInput.value = '';
             
-            data = idData;
-            error = idError;
-        }
+            const joinModal = document.getElementById('join-modal');
+            if(joinModal) joinModal.classList.add('hidden');
             
-        if(error || !data) {
+            await syncMemberDB(data.id);
+
+            showToast(getLocale('joinSuccess', '성공적으로 방에 참가했습니다!'), 'success');
+            
+            await loadData();
+            await loadSingleSettlement(data.id);
+        } catch(e) {
+            console.error(e);
+            showToast('에러가 발생했습니다.', 'error');
+        } finally {
             setLoading(false);
-            showToast('유효하지 않은 코드이거나 방을 찾을 수 없습니다.', 'error');
-            return;
         }
-
-        if (isBanned(data.id)) {
-            setLoading(false);
-            showToast('접근이 차단된 방입니다.', 'error');
-            if (joinModal) joinModal.classList.add('hidden');
-            return;
-        }
-
-        saveJoinedRoom(data.id);
-        if (joinCodeInput) joinCodeInput.value = '';
-        
-        const joinModal = document.getElementById('join-modal');
-        if(joinModal) joinModal.classList.add('hidden');
-        
-        await syncMemberDB(data.id);
-
-        showToast(getLocale('joinSuccess', '성공적으로 방에 참가했습니다!'), 'success');
-        
-        await loadData();
-        await loadSingleSettlement(data.id);
-        setLoading(false);
     }
 
+    // 🚀 [수정됨] 환율 로드 로직 최신 API로 변경, 예외처리 개선
     async function getExchangeRate(date, base, target) {
         if (base === target) return 1;
         const cacheKey = `${date}_${base}_${target}`;
         if (exchangeRatesCache[cacheKey]) return exchangeRatesCache[cacheKey];
-        const requestDate = new Date(date) > new Date() ? 'latest' : date;
+        
+        let requestDate = date;
+        if (date === 'latest' || new Date(date) > new Date()) {
+            requestDate = 'latest';
+        } else {
+            requestDate = date.split('T')[0];
+        }
+
+        const baseLower = base.toLowerCase();
+        const targetLower = target.toLowerCase();
+
         try {
-            const response = await fetch(`https://api.frankfurter.app/${requestDate}?from=${base}&to=${target}`);
-            if (!response.ok) throw new Error('Network response was not ok');
+            const url = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@${requestDate}/v1/currencies/${baseLower}.json`;
+            let response = await fetch(url);
+            
+            if (!response.ok) {
+                const fallbackUrl = `https://${requestDate}.currency-api.pages.dev/v1/currencies/${baseLower}.json`;
+                response = await fetch(fallbackUrl);
+            }
+            
+            if (!response.ok && requestDate !== 'latest') {
+                 const latestUrl = `https://latest.currency-api.pages.dev/v1/currencies/${baseLower}.json`;
+                 response = await fetch(latestUrl);
+            }
+
+            if (!response.ok) throw new Error('API fetching failed');
+
             const data = await response.json();
-            const rate = data.rates[target];
+            const rate = data[baseLower][targetLower];
             if (!rate) throw new Error(`Rate not found for ${target}`);
             exchangeRatesCache[cacheKey] = rate; 
             return rate;
         } catch (error) { 
+            console.error("Exchange rate fetch error:", error);
+            try {
+                const fDate = requestDate === 'latest' ? 'latest' : requestDate;
+                const fRes = await fetch(`https://api.frankfurter.app/${fDate}?from=${base}&to=${target}`);
+                if (fRes.ok) {
+                    const fData = await fRes.json();
+                    const fRate = fData.rates[target];
+                    if (fRate) {
+                        exchangeRatesCache[cacheKey] = fRate;
+                        return fRate;
+                    }
+                }
+            } catch(e) {}
             return null; 
         }
     }
@@ -708,7 +746,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             } else {
                 if (!currentUser) {
-                    // 🚀 [수정] 미로그인 상태에서 초기 로드 시 탈출 적용
                     redirectToExternalBrowser('login.html', true); 
                     return; 
                 } else {
@@ -731,7 +768,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
                 if (event === 'SIGNED_OUT' && !guestRoomId) {
-                    // 🚀 [수정] 로그아웃 발생 시 탈출 적용
                     redirectToExternalBrowser('login.html', true);
                 } else {
                     currentUser = session ? session.user : null;
@@ -1002,24 +1038,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function fetchAndSetRate(fetchType, currencyFrom, currencyTo, inputEl, previewUpdater, customDateStr = null) {
         if (!currentSettlement) return;
         setLoading(true);
-        
-        let fetchDate = currentSettlement.date; 
-        
-        if (fetchType === 'latest') {
-            fetchDate = 'latest';
-        } else if (fetchType === 'expense' && customDateStr) {
-            fetchDate = customDateStr.split('T')[0];
-        }
+        try {
+            let fetchDate = currentSettlement.date; 
+            
+            if (fetchType === 'latest') {
+                fetchDate = 'latest';
+            } else if (fetchType === 'expense' && customDateStr) {
+                fetchDate = customDateStr.split('T')[0];
+            }
 
-        const rate = await getExchangeRate(fetchDate, currencyFrom, currencyTo);
-        
-        if (rate !== null && inputEl) { 
-            inputEl.value = rate.toFixed(4); 
-            if (previewUpdater) previewUpdater(); 
-        } else if (rate === null && fetchType === 'expense') {
-            showToast('해당 날짜의 환율 정보를 가져오지 못했습니다.', 'error');
+            const rate = await getExchangeRate(fetchDate, currencyFrom, currencyTo);
+            
+            if (rate !== null && inputEl) { 
+                inputEl.value = rate.toFixed(4); 
+                if (previewUpdater) previewUpdater(); 
+            } else if (rate === null && fetchType === 'expense') {
+                showToast('해당 날짜의 환율 정보를 가져오지 못했습니다.', 'error');
+            }
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     }
 
     async function handleAddCurrencyChange() {
@@ -1086,30 +1124,36 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!title || !date || participants.length < 2) { showToast("참가자는 최소 2명 이상이어야 합니다.", "error"); return; }
 
         setLoading(true);
-        const { data, error } = await supabaseClient.from('settlements').insert([{ 
-            title, date, participants: participants, base_currency: baseCurrency, is_settled: false, 
-            user_id: currentUser ? currentUser.id : null, invite_code: inviteCode
-        }]).select('*, expenses (*)');
-        setLoading(false);
-
-        if (error) { 
-            showToast('정산 생성에 실패했습니다.', 'error'); 
-            console.error(error); return; 
+        try {
+            const { data, error } = await supabaseClient.from('settlements').insert([{ 
+                title, date, participants: participants, base_currency: baseCurrency, is_settled: false, 
+                user_id: currentUser ? currentUser.id : null, invite_code: inviteCode
+            }]).select('*, expenses (*)');
+            
+            if (error) { 
+                showToast('정산 생성에 실패했습니다.', 'error'); 
+                console.error(error); return; 
+            }
+            
+            showToast('새로운 정산이 생성되었습니다.', 'success');
+            const newSettlement = data[0];
+            newSettlement.is_host = true; 
+            
+            await syncMemberDB(newSettlement.id);
+            
+            settlements.push(newSettlement);
+            settlements.sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            renderSettlementList(); 
+            selectSettlement(newSettlement);
+            if(addSettlementModal) addSettlementModal.classList.add('hidden');
+            if(newSettlementTitleInput) newSettlementTitleInput.value = ''; 
+        } catch(e) {
+            console.error(e);
+            showToast('에러가 발생했습니다.', 'error');
+        } finally {
+            setLoading(false);
         }
-        
-        showToast('새로운 정산이 생성되었습니다.', 'success');
-        const newSettlement = data[0];
-        newSettlement.is_host = true; 
-        
-        await syncMemberDB(newSettlement.id);
-        
-        settlements.push(newSettlement);
-        settlements.sort((a, b) => new Date(b.date) - new Date(a.date));
-        
-        renderSettlementList(); 
-        selectSettlement(newSettlement);
-        if(addSettlementModal) addSettlementModal.classList.add('hidden');
-        if(newSettlementTitleInput) newSettlementTitleInput.value = ''; 
     }
     
     async function addExpense() {
@@ -1152,21 +1196,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         setLoading(true);
-        const { data, error } = await supabaseClient.from('expenses').insert([{ 
-            settlement_id: currentSettlement.id, expense_date: expenseDate, name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
-        }]).select();
-        setLoading(false);
+        try {
+            const { data, error } = await supabaseClient.from('expenses').insert([{ 
+                settlement_id: currentSettlement.id, expense_date: expenseDate, name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
+            }]).select();
 
-        if (error) { showToast('기록에 실패했습니다.', 'error'); return; }
-        
-        showToast('지출이 기록되었습니다.', 'success');
-        currentSettlement.expenses.push(data[0]);
+            if (error) { showToast('기록에 실패했습니다.', 'error'); return; }
+            
+            showToast('지출이 기록되었습니다.', 'success');
+            currentSettlement.expenses.push(data[0]);
 
-        if (currentSettlement.is_settled) {
-            currentSettlement.is_settled = false;
-            await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
+            if (currentSettlement.is_settled) {
+                currentSettlement.is_settled = false;
+                await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
+            }
+            render(); clearInputs();
+        } catch(e) {
+            console.error(e);
+            showToast('에러가 발생했습니다.', 'error');
+        } finally {
+            setLoading(false);
         }
-        render(); clearInputs();
     }
 
     function openEditExpenseModal(expenseId) {
@@ -1246,25 +1296,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         setLoading(true);
-        const { data, error } = await supabaseClient.from('expenses').update({ 
-            expense_date: expenseDate, name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
-        }).eq('id', currentEditingExpenseId).select();
-        setLoading(false);
+        try {
+            const { data, error } = await supabaseClient.from('expenses').update({ 
+                expense_date: expenseDate, name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
+            }).eq('id', currentEditingExpenseId).select();
 
-        if (error) { showToast('저장에 실패했습니다.', 'error'); return; }
-        showToast('성공적으로 수정되었습니다.', 'success');
-        
-        const expenseIndex = currentSettlement.expenses.findIndex(e => e.id === currentEditingExpenseId);
-        if (expenseIndex > -1) { currentSettlement.expenses[expenseIndex] = data[0]; }
+            if (error) { showToast('저장에 실패했습니다.', 'error'); return; }
+            showToast('성공적으로 수정되었습니다.', 'success');
+            
+            const expenseIndex = currentSettlement.expenses.findIndex(e => e.id === currentEditingExpenseId);
+            if (expenseIndex > -1) { currentSettlement.expenses[expenseIndex] = data[0]; }
 
-        if (currentSettlement.is_settled) {
-            currentSettlement.is_settled = false;
-            await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
+            if (currentSettlement.is_settled) {
+                currentSettlement.is_settled = false;
+                await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
+            }
+            
+            render(); 
+            if(editExpenseModal) editExpenseModal.classList.add('hidden'); 
+            currentEditingExpenseId = null;
+        } catch(e) {
+            console.error(e);
+            showToast('에러가 발생했습니다.', 'error');
+        } finally {
+            setLoading(false);
         }
-        
-        render(); 
-        if(editExpenseModal) editExpenseModal.classList.add('hidden'); 
-        currentEditingExpenseId = null;
     }
     
     async function deleteExpense(expenseId) {
@@ -1272,38 +1328,50 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!(await verifyMembership())) return; 
 
             setLoading(true);
-            const { error } = await supabaseClient.from('expenses').delete().eq('id', expenseId);
-            setLoading(false);
-            if (error) { showToast('삭제에 실패했습니다.', 'error'); return; }
-            showToast('삭제되었습니다.', 'success');
-            currentSettlement.expenses = currentSettlement.expenses.filter(exp => exp.id !== expenseId);
-            if (currentSettlement.is_settled) {
-                currentSettlement.is_settled = false;
-                await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
+            try {
+                const { error } = await supabaseClient.from('expenses').delete().eq('id', expenseId);
+                if (error) { showToast('삭제에 실패했습니다.', 'error'); return; }
+                showToast('삭제되었습니다.', 'success');
+                currentSettlement.expenses = currentSettlement.expenses.filter(exp => exp.id !== expenseId);
+                if (currentSettlement.is_settled) {
+                    currentSettlement.is_settled = false;
+                    await supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id);
+                }
+                render(); 
+            } catch(e) {
+                console.error(e);
+                showToast('에러가 발생했습니다.', 'error');
+            } finally {
+                setLoading(false);
             }
-            render(); 
         }
     }
 
     async function deleteSettlement(settlementId) {
         if (await showConfirm(getLocale('deleteSettlementConfirm', '정말 방을 삭제하시겠습니까?'))) {
             setLoading(true);
-            const { error: settlementError } = await supabaseClient
-                .from('settlements')
-                .update({ deleted_at: new Date().toISOString() }) 
-                .eq('id', settlementId);
-            setLoading(false);
+            try {
+                const { error: settlementError } = await supabaseClient
+                    .from('settlements')
+                    .update({ deleted_at: new Date().toISOString() }) 
+                    .eq('id', settlementId);
 
-            if (settlementError) { showToast('삭제에 실패했습니다. (방장만 삭제 가능합니다)', 'error'); return; }
-            showToast('성공적으로 삭제되었습니다.', 'success');
-            settlements = settlements.filter(s => s.id !== settlementId);
-            if (currentSettlement && currentSettlement.id === settlementId) {
-                currentSettlement = null; 
-                if(calculatorView) calculatorView.classList.add('hidden'); 
-                if(placeholderRightPane) placeholderRightPane.classList.remove('hidden');
-                window.history.replaceState({}, '', window.location.pathname); 
+                if (settlementError) { showToast('삭제에 실패했습니다. (방장만 삭제 가능합니다)', 'error'); return; }
+                showToast('성공적으로 삭제되었습니다.', 'success');
+                settlements = settlements.filter(s => s.id !== settlementId);
+                if (currentSettlement && currentSettlement.id === settlementId) {
+                    currentSettlement = null; 
+                    if(calculatorView) calculatorView.classList.add('hidden'); 
+                    if(placeholderRightPane) placeholderRightPane.classList.remove('hidden');
+                    window.history.replaceState({}, '', window.location.pathname); 
+                }
+                renderSettlementList();
+            } catch(e) {
+                console.error(e);
+                showToast('에러가 발생했습니다.', 'error');
+            } finally {
+                setLoading(false);
             }
-            renderSettlementList();
         }
     }
 
@@ -1365,15 +1433,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         setLoading(true);
-        let ratesInfoHTML = `<div class="rate-item"><span class="base">1 ${base_currency}</span> =</div>`;
-        const targetCurrencies = SUPPORTED_CURRENCIES.filter(c => c !== base_currency);
-        for (const target of targetCurrencies) {
-            const rate = await getExchangeRate(date, base_currency, target);
-            if (rate !== null) ratesInfoHTML += `<div class="rate-item"><span>${formatNumber(rate, 4)}</span><span>${target}</span></div>`;
+        try {
+            let ratesInfoHTML = `<div class="rate-item"><span class="base">1 ${base_currency}</span> =</div>`;
+            const targetCurrencies = SUPPORTED_CURRENCIES.filter(c => c !== base_currency);
+            for (const target of targetCurrencies) {
+                const rate = await getExchangeRate(date, base_currency, target);
+                if (rate !== null) ratesInfoHTML += `<div class="rate-item"><span>${formatNumber(rate, 4)}</span><span>${target}</span></div>`;
+            }
+            if(exchangeRateInfo) exchangeRateInfo.innerHTML = ratesInfoHTML;
+            if(exchangeRateModal) exchangeRateModal.classList.remove('hidden');
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
-        if(exchangeRateInfo) exchangeRateInfo.innerHTML = ratesInfoHTML;
-        if(exchangeRateModal) exchangeRateModal.classList.remove('hidden');
     }
 
     function render() { 
@@ -1718,120 +1789,125 @@ document.addEventListener('DOMContentLoaded', async () => {
     async function renderParticipantsModal() {
         if (!currentSettlement) return;
         setLoading(true);
-        const { data: members, error } = await supabaseClient
-            .from('settlement_members')
-            .select('*')
-            .eq('settlement_id', currentSettlement.id)
-            .order('joined_at', { ascending: true });
-        setLoading(false);
+        try {
+            const { data: members, error } = await supabaseClient
+                .from('settlement_members')
+                .select('*')
+                .eq('settlement_id', currentSettlement.id)
+                .order('joined_at', { ascending: true });
 
-        if (error) {
-            showToast('목록을 불러오지 못했습니다.', 'error');
-            return;
-        }
+            if (error) {
+                showToast('목록을 불러오지 못했습니다.', 'error');
+                return;
+            }
 
-        participantsModalList.innerHTML = '';
-        if (!members || members.length === 0) {
-            participantsModalList.innerHTML = '<p class="text-muted" style="text-align:center;">아직 연동된 계정이 없습니다.</p>';
-        } else {
-            const isMeHost = currentUser && currentSettlement.user_id === currentUser.id;
-            
-            members.forEach(m => {
-                const isHost = m.user_id === currentSettlement.user_id;
-                const isMe = currentUser && m.user_id === currentUser.id;
+            participantsModalList.innerHTML = '';
+            if (!members || members.length === 0) {
+                participantsModalList.innerHTML = '<p class="text-muted" style="text-align:center;">아직 연동된 계정이 없습니다.</p>';
+            } else {
+                const isMeHost = currentUser && currentSettlement.user_id === currentUser.id;
                 
-                let iconHtml = '<i class="fas fa-envelope" style="color: var(--primary);"></i>';
-                if (m.provider === 'google') iconHtml = '<i class="fab fa-google" style="color: #EA4335;"></i>';
-                else if (m.provider === 'apple') iconHtml = '<i class="fab fa-apple"></i>';
+                members.forEach(m => {
+                    const isHost = m.user_id === currentSettlement.user_id;
+                    const isMe = currentUser && m.user_id === currentUser.id;
+                    
+                    let iconHtml = '<i class="fas fa-envelope" style="color: var(--primary);"></i>';
+                    if (m.provider === 'google') iconHtml = '<i class="fab fa-google" style="color: #EA4335;"></i>';
+                    else if (m.provider === 'apple') iconHtml = '<i class="fab fa-apple"></i>';
 
-                let badges = '';
-                if (isHost) badges += `<span class="badge badge-host" style="font-size:0.7rem; padding:0.2rem 0.4rem; margin-left:0.5rem;">${getLocale('badgeHost', '방장')}</span>`;
-                if (isMe) badges += `<span class="badge" style="background:#e2e8f0; color:#475569; font-size:0.7rem; padding:0.2rem 0.4rem; margin-left:0.5rem;">${getLocale('badgeMe', '나')}</span>`;
+                    let badges = '';
+                    if (isHost) badges += `<span class="badge badge-host" style="font-size:0.7rem; padding:0.2rem 0.4rem; margin-left:0.5rem;">${getLocale('badgeHost', '방장')}</span>`;
+                    if (isMe) badges += `<span class="badge" style="background:#e2e8f0; color:#475569; font-size:0.7rem; padding:0.2rem 0.4rem; margin-left:0.5rem;">${getLocale('badgeMe', '나')}</span>`;
 
-                const itemDiv = document.createElement('div');
-                itemDiv.style.display = 'flex';
-                itemDiv.style.alignItems = 'center';
-                itemDiv.style.justifyContent = 'space-between';
-                itemDiv.style.padding = '0.8rem';
-                itemDiv.style.border = '1px solid var(--border)';
-                itemDiv.style.borderRadius = '8px';
-                
-                let emailDisplay = m.email || '';
-                if (!isMe && !isHost && isMeHost === false) {
-                    const parts = emailDisplay.split('@');
-                    if(parts.length === 2) emailDisplay = parts[0].substring(0, 3) + '***@' + parts[1];
-                }
+                    const itemDiv = document.createElement('div');
+                    itemDiv.style.display = 'flex';
+                    itemDiv.style.alignItems = 'center';
+                    itemDiv.style.justifyContent = 'space-between';
+                    itemDiv.style.padding = '0.8rem';
+                    itemDiv.style.border = '1px solid var(--border)';
+                    itemDiv.style.borderRadius = '8px';
+                    
+                    let emailDisplay = m.email || '';
+                    if (!isMe && !isHost && isMeHost === false) {
+                        const parts = emailDisplay.split('@');
+                        if(parts.length === 2) emailDisplay = parts[0].substring(0, 3) + '***@' + parts[1];
+                    }
 
-                let leftContent = `<div style="display:flex; align-items:center; gap:0.8rem;">
-                    <div style="width:32px; height:32px; border-radius:50%; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-size:1.1rem;">
-                        ${iconHtml}
-                    </div>
-                    <div style="display:flex; flex-direction:column;">
-                        <div style="display:flex; align-items:center;">
-                            <span style="font-weight:600; font-size:0.9rem; color:var(--text-main);">${emailDisplay}</span>
-                            ${badges}
+                    let leftContent = `<div style="display:flex; align-items:center; gap:0.8rem;">
+                        <div style="width:32px; height:32px; border-radius:50%; background:#f1f5f9; display:flex; align-items:center; justify-content:center; font-size:1.1rem;">
+                            ${iconHtml}
                         </div>
-                    </div>
-                </div>`;
+                        <div style="display:flex; flex-direction:column;">
+                            <div style="display:flex; align-items:center;">
+                                <span style="font-weight:600; font-size:0.9rem; color:var(--text-main);">${emailDisplay}</span>
+                                ${badges}
+                            </div>
+                        </div>
+                    </div>`;
 
-                let rightContent = '';
-                if (isMeHost && !isHost) {
-                    rightContent = `<button class="kick-btn" data-uid="${m.user_id}" style="background:none; border:none; color:var(--danger); cursor:pointer; padding:0.5rem; font-size:0.9rem;"><i class="fas fa-user-slash"></i> <span class="btn-text">${getLocale('kickUser', '내보내기')}</span></button>`;
-                }
+                    let rightContent = '';
+                    if (isMeHost && !isHost) {
+                        rightContent = `<button class="kick-btn" data-uid="${m.user_id}" style="background:none; border:none; color:var(--danger); cursor:pointer; padding:0.5rem; font-size:0.9rem;"><i class="fas fa-user-slash"></i> <span class="btn-text">${getLocale('kickUser', '내보내기')}</span></button>`;
+                    }
 
-                itemDiv.innerHTML = leftContent + rightContent;
-                participantsModalList.appendChild(itemDiv);
-            });
+                    itemDiv.innerHTML = leftContent + rightContent;
+                    participantsModalList.appendChild(itemDiv);
+                });
 
-            participantsModalList.querySelectorAll('.kick-btn').forEach(btn => {
-                btn.addEventListener('click', async (e) => {
-                    const targetBtn = e.currentTarget;
-                    if (await showConfirm(getLocale('kickConfirm', '정말로 이 사용자를 이 방에서 내보내시겠습니까?'))) {
-                        const targetUid = targetBtn.dataset.uid;
-                        const rowElement = targetBtn.closest('div[style*="border"]');
-                        
-                        targetBtn.disabled = true;
-                        targetBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
-                        let deleteError = null;
-                        const { error: err1 } = await supabaseClient.from('settlement_members')
-                            .delete()
-                            .match({ settlement_id: currentSettlement.id, user_id: targetUid });
-                        
-                        deleteError = err1;
-
-                        if (err1) {
-                            const { error: err2 } = await supabaseClient.rpc('kick_member', {
-                                p_settlement_id: currentSettlement.id,
-                                p_target_uid: targetUid
-                            });
-                            deleteError = err2;
-                        }
-
-                        if (deleteError) {
-                            targetBtn.disabled = false;
-                            targetBtn.innerHTML = `<i class="fas fa-user-slash"></i>`;
-                            showToast('권한 부족: Supabase SQL을 확인해주세요.', 'error');
-                            console.error(deleteError);
-                        } else {
-                            showToast('성공적으로 내보냈습니다.', 'success');
+                participantsModalList.querySelectorAll('.kick-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const targetBtn = e.currentTarget;
+                        if (await showConfirm(getLocale('kickConfirm', '정말로 이 사용자를 이 방에서 내보내시겠습니까?'))) {
+                            const targetUid = targetBtn.dataset.uid;
+                            const rowElement = targetBtn.closest('div[style*="border"]');
                             
-                            if (rowElement) {
-                                rowElement.style.transition = 'all 0.3s ease';
-                                rowElement.style.opacity = '0';
-                                rowElement.style.transform = 'translateX(20px)';
+                            targetBtn.disabled = true;
+                            targetBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                            let deleteError = null;
+                            const { error: err1 } = await supabaseClient.from('settlement_members')
+                                .delete()
+                                .match({ settlement_id: currentSettlement.id, user_id: targetUid });
+                            
+                            deleteError = err1;
+
+                            if (err1) {
+                                const { error: err2 } = await supabaseClient.rpc('kick_member', {
+                                    p_settlement_id: currentSettlement.id,
+                                    p_target_uid: targetUid
+                                });
+                                deleteError = err2;
+                            }
+
+                            if (deleteError) {
+                                targetBtn.disabled = false;
+                                targetBtn.innerHTML = `<i class="fas fa-user-slash"></i>`;
+                                showToast('권한 부족: Supabase SQL을 확인해주세요.', 'error');
+                                console.error(deleteError);
+                            } else {
+                                showToast('성공적으로 내보냈습니다.', 'success');
                                 
-                                setTimeout(() => {
-                                    rowElement.remove();
-                                    if (participantsModalList.children.length === 0) {
-                                        participantsModalList.innerHTML = '<p class="text-muted" style="text-align:center;">아직 연동된 계정이 없습니다.</p>';
-                                    }
-                                }, 300);
+                                if (rowElement) {
+                                    rowElement.style.transition = 'all 0.3s ease';
+                                    rowElement.style.opacity = '0';
+                                    rowElement.style.transform = 'translateX(20px)';
+                                    
+                                    setTimeout(() => {
+                                        rowElement.remove();
+                                        if (participantsModalList.children.length === 0) {
+                                            participantsModalList.innerHTML = '<p class="text-muted" style="text-align:center;">아직 연동된 계정이 없습니다.</p>';
+                                        }
+                                    }, 300);
+                                }
                             }
                         }
-                    }
+                    });
                 });
-            });
+            }
+        } catch(e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
         }
     }
 
@@ -1981,24 +2057,29 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
                 
                 setLoading(true);
-                const { error } = await supabaseClient
-                    .from('profiles')
-                    .update({ nickname: newNickname })
-                    .eq('user_id', currentUser.id);
-                setLoading(false);
-                
-                if (error) {
-                    showToast('닉네임 변경에 실패했습니다.', 'error');
-                    console.error(error);
-                } else {
-                    showToast(getLocale('nicknameUpdated', '닉네임이 성공적으로 변경되었습니다.'), 'success');
-                    currentUser.nickname = newNickname; 
-                    updateAuthUI(); 
+                try {
+                    const { error } = await supabaseClient
+                        .from('profiles')
+                        .update({ nickname: newNickname })
+                        .eq('user_id', currentUser.id);
                     
-                    const currentNicknameDisplay = document.getElementById('current-nickname-display');
-                    if (currentNicknameDisplay) {
-                        currentNicknameDisplay.textContent = newNickname;
+                    if (error) {
+                        showToast('닉네임 변경에 실패했습니다.', 'error');
+                        console.error(error);
+                    } else {
+                        showToast(getLocale('nicknameUpdated', '닉네임이 성공적으로 변경되었습니다.'), 'success');
+                        currentUser.nickname = newNickname; 
+                        updateAuthUI(); 
+                        
+                        const currentNicknameDisplay = document.getElementById('current-nickname-display');
+                        if (currentNicknameDisplay) {
+                            currentNicknameDisplay.textContent = newNickname;
+                        }
                     }
+                } catch(e) {
+                    console.error(e);
+                } finally {
+                    setLoading(false);
                 }
             });
         }
@@ -2032,15 +2113,20 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
             setLoading(true);
-            const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
-            setLoading(false);
-            if (error) {
-                showToast(error.message, 'error');
-            } else {
-                showToast(getLocale('passwordUpdated', '비밀번호가 성공적으로 변경되었습니다.'), 'success');
-                if(profileNewPassword) profileNewPassword.value = '';
-                const profileModal = document.getElementById('profile-modal');
-                if(profileModal) profileModal.classList.add('hidden');
+            try {
+                const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+                if (error) {
+                    showToast(error.message, 'error');
+                } else {
+                    showToast(getLocale('passwordUpdated', '비밀번호가 성공적으로 변경되었습니다.'), 'success');
+                    if(profileNewPassword) profileNewPassword.value = '';
+                    const profileModal = document.getElementById('profile-modal');
+                    if(profileModal) profileModal.classList.add('hidden');
+                }
+            } catch(e) {
+                console.error(e);
+            } finally {
+                setLoading(false);
             }
         });
 
@@ -2048,16 +2134,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(deleteAccountBtn) deleteAccountBtn.addEventListener('click', async () => {
             if (await showConfirm(getLocale('deleteAccountConfirm', '정말로 탈퇴하시겠습니까? 복구할 수 없습니다.'))) {
                 setLoading(true);
-                const { error } = await supabaseClient.rpc('delete_user');
-                setLoading(false);
-                
-                if (error) {
-                    showToast('회원 탈퇴 실패 (관리자가 SQL 설정을 했는지 확인해주세요)', 'error');
-                    console.error("delete_user RPC error:", error);
-                } else {
-                    showToast(getLocale('accountDeletedSuccess', '회원 탈퇴가 완료되었습니다.'), 'success');
-                    await supabaseClient.auth.signOut();
-                    window.location.replace('login.html');
+                try {
+                    const { error } = await supabaseClient.rpc('delete_user');
+                    
+                    if (error) {
+                        showToast('회원 탈퇴 실패 (관리자가 SQL 설정을 했는지 확인해주세요)', 'error');
+                        console.error("delete_user RPC error:", error);
+                    } else {
+                        showToast(getLocale('accountDeletedSuccess', '회원 탈퇴가 완료되었습니다.'), 'success');
+                        await supabaseClient.auth.signOut();
+                        window.location.replace('login.html');
+                    }
+                } catch(e) {
+                    console.error(e);
+                } finally {
+                    setLoading(false);
                 }
             }
         });
@@ -2208,24 +2299,29 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
 
                 setLoading(true);
-                const { error } = await supabaseClient.from('settlements').update({ title: newTitle }).eq('id', currentSettlement.id);
-                setLoading(false);
+                try {
+                    const { error } = await supabaseClient.from('settlements').update({ title: newTitle }).eq('id', currentSettlement.id);
 
-                if(error) {
-                    showToast('제목 수정에 실패했습니다.', 'error');
-                    return;
+                    if(error) {
+                        showToast('제목 수정에 실패했습니다.', 'error');
+                        return;
+                    }
+
+                    showToast('제목이 수정되었습니다.', 'success');
+                    currentSettlement.title = newTitle;
+                    
+                    const sIndex = settlements.findIndex(s => s.id === currentSettlement.id);
+                    if(sIndex > -1) settlements[sIndex].title = newTitle;
+                    
+                    if(settlementDisplay) settlementDisplay.textContent = newTitle;
+                    renderSettlementList();
+                    updateOpenGraphTags(currentSettlement); 
+                    if(editTitleModal) editTitleModal.classList.add('hidden');
+                } catch(e) {
+                    console.error(e);
+                } finally {
+                    setLoading(false);
                 }
-
-                showToast('제목이 수정되었습니다.', 'success');
-                currentSettlement.title = newTitle;
-                
-                const sIndex = settlements.findIndex(s => s.id === currentSettlement.id);
-                if(sIndex > -1) settlements[sIndex].title = newTitle;
-                
-                if(settlementDisplay) settlementDisplay.textContent = newTitle;
-                renderSettlementList();
-                updateOpenGraphTags(currentSettlement); 
-                if(editTitleModal) editTitleModal.classList.add('hidden');
             });
         }
 
@@ -2318,16 +2414,21 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (!(await verifyMembership())) return; 
 
                 setLoading(true);
-                currentSettlement.is_settled = !currentSettlement.is_settled;
-                const { error } = await supabaseClient.from('settlements').update({ is_settled: currentSettlement.is_settled }).eq('id', currentSettlement.id);
-                if (error) { 
-                    showToast('상태 업데이트 실패', 'error'); 
-                } else { 
-                    showToast(currentSettlement.is_settled ? '정산이 완료되었습니다.' : '정산이 다시 열렸습니다.', 'info'); 
+                try {
+                    currentSettlement.is_settled = !currentSettlement.is_settled;
+                    const { error } = await supabaseClient.from('settlements').update({ is_settled: currentSettlement.is_settled }).eq('id', currentSettlement.id);
+                    if (error) { 
+                        showToast('상태 업데이트 실패', 'error'); 
+                    } else { 
+                        showToast(currentSettlement.is_settled ? '정산이 완료되었습니다.' : '정산이 다시 열렸습니다.', 'info'); 
+                    }
+                    render(); 
+                    renderSettlementList(); 
+                } catch(e) {
+                    console.error(e);
+                } finally {
+                    setLoading(false);
                 }
-                render(); 
-                renderSettlementList(); 
-                setLoading(false);
             }
         });
         
@@ -2517,25 +2618,28 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             setLoading(true);
+            try {
+                const { error } = await supabaseClient
+                    .from('profiles')
+                    .insert([{ user_id: currentUser.id, nickname: nickname }]);
 
-            const { error } = await supabaseClient
-                .from('profiles')
-                .insert([{ user_id: currentUser.id, nickname: nickname }]);
-
-            setLoading(false);
-
-            if (error) {
-                showToast('닉네임 저장에 실패했습니다.', 'error');
-                console.error(error);
-            } else {
-                showToast(getLocale('nicknameUpdated', '반갑습니다! 닉네임이 설정되었습니다.'), 'success');
-                currentUser.nickname = nickname; 
-                updateAuthUI(); 
-                
-                const nicknameModal = document.getElementById('nickname-modal');
-                if (nicknameModal) {
-                    nicknameModal.classList.add('hidden');
+                if (error) {
+                    showToast('닉네임 저장에 실패했습니다.', 'error');
+                    console.error(error);
+                } else {
+                    showToast(getLocale('nicknameUpdated', '반갑습니다! 닉네임이 설정되었습니다.'), 'success');
+                    currentUser.nickname = nickname; 
+                    updateAuthUI(); 
+                    
+                    const nicknameModal = document.getElementById('nickname-modal');
+                    if (nicknameModal) {
+                        nicknameModal.classList.add('hidden');
+                    }
                 }
+            } catch(e) {
+                console.error(e);
+            } finally {
+                setLoading(false);
             }
         });
         
