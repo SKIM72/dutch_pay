@@ -260,9 +260,33 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // 🚀 [추가됨] 통신 두절 대비 무한 로딩 강제 종료 로직
+    let loadingTimeout = null;
     function setLoading(isLoading) { 
         const loader = document.getElementById('global-loader');
-        if(loader) { if (isLoading) loader.classList.remove('hidden'); else loader.classList.add('hidden'); }
+        if(loader) { 
+            if (isLoading) { 
+                loader.classList.remove('hidden'); 
+                
+                // 기존 타이머가 있다면 초기화
+                if (loadingTimeout) clearTimeout(loadingTimeout);
+                
+                // 15초(15000ms) 후에도 로딩이 안 끝나면 강제 해제 (화면 꺼짐, 네트워크 끊김 등 무한 로딩 방지)
+                loadingTimeout = setTimeout(() => {
+                    loader.classList.add('hidden');
+                    // 중복 알림 방지 처리 후 안내 메시지 띄움
+                    const toastContainer = document.getElementById('toast-container');
+                    if (toastContainer && !toastContainer.innerHTML.includes('응답 지연')) {
+                        showToast('네트워크 응답 지연으로 로딩을 강제로 종료합니다.', 'error');
+                    }
+                }, 15000);
+
+            } else { 
+                loader.classList.add('hidden'); 
+                // 작업이 정상적으로 끝나면 강제 종료 타이머 해제
+                if (loadingTimeout) clearTimeout(loadingTimeout);
+            } 
+        }
     }
 
     function getStorageKey(baseKey) {
