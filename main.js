@@ -1,6 +1,37 @@
 document.addEventListener('DOMContentLoaded', async () => {
 
-    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+    // 🚀 [추가 및 수정됨] Supabase 통신 좀비 상태 방지용 커스텀 Fetch
+    const customFetch = async (url, options) => {
+        // 1. 기기가 오프라인 상태면 통신 시도조차 하지 않고 즉시 차단
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            throw new Error('Network is offline');
+        }
+        
+        // 2. 10초 이상 응답이 없으면 통신 자체를 물리적으로 끊어버림(Abort)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); 
+
+        try {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            clearTimeout(timeoutId);
+            return response;
+        } catch (err) {
+            clearTimeout(timeoutId);
+            throw err; // 에러를 뱉어야 로딩 스피너도 정상적으로 꺼지고 다음 클릭이 먹힘
+        }
+    };
+
+    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey, {
+        global: { fetch: customFetch }
+    });
+
+    // 3. 잠금 화면에서 돌아왔을 때 멈춰있던 인증 세션과 소켓을 강제로 깨워줌
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && navigator.onLine) {
+            supabaseClient.auth.getSession();
+            supabaseClient.realtime.connect();
+        }
+    });
 
     // --- Global State ---
     let settlements = [];
