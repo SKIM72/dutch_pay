@@ -832,10 +832,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const normalizedCode = guestInviteCode.trim().toUpperCase();
                 if (currentUser) {
                     await joinRoomByCode(normalizedCode);
+                    localStorage.removeItem('pendingJoinCode');
                     if (joinRoomBtn) joinRoomBtn.classList.add('hidden');
                 } else {
                     localStorage.setItem('pendingJoinCode', normalizedCode);
-                    redirectToExternalBrowser('login.html', true);
+                    redirectToExternalBrowser(`login.html?code=${encodeURIComponent(normalizedCode)}`, true);
                     return;
                 }
             } else if (guestRoomId) {

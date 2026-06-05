@@ -29,6 +29,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         return false;
     }
 
+    function normalizeInviteCode(code) {
+        const normalized = (code || '').trim().toUpperCase();
+        return normalized || null;
+    }
+
+    const loginUrlParams = new URLSearchParams(window.location.search);
+    const initialInviteCode = normalizeInviteCode(loginUrlParams.get('code') || localStorage.getItem('pendingJoinCode'));
+    if (initialInviteCode) {
+        localStorage.setItem('pendingJoinCode', initialInviteCode);
+    }
+
+    function getPostLoginTarget() {
+        const inviteCode = normalizeInviteCode(localStorage.getItem('pendingJoinCode') || initialInviteCode);
+        return inviteCode ? `index.html?code=${encodeURIComponent(inviteCode)}` : 'index.html';
+    }
+
+    function getLoginTarget() {
+        const inviteCode = normalizeInviteCode(localStorage.getItem('pendingJoinCode') || initialInviteCode);
+        return inviteCode ? `login.html?code=${encodeURIComponent(inviteCode)}` : 'login.html';
+    }
+
     // --- Elements ---
     const languageSwitcher = document.getElementById('language-switcher');
     const loginView = document.getElementById('login-view');
@@ -46,7 +67,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Session Check ---
     const { data: { session } } = await supabaseClient.auth.getSession();
     if (session) {
-        window.location.replace('index.html'); // 이미 로그인된 유저는 바로 메인 화면으로 패스
+        window.location.replace(getPostLoginTarget()); // 이미 로그인된 유저는 바로 메인 화면으로 패스
         return;
     } else {
         if(landingView) landingView.style.display = 'block';
@@ -70,7 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const handleAuthBtnClick = (e) => {
         if (e) e.preventDefault();
         // 인앱 브라우저면 외부로 튕겨내고 함수 종료
-        if (redirectToExternalBrowser('login.html')) return; 
+        if (redirectToExternalBrowser(getLoginTarget())) return; 
         showAuthForm();
     };
 
@@ -153,12 +174,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 소셜 로그인 처리 로직
     const handleOAuthLogin = async (provider) => {
         // 🚀 [추가됨] 구글/애플 버튼 직접 클릭 시에도 인앱 탈출 방어막 작동
-        if (redirectToExternalBrowser('login.html')) return;
+        if (redirectToExternalBrowser(getLoginTarget())) return;
 
         const { data, error } = await supabaseClient.auth.signInWithOAuth({
             provider: provider,
             options: {
-                redirectTo: window.location.origin + window.location.pathname.replace('login.html', 'index.html')
+                redirectTo: window.location.origin + window.location.pathname.replace('login.html', getPostLoginTarget())
             }
         });
         if (error) alert(error.message);
@@ -196,7 +217,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             btn.disabled = false;
         }
         else {
-            window.location.replace('index.html'); 
+            window.location.replace(getPostLoginTarget()); 
         }
     });
 
@@ -221,7 +242,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (error) alert(error.message);
         else {
             if (data && data.session) {
-                window.location.replace('index.html');
+                window.location.replace(getPostLoginTarget());
             } else {
                 alert(locales[currentLang]?.signupSuccess || '가입 성공!');
                 showView('login');
