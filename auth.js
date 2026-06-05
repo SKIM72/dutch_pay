@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
     let currentLang = 'ko';
+    const APP_VERSION = 'v2026.06.06.1';
 
     // 🚀 [추가됨] 인앱 브라우저 강제 탈출 로직 (CleanURL 적용)
     function redirectToExternalBrowser(targetPage) {
@@ -52,6 +53,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Elements ---
     const languageSwitcher = document.getElementById('language-switcher');
+    const appVersionBadge = document.getElementById('app-version-badge');
     const loginView = document.getElementById('login-view');
     const signupView = document.getElementById('signup-view');
     const forgotPasswordView = document.getElementById('forgot-password-view');
@@ -63,6 +65,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 초기 깜빡임 방지용 숨김 처리
     if(authCard) authCard.style.opacity = '0'; 
+    if(appVersionBadge) appVersionBadge.textContent = APP_VERSION;
 
     // --- Session Check ---
     const { data: { session } } = await supabaseClient.auth.getSession();

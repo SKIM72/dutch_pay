@@ -13,6 +13,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         return fallbackText || key;
     }
 
+    function escapeHTML(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char]));
+    }
+
     function updateUI() {
         if (typeof locales === 'undefined') return;
         const translations = locales[currentLang] || {};
@@ -174,7 +184,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const openAdminConfirmModal = (message, callback) => {
-        if (adminConfirmMsgDesc) adminConfirmMsgDesc.innerHTML = message;
+        if (adminConfirmMsgDesc) adminConfirmMsgDesc.textContent = message;
         adminActionCallback = callback;
         if (adminConfirmModal) adminConfirmModal.classList.add('show');
     };
@@ -603,7 +613,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const msgDiv = document.querySelector(`.chat-msg-wrapper[data-id="${msgId}"]`);
         if (msgDiv) {
             const bubble = msgDiv.querySelector('.chat-bubble');
-            if (bubble) bubble.innerHTML = newContent + `<span class="edited-tag">${getLocale('editedTag', '(수정됨)')}</span>`;
+            if (bubble) bubble.innerHTML = `${escapeHTML(newContent)}<span class="edited-tag">${escapeHTML(getLocale('editedTag', '(수정됨)'))}</span>`;
         }
 
         const { error } = await supabaseClient
@@ -622,7 +632,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (msgDiv) {
             const bubble = msgDiv.querySelector('.chat-bubble');
             if (bubble) {
-                bubble.innerHTML = getLocale('deletedMessage', '🚫 삭제된 메시지입니다.');
+                bubble.textContent = getLocale('deletedMessage', '🚫 삭제된 메시지입니다.');
                 bubble.className = 'chat-bubble deleted';
             }
         }
@@ -829,12 +839,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const nickname = msg.profiles?.nickname || getLocale('unknownUser', '알 수 없음');
         const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
         
-        let contentHtml = msg.content;
+        let contentHtml = escapeHTML(msg.content);
         let bubbleClass = 'chat-bubble';
-        let editedHtml = (msg.is_edited && !msg.is_deleted) ? `<span class="edited-tag">${getLocale('editedTag', '(수정됨)')}</span>` : '';
+        let editedHtml = (msg.is_edited && !msg.is_deleted) ? `<span class="edited-tag">${escapeHTML(getLocale('editedTag', '(수정됨)'))}</span>` : '';
 
         if (msg.is_deleted) {
-            contentHtml = getLocale('deletedMessage', '🚫 삭제된 메시지입니다.');
+            contentHtml = escapeHTML(getLocale('deletedMessage', '🚫 삭제된 메시지입니다.'));
             bubbleClass += ' deleted';
             editedHtml = '';
         }
@@ -846,7 +856,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
 
         let html = '';
-        if (!isMine) html += `<div class="chat-sender">${nickname}</div>`;
+        if (!isMine) html += `<div class="chat-sender">${escapeHTML(nickname)}</div>`;
         
         const isAdmin = currentUser.email.toLowerCase() === 'eowert72@gmail.com';
         const canEditOrDelete = isMine && !msg.is_deleted;

@@ -56,9 +56,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
+    const APP_VERSION = 'v2026.06.06.1';
+
+    function escapeHTML(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[char]));
+    }
 
     // --- Element References ---
     const languageSwitcher = document.getElementById('language-switcher');
+    const appVersionBadge = document.getElementById('app-version-badge');
     const authBtn = document.getElementById('auth-btn'); 
     const userInfoDisplay = document.getElementById('user-info-display');
     const userEmailText = document.getElementById('user-email-text');
@@ -274,7 +286,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
         let iconClass = type === 'error' ? 'fa-exclamation-circle' : type === 'info' ? 'fa-info-circle' : 'fa-check-circle';
-        toast.innerHTML = `<i class="fas ${iconClass}"></i> <span>${message}</span>`;
+        toast.innerHTML = `<i class="fas ${iconClass}"></i> <span></span>`;
+        const toastMessage = toast.querySelector('span');
+        if (toastMessage) toastMessage.textContent = message;
         container.appendChild(toast);
         setTimeout(() => toast.classList.add('show'), 10);
         setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
@@ -453,6 +467,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function updateAuthUI() {
+        if (appVersionBadge) appVersionBadge.textContent = APP_VERSION;
+
         if (currentUser) {
             if(authBtn) { authBtn.innerHTML = `<i class="fas fa-sign-out-alt" style="color: var(--danger);"></i> <span style="color: var(--danger);">${getLocale('logout', '로그아웃')}</span>`; authBtn.style.background = '#fee2e2'; authBtn.style.borderColor = 'transparent'; }
             if(addSettlementFab) addSettlementFab.classList.remove('hidden'); 
@@ -475,7 +491,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 const displayName = currentUser.nickname ? currentUser.nickname : currentUser.email;
 
-                userInfoDisplay.innerHTML = `${iconHtml} <span id="user-email-text" style="display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;">${displayName}</span>`;
+                userInfoDisplay.innerHTML = `${iconHtml} <span id="user-email-text" style="display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;">${escapeHTML(displayName)}</span>`;
                 userInfoDisplay.classList.remove('hidden'); 
             }
         } else {
@@ -1133,34 +1149,45 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         if (displaySettlements.length === 0) {
             const fallbackText = query ? getLocale('noSearchResult', '검색 결과가 없습니다.') : getLocale('noHistory', '참여 중인 정산 내역이 없습니다.');
-            settlementListContainer.innerHTML = `<p class="subtitle" style="text-align: center; color: var(--text-muted); margin-top: 1.5rem; font-size: 0.9rem;">${fallbackText}</p>`;
+            settlementListContainer.innerHTML = `<p class="subtitle" style="text-align: center; color: var(--text-muted); margin-top: 1.5rem; font-size: 0.9rem;">${escapeHTML(fallbackText)}</p>`;
             return;
         }
         
-        settlementListContainer.innerHTML = displaySettlements.map(s => `
+        settlementListContainer.innerHTML = displaySettlements.map(s => {
+            const settlementId = escapeHTML(s.id);
+            const title = escapeHTML(s.title);
+            const date = escapeHTML(formatDisplayDate(s.date));
+            const participantsText = escapeHTML((s.participants || []).join(', '));
+            const baseCurrency = escapeHTML(s.base_currency);
+            const roleBadge = s.is_host
+                ? `<span class="badge badge-host"><i class="fas fa-crown"></i> ${escapeHTML(getLocale('host', '방장'))}</span>`
+                : `<span class="badge badge-guest"><i class="fas fa-users"></i> ${escapeHTML(getLocale('participating', '참여중'))}</span>`;
+
+            return `
             <div class="settlement-item-wrapper">
-                <button class="settlement-item ${s.is_settled ? 'is-settled' : ''}" data-id="${s.id}">
+                <button class="settlement-item ${s.is_settled ? 'is-settled' : ''}" data-id="${settlementId}">
                     <div class="item-content">
                         <div class="item-text-group">
                             <div class="item-badges">
-                                ${s.is_host ? `<span class="badge badge-host"><i class="fas fa-crown"></i> ${getLocale('host', '방장')}</span>` : `<span class="badge badge-guest"><i class="fas fa-users"></i> ${getLocale('participating', '참여중')}</span>`}
+                                ${roleBadge}
                             </div>
                             <div class="date-row">
                                 ${s.is_settled ? '<i class="fas fa-check-circle settled-icon"></i>' : ''}
-                                <span class="item-date-badge"><i class="far fa-calendar-alt"></i> ${formatDisplayDate(s.date)}</span>
+                                <span class="item-date-badge"><i class="far fa-calendar-alt"></i> ${date}</span>
                             </div>
-                            <span class="item-title">${s.title}</span>
-                            <span class="item-participants">(${(s.participants || []).join(', ')}) - ${s.base_currency}</span>
+                            <span class="item-title">${title}</span>
+                            <span class="item-participants">(${participantsText}) - ${baseCurrency}</span>
                         </div>
                     </div>
                     <i class="fas fa-chevron-right"></i>
                 </button>
                 ${s.is_host 
-                    ? `<button class="delete-settlement-btn" data-id="${s.id}" title="방 삭제"><i class="fas fa-trash-alt"></i></button>`
-                    : `<button class="leave-settlement-btn" data-id="${s.id}" title="방 나가기"><i class="fas fa-sign-out-alt"></i></button>`
+                    ? `<button class="delete-settlement-btn" data-id="${settlementId}" title="방 삭제"><i class="fas fa-trash-alt"></i></button>`
+                    : `<button class="leave-settlement-btn" data-id="${settlementId}" title="방 나가기"><i class="fas fa-sign-out-alt"></i></button>`
                 }
             </div>
-        `).join('');
+        `;
+        }).join('');
         
         document.querySelectorAll('.settlement-item').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1273,12 +1300,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateParticipantNames(participants) {
         const paidByString = getLocale('paidBy', '{payer}님이 결제');
         const shareOfString = getLocale('shareOf', '{name}님 분담액');
+        const fillPayerSelect = (selectEl) => {
+            if (!selectEl) return;
+            selectEl.innerHTML = '';
+            participants.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p;
+                option.textContent = paidByString.replace('{payer}', p);
+                selectEl.appendChild(option);
+            });
+        };
 
         const addPayerSelect = document.getElementById('item-payer');
-        if(addPayerSelect) {
-            addPayerSelect.innerHTML = participants.map(p => `<option value="${p}">${paidByString.replace('{payer}', p)}</option>`).join('');
-        }
-        if(editItemPayerSelect) editItemPayerSelect.innerHTML = participants.map(p => `<option value="${p}">${paidByString.replace('{payer}', p)}</option>`).join('');
+        fillPayerSelect(addPayerSelect);
+        fillPayerSelect(editItemPayerSelect);
 
         const helperHtml = `<div style="grid-column: 1 / -1; font-size: 0.85rem; color: #4f46e5; margin-bottom: 0.8rem; background: #eef2ff; padding: 0.6rem; border-radius: 8px; text-align: center; border: 1px solid #c7d2fe;"><i class="fas fa-info-circle"></i> <span data-i18n="manualInputHelper">${getLocale('manualInputHelper', '👇 아래에 각자 쓴 금액을 입력하면 총액이 자동 계산됩니다.')}</span></div>`;
 
@@ -1292,12 +1327,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         participants.forEach(p => {
             if(splitAmountInputs) {
                 const addDiv = document.createElement('div'); addDiv.className = 'dynamic-split-item'; 
-                addDiv.innerHTML = `<label>${p}</label><input type="text" data-participant="${p}" placeholder="${shareOfString.replace('{name}', p)}" inputmode="decimal">`; 
+                const label = document.createElement('label');
+                label.textContent = p;
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.dataset.participant = p;
+                input.placeholder = shareOfString.replace('{name}', p);
+                input.inputMode = 'decimal';
+                addDiv.append(label, input);
                 splitAmountInputs.appendChild(addDiv);
             }
             if(editSplitAmountInputs) {
                 const editDiv = document.createElement('div'); editDiv.className = 'dynamic-split-item'; 
-                editDiv.innerHTML = `<label>${p}</label><input type="text" data-participant="${p}" inputmode="decimal">`; 
+                const label = document.createElement('label');
+                label.textContent = p;
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.dataset.participant = p;
+                input.inputMode = 'decimal';
+                editDiv.append(label, input);
                 editSplitAmountInputs.appendChild(editDiv);
             }
         });
@@ -1750,21 +1798,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             const row = expenseTableBody.insertRow();
             row.dataset.id = exp.id;
             row.classList.toggle('is-settled', isLocked);
+            const expenseId = escapeHTML(exp.id);
+            const expenseName = escapeHTML(exp.name);
+            const payerName = escapeHTML(exp.payer);
+            const expenseCurrency = escapeHTML(exp.currency);
+            const baseCurrency = escapeHTML(currentSettlement.base_currency);
             let dateHtml = '';
             if (exp.expense_date) {
                 const d = new Date(exp.expense_date);
                 let localeCode = currentLang === 'en' ? 'en-US' : (currentLang === 'ja' ? 'ja-JP' : 'ko-KR');
                 const dateStr = d.toLocaleDateString(localeCode, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
-                dateHtml = `<div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">${dateStr}</div>`;
+                dateHtml = `<div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">${escapeHTML(dateStr)}</div>`;
             }
-            let amountHtml = `${formatNumber(exp.original_amount, exp.currency)} ${exp.currency}`;
+            let amountHtml = `${escapeHTML(formatNumber(exp.original_amount, exp.currency))} ${expenseCurrency}`;
             if (exp.currency !== currentSettlement.base_currency) { 
-                amountHtml = `<span class="clickable-amount" data-id="${exp.id}" title="적용 환율 보기"><i class="fas fa-info-circle"></i> ${amountHtml}</span>`; 
+                amountHtml = `<span class="clickable-amount" data-id="${expenseId}" title="적용 환율 보기"><i class="fas fa-info-circle"></i> ${amountHtml}</span>`;
             }
             
-            let htmlStr = `<td>${dateHtml}<div>${exp.name}</div></td><td>${amountHtml}</td><td>${exp.payer}</td>`;
-            participants.forEach(p => { htmlStr += `<td>${formatNumber(exp.shares[p] || 0, currentSettlement.base_currency)} ${currentSettlement.base_currency}</td>`; });
-            if (!isLocked) htmlStr += `<td><button class="delete-expense-btn" data-id="${exp.id}"><i class="fas fa-trash-alt"></i></button></td>`;
+            let htmlStr = `<td>${dateHtml}<div>${expenseName}</div></td><td>${amountHtml}</td><td>${payerName}</td>`;
+            participants.forEach(p => { htmlStr += `<td>${escapeHTML(formatNumber(exp.shares[p] || 0, currentSettlement.base_currency))} ${baseCurrency}</td>`; });
+            if (!isLocked) htmlStr += `<td><button class="delete-expense-btn" data-id="${expenseId}"><i class="fas fa-trash-alt"></i></button></td>`;
             row.innerHTML = htmlStr;
             
             const clickableAmountSpan = row.querySelector('.clickable-amount');
@@ -1879,7 +1932,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     div.innerHTML = `
                         <div style="font-weight: 700; color: white;">
-                            ${tr.from} ➡️ ${tr.to} (${formatNumber(tr.amount, base_currency)} ${base_currency})
+                            ${escapeHTML(tr.from)} ➡️ ${escapeHTML(tr.to)} (${escapeHTML(formatNumber(tr.amount, base_currency))} ${escapeHTML(base_currency)})
                         </div>
                         ${payButtons}
                     `;
@@ -2126,7 +2179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         </div>
                         <div style="display:flex; flex-direction:column;">
                             <div style="display:flex; align-items:center;">
-                                <span style="font-weight:600; font-size:0.9rem; color:var(--text-main);">${emailDisplay}</span>
+                                <span style="font-weight:600; font-size:0.9rem; color:var(--text-main);">${escapeHTML(emailDisplay)}</span>
                                 ${badges}
                             </div>
                         </div>
@@ -2134,7 +2187,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     let rightContent = '';
                     if (isMeHost && !isHost) {
-                        rightContent = `<button class="kick-btn" data-uid="${m.user_id}" style="background:none; border:none; color:var(--danger); cursor:pointer; padding:0.5rem; font-size:0.9rem;"><i class="fas fa-user-slash"></i> <span class="btn-text">${getLocale('kickUser', '내보내기')}</span></button>`;
+                        rightContent = `<button class="kick-btn" data-uid="${escapeHTML(m.user_id)}" style="background:none; border:none; color:var(--danger); cursor:pointer; padding:0.5rem; font-size:0.9rem;"><i class="fas fa-user-slash"></i> <span class="btn-text">${escapeHTML(getLocale('kickUser', '내보내기'))}</span></button>`;
                     }
 
                     itemDiv.innerHTML = leftContent + rightContent;
