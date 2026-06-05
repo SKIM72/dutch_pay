@@ -500,7 +500,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         } 
         else { 
-            redirectToExternalBrowser('login.html');
+            redirectToExternalBrowser(getLoginTargetForCurrentInvite());
         }
     }
 
@@ -586,6 +586,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         const url = new URL(window.location.origin + window.location.pathname);
         url.searchParams.set('code', getSettlementInviteCode(settlement));
         return url.toString();
+    }
+
+    function normalizeInviteCode(code) {
+        const normalized = String(code || '').trim().toUpperCase();
+        return normalized || null;
+    }
+
+    function getCurrentInviteCode() {
+        const urlCode = normalizeInviteCode(new URLSearchParams(window.location.search).get('code'));
+        if (urlCode) return urlCode;
+
+        const pendingCode = normalizeInviteCode(localStorage.getItem('pendingJoinCode'));
+        if (pendingCode) return pendingCode;
+
+        return currentSettlement ? getSettlementInviteCode(currentSettlement) : null;
+    }
+
+    function getLoginTargetForCurrentInvite() {
+        const inviteCode = getCurrentInviteCode();
+        return inviteCode ? `login.html?code=${encodeURIComponent(inviteCode)}` : 'login.html';
+    }
+
+    async function requireLoginForAction(message) {
+        if (currentUser) return true;
+
+        const confirmMessage = message || getLocale('loginToSave', '로그인이 필요한 기능입니다.\n로그인 화면으로 이동하시겠습니까?');
+        if (await showConfirm(confirmMessage)) {
+            const inviteCode = getCurrentInviteCode();
+            if (inviteCode) localStorage.setItem('pendingJoinCode', inviteCode);
+            if (currentSettlement) localStorage.setItem('pendingJoinRoomId', currentSettlement.id);
+            redirectToExternalBrowser(getLoginTargetForCurrentInvite());
+        }
+        return false;
+    }
+
+    function updateSettlementAccessUI() {
+        const isGuestPreview = !!currentSettlement && !currentUser;
+
+        if (joinRoomBtn) joinRoomBtn.classList.toggle('hidden', !isGuestPreview);
+        [openShareModalBtn, copyTextBtn, saveImageBtn, downloadExcelBtn, viewParticipantsBtn].forEach(el => {
+            if (el) el.classList.toggle('hidden', isGuestPreview);
+        });
+
+        const chatFab = document.getElementById('chat-fab');
+        if (chatFab && isGuestPreview) chatFab.classList.add('hidden');
     }
 
     async function fallbackCopyTextToClipboard(text) {
@@ -686,6 +731,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { data: null, error: error || rpcError };
     }
 
+    async function loadPublicSettlementByCode(codeInput) {
+        const code = normalizeInviteCode(codeInput);
+        if (!code) return false;
+
+        try {
+            const { data, error } = await safeDB(supabaseClient
+                .from('settlements')
+                .select(`*, expenses (*)`)
+                .eq('invite_code', code)
+                .is('deleted_at', null)
+                .single());
+
+            if (error || !data) {
+                showToast('유효하지 않은 초대 코드이거나 방을 찾을 수 없습니다.', 'error');
+                return false;
+            }
+
+            data.is_host = false;
+            data.is_public_preview = true;
+            data.invite_code = data.invite_code || code;
+
+            await selectSettlement(data);
+            updateSettlementAccessUI();
+            return true;
+        } catch (e) {
+            console.error(e);
+            showToast('정산 내용을 불러오지 못했습니다.', 'error');
+            return false;
+        }
+    }
+
     async function joinSettlementIdByCode(codeInput) {
         const code = String(codeInput || '').trim().toUpperCase();
         if (!code) return { data: null, error: new Error('EMPTY_CODE'), joinedViaRpc: false };
@@ -711,6 +787,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         setLoading(true);
         try {
+            if (!currentUser) {
+                const loaded = await loadPublicSettlementByCode(codeInput);
+                if (loaded) {
+                    localStorage.setItem('pendingJoinCode', normalizeInviteCode(codeInput));
+                    const joinModal = document.getElementById('join-modal');
+                    if(joinModal) joinModal.classList.add('hidden');
+                    if (joinCodeInput) joinCodeInput.value = '';
+                    showToast('로그인하면 내 정산방에 저장할 수 있습니다.', 'info');
+                }
+                return;
+            }
+
             const { data, error, joinedViaRpc } = await joinSettlementIdByCode(codeInput);
                 
             if(error || !data) {
@@ -836,8 +924,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (joinRoomBtn) joinRoomBtn.classList.add('hidden');
                 } else {
                     localStorage.setItem('pendingJoinCode', normalizedCode);
-                    redirectToExternalBrowser(`login.html?code=${encodeURIComponent(normalizedCode)}`, true);
-                    return;
+                    await loadPublicSettlementByCode(normalizedCode);
                 }
             } else if (guestRoomId) {
                 if (isBanned(guestRoomId)) {
@@ -1111,11 +1198,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (window.innerWidth <= 768 && sidebar) sidebar.classList.add('collapsed');
         if(itemDateInput) itemDateInput.value = getLocalISOString();
         
-        window.history.replaceState({}, '', `${window.location.pathname}?id=${settlement.id}`);
+        const previewCode = normalizeInviteCode(new URLSearchParams(window.location.search).get('code') || settlement.invite_code);
+        if (!currentUser && previewCode) {
+            window.history.replaceState({}, '', `${window.location.pathname}?code=${encodeURIComponent(previewCode)}`);
+        } else {
+            window.history.replaceState({}, '', `${window.location.pathname}?id=${settlement.id}`);
+        }
         
         updateOpenGraphTags(settlement);
 
         render();
+        updateSettlementAccessUI();
     }
 
     function renderTableHeader(participants) {
@@ -1130,10 +1223,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             th.textContent = shareOfString.replace('{name}', p); 
             expenseTableHeaderRow.appendChild(th);
         });
-        const actionTh = document.createElement('th'); 
-        actionTh.setAttribute('data-i18n', 'tableHeaderActions'); 
-        actionTh.textContent = getLocale('tableHeaderActions', '관리'); 
-        expenseTableHeaderRow.appendChild(actionTh);
+        const showActions = !!currentUser && !(currentSettlement && currentSettlement.is_settled);
+        if (showActions) {
+            const actionTh = document.createElement('th'); 
+            actionTh.setAttribute('data-i18n', 'tableHeaderActions'); 
+            actionTh.textContent = getLocale('tableHeaderActions', '관리'); 
+            expenseTableHeaderRow.appendChild(actionTh);
+        }
     }
 
     function updateParticipantNames(participants) {
@@ -1252,6 +1348,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function createSettlement() {
+        if (!(await requireLoginForAction('새 정산을 만들려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?'))) return;
+
         const title = newSettlementTitleInput.value.trim();
         const date = newSettlementDateInput.value;
         const participants = getParticipantNamesFromModal();
@@ -1293,6 +1391,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     async function addExpense() {
         if (!currentSettlement) return;
+        if (!(await requireLoginForAction('지출을 추가하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?'))) return;
         if (!(await verifyMembership())) return; 
         
         const name = itemNameInput.value.trim();
@@ -1396,6 +1495,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function handleSaveExpenseChanges() {
         if (!currentSettlement || currentEditingExpenseId === null) return;
+        if (!(await requireLoginForAction('지출을 수정하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?'))) return;
         if (!(await verifyMembership())) return; 
         
         const name = editItemNameInput.value.trim();
@@ -1461,6 +1561,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     async function deleteExpense(expenseId) {
+        if (!(await requireLoginForAction('지출을 삭제하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?'))) return;
+
         if (await showConfirm(getLocale('deleteConfirm', '정말 삭제하시겠습니까?'))) {
             if (!(await verifyMembership())) return; 
 
@@ -1594,6 +1696,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderExpenses(); updateSummary(); 
             const isLocked = currentSettlement.is_settled || !currentUser; 
             toggleExpenseForm(isLocked);
+            updateSettlementAccessUI();
         }
     }
 
@@ -1623,7 +1726,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             let htmlStr = `<td>${dateHtml}<div>${exp.name}</div></td><td>${amountHtml}</td><td>${exp.payer}</td>`;
             participants.forEach(p => { htmlStr += `<td>${formatNumber(exp.shares[p] || 0, currentSettlement.base_currency)} ${currentSettlement.base_currency}</td>`; });
-            htmlStr += `<td><button class="delete-expense-btn" data-id="${exp.id}"><i class="fas fa-trash-alt"></i></button></td>`;
+            if (!isLocked) htmlStr += `<td><button class="delete-expense-btn" data-id="${exp.id}"><i class="fas fa-trash-alt"></i></button></td>`;
             row.innerHTML = htmlStr;
             
             const clickableAmountSpan = row.querySelector('.clickable-amount');
@@ -1631,9 +1734,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!isLocked) { row.addEventListener('click', (e) => { if (e.target.closest('.delete-expense-btn') || e.target.closest('.clickable-amount')) return; openEditExpenseModal(exp.id); }); }
         });
         
-        expenseTableBody.querySelectorAll('.delete-expense-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => { e.stopPropagation(); deleteExpense(parseInt(e.currentTarget.dataset.id)); });
-        });
+        if (!isLocked) {
+            expenseTableBody.querySelectorAll('.delete-expense-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => { e.stopPropagation(); deleteExpense(parseInt(e.currentTarget.dataset.id)); });
+            });
+        }
     }
 
     function calculateMinimumTransfers(expenses, participants) {
@@ -1760,6 +1865,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function toggleExpenseForm(isLocked) { 
         if(!expenseFormCard) return;
+        const isGuestPreview = !!currentSettlement && !currentUser;
+        expenseFormCard.classList.toggle('hidden', isGuestPreview);
+        if (isGuestPreview) return;
+
         expenseFormCard.classList.toggle('is-settled', isLocked); 
         expenseFormCard.querySelectorAll('input, select, button').forEach(el => { el.disabled = isLocked; }); 
     }
@@ -2341,8 +2450,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             if (!currentUser) { 
                 if (await showConfirm(getLocale('loginToSave', '내 목록에 저장하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?'))) {
+                    const inviteCode = getCurrentInviteCode();
+                    if (inviteCode) localStorage.setItem('pendingJoinCode', inviteCode);
                     localStorage.setItem('pendingJoinRoomId', currentSettlement.id);
-                    redirectToExternalBrowser('login.html');
+                    redirectToExternalBrowser(getLoginTargetForCurrentInvite());
                 }
                 return;
             }
@@ -2437,6 +2548,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(editSettlementTitleBtn) {
             editSettlementTitleBtn.addEventListener('click', async () => {
                 if(!currentSettlement) return;
+                if (!(await requireLoginForAction('제목을 수정하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?'))) return;
                 if (!(await verifyMembership())) return; 
 
                 if(editTitleInput) editTitleInput.value = currentSettlement.title;
@@ -2447,6 +2559,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(saveTitleBtn) {
             saveTitleBtn.addEventListener('click', async () => {
                 if(!currentSettlement) return;
+                if (!(await requireLoginForAction('제목을 수정하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?'))) return;
                 if (!(await verifyMembership())) return; 
 
                 const newTitle = editTitleInput ? editTitleInput.value.trim() : '';
@@ -2570,6 +2683,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if(completeSettlementBtn) completeSettlementBtn.addEventListener('click', async () => {
             if (currentSettlement) {
+                if (!(await requireLoginForAction('정산 상태를 변경하려면 로그인이 필요합니다.\n로그인 화면으로 이동하시겠습니까?'))) return;
                 if (!(await verifyMembership())) return; 
 
                 setLoading(true);
