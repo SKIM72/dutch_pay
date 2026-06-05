@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
     let currentLang = 'ko';
-    const APP_VERSION = 'v2026.06.06.1';
+    const APP_VERSION = 'v2026.06.06.2';
 
     // 🚀 [추가됨] 인앱 브라우저 강제 탈출 로직 (CleanURL 적용)
     function redirectToExternalBrowser(targetPage) {
