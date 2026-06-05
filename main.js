@@ -731,11 +731,45 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { data: null, error: error || rpcError };
     }
 
+    function normalizePublicSettlementData(rawData, fallbackCode) {
+        if (!rawData) return null;
+
+        let data = rawData;
+        if (typeof data === 'string') {
+            try {
+                data = JSON.parse(data);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        if (!data || !data.id) return null;
+
+        return {
+            ...data,
+            expenses: Array.isArray(data.expenses) ? data.expenses : [],
+            invite_code: data.invite_code || fallbackCode,
+            is_host: false,
+            is_public_preview: true
+        };
+    }
+
     async function loadPublicSettlementByCode(codeInput) {
         const code = normalizeInviteCode(codeInput);
         if (!code) return false;
 
         try {
+            const { data: rpcData, error: rpcError } = await safeDB(
+                supabaseClient.rpc('get_public_settlement_by_invite_code', { p_invite_code: code })
+            );
+            const rpcSettlement = normalizePublicSettlementData(rpcData, code);
+
+            if (!rpcError && rpcSettlement) {
+                await selectSettlement(rpcSettlement);
+                updateSettlementAccessUI();
+                return true;
+            }
+
             const { data, error } = await safeDB(supabaseClient
                 .from('settlements')
                 .select(`*, expenses (*)`)
@@ -748,11 +782,13 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return false;
             }
 
-            data.is_host = false;
-            data.is_public_preview = true;
-            data.invite_code = data.invite_code || code;
+            const publicSettlement = normalizePublicSettlementData(data, code);
+            if (!publicSettlement) {
+                showToast('정산 내용을 불러오지 못했습니다.', 'error');
+                return false;
+            }
 
-            await selectSettlement(data);
+            await selectSettlement(publicSettlement);
             updateSettlementAccessUI();
             return true;
         } catch (e) {
