@@ -1273,7 +1273,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         setLoading(true);
         try {
             const { data, error } = await safeDB(supabaseClient.from('expenses').insert([{ 
-                settlement_id: currentSettlement.id, expense_date: expenseDate, name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
+                settlement_id: currentSettlement.id, user_id: currentUser ? currentUser.id : null, expense_date: expenseDate, name, original_amount: originalAmount, currency, amount: convertedAmount, payer, split: splitMethod, shares 
             }]).select());
 
             if (error) throw error;
