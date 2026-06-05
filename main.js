@@ -2060,15 +2060,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                             const adminLockPinSaveBtn = document.getElementById('admin-lock-pin-save-btn');
                             
                             try {
-                                const { data: profileData } = await safeDB(supabaseClient.from('profiles').select('admin_pin').eq('user_id', currentUser.id).single());
-                                if(adminLockPinInput) adminLockPinInput.value = profileData?.admin_pin || '';
+                                const { data: adminPin, error } = await safeDB(supabaseClient.rpc('get_my_admin_pin'));
+                                if (error) console.error(error);
+                                if(adminLockPinInput) adminLockPinInput.value = adminPin || '';
                             } catch(e) { console.error(e); }
                             
                             if(adminLockPinSaveBtn) {
                                 adminLockPinSaveBtn.onclick = async () => {
                                     const newPin = adminLockPinInput.value;
                                     try {
-                                        const { error } = await safeDB(supabaseClient.from('profiles').update({ admin_pin: newPin }).eq('user_id', currentUser.id));
+                                        const { error } = await safeDB(supabaseClient.rpc('set_my_admin_pin', { p_admin_pin: newPin }));
                                         if(error) {
                                             showToast('PIN 저장에 실패했습니다.', 'error');
                                         } else {
