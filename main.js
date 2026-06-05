@@ -624,6 +624,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateSettlementAccessUI() {
         const isGuestPreview = !!currentSettlement && !currentUser;
 
+        if (sidebar) sidebar.classList.toggle('hidden', isGuestPreview);
+        if (mobileMenuBtn) mobileMenuBtn.classList.toggle('hidden', isGuestPreview);
         if (joinRoomBtn) joinRoomBtn.classList.toggle('hidden', !isGuestPreview);
         [openShareModalBtn, copyTextBtn, saveImageBtn, downloadExcelBtn, viewParticipantsBtn].forEach(el => {
             if (el) el.classList.toggle('hidden', isGuestPreview);
