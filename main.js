@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.06.1';
+    const APP_VERSION = 'v2026.06.06.2';
 
     function escapeHTML(value) {
         return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -2930,16 +2930,39 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if ('serviceWorker' in navigator) {
+        let updatePromptOpen = false;
+        const promptForServiceWorkerUpdate = async (worker) => {
+            if (!worker || updatePromptOpen) return;
+            updatePromptOpen = true;
+            try {
+                if (await showConfirm(getLocale('newVersionAvailable', '앱의 새로운 버전이 업데이트되었습니다. 지금 새로고침 하시겠습니까?'))) {
+                    worker.postMessage({ type: 'SKIP_WAITING' });
+                }
+            } finally {
+                updatePromptOpen = false;
+            }
+        };
+
         navigator.serviceWorker.register('sw.js').then(reg => {
+            reg.update().catch(() => {});
+            if (reg.waiting && navigator.serviceWorker.controller) {
+                promptForServiceWorkerUpdate(reg.waiting);
+            }
+
             reg.addEventListener('updatefound', () => {
                 const newWorker = reg.installing;
+                if (!newWorker) return;
                 newWorker.addEventListener('statechange', async () => {
                     if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                        if (await showConfirm(getLocale('newVersionAvailable', '앱의 새로운 버전이 업데이트되었습니다. 지금 새로고침 하시겠습니까?'))) {
-                            newWorker.postMessage({ type: 'SKIP_WAITING' });
-                        }
+                        promptForServiceWorkerUpdate(newWorker);
                     }
                 });
+            });
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    reg.update().catch(() => {});
+                }
             });
         }).catch(err => console.error('Service Worker registration failed:', err));
 
