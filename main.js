@@ -578,6 +578,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         return names.length >= 2 ? names : ['A', 'B']; 
     }
 
+    function getSettlementInviteCode(settlement) {
+        return String(settlement?.invite_code || settlement?.id || '').trim().toUpperCase();
+    }
+
+    function getSettlementShareUrl(settlement) {
+        const url = new URL(window.location.origin + window.location.pathname);
+        url.searchParams.set('code', getSettlementInviteCode(settlement));
+        return url.toString();
+    }
+
     async function fallbackCopyTextToClipboard(text) {
         try {
             await navigator.clipboard.writeText(text);
@@ -602,14 +612,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function openShareModal() {
         if(!currentSettlement) return;
-        const currentUrl = window.location.origin + window.location.pathname;
-        const shareUrl = `${currentUrl}?id=${currentSettlement.id}`;
+        const shareUrl = getSettlementShareUrl(currentSettlement);
         
         const shareLinkInput = document.getElementById('share-link-input');
         if(shareLinkInput) shareLinkInput.value = shareUrl;
         
-        const fallbackCode = String(currentSettlement.id).split('-')[0].toUpperCase();
-        const inviteCode = currentSettlement.invite_code || fallbackCode;
+        const inviteCode = getSettlementInviteCode(currentSettlement);
         
         const shareCodeInput = document.getElementById('share-code-input');
         if(shareCodeInput) shareCodeInput.value = inviteCode;
@@ -635,15 +643,47 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function sendEmailInvite() {
         if(!currentSettlement) return;
-        const currentUrl = window.location.origin + window.location.pathname;
-        const shareUrl = `${currentUrl}?id=${currentSettlement.id}`;
-        const fallbackCode = String(currentSettlement.id).split('-')[0].toUpperCase();
-        const inviteCode = currentSettlement.invite_code || fallbackCode;
+        const shareUrl = getSettlementShareUrl(currentSettlement);
+        const inviteCode = getSettlementInviteCode(currentSettlement);
         
         const subject = encodeURIComponent(`[Settle Up] ${currentSettlement.title} 정산에 초대합니다.`);
         const body = encodeURIComponent(`👋 ${currentSettlement.title} 정산 방이 만들어졌습니다!\n\n아래 링크를 클릭해서 바로 참여하거나, 앱에서 아래의 초대 코드를 입력해 주세요.\n\n🔗 접속 링크: ${shareUrl}\n🔑 초대 코드: ${inviteCode}\n\n감사합니다!`);
         
         window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    }
+
+    async function resolveSettlementIdByCode(codeInput) {
+        const code = String(codeInput || '').trim().toUpperCase();
+        if (!code) return { data: null, error: new Error('EMPTY_CODE') };
+
+        const { data: rpcData, error: rpcError } = await safeDB(
+            supabaseClient.rpc('get_settlement_id_by_invite_code', { p_invite_code: code })
+        );
+
+        if (!rpcError && rpcData) {
+            return { data: { id: rpcData }, error: null };
+        }
+
+        const { data, error } = await safeDB(supabaseClient
+            .from('settlements')
+            .select('id')
+            .eq('invite_code', code)
+            .is('deleted_at', null)
+            .single());
+
+        if (!error && data) return { data, error: null };
+
+        if (/^\d+$/.test(code)) {
+            const numericId = parseInt(code, 10);
+            return safeDB(supabaseClient
+                .from('settlements')
+                .select('id')
+                .eq('id', numericId)
+                .is('deleted_at', null)
+                .single());
+        }
+
+        return { data: null, error: error || rpcError };
     }
 
     async function joinRoomByCode(directCode = null) {
@@ -653,25 +693,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         setLoading(true);
         try {
-            let { data, error } = await safeDB(supabaseClient
-                .from('settlements')
-                .select('id')
-                .eq('invite_code', codeInput)
-                .is('deleted_at', null) 
-                .single());
-                
-            if ((error || !data) && /^\d+$/.test(codeInput)) {
-                const numericId = parseInt(codeInput, 10);
-                const { data: idData, error: idError } = await safeDB(supabaseClient
-                    .from('settlements')
-                    .select('id')
-                    .eq('id', numericId)
-                    .is('deleted_at', null) 
-                    .single());
-                
-                data = idData;
-                error = idError;
-            }
+            const { data, error } = await resolveSettlementIdByCode(codeInput);
                 
             if(error || !data) {
                 showToast('유효하지 않은 코드이거나 방을 찾을 수 없습니다.', 'error');
@@ -783,9 +805,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateAuthUI();
 
             const urlParams = new URLSearchParams(window.location.search);
+            const guestInviteCode = urlParams.get('code');
             const guestRoomId = urlParams.get('id');
 
-            if (guestRoomId) {
+            if (guestInviteCode) {
+                const normalizedCode = guestInviteCode.trim().toUpperCase();
+                if (currentUser) {
+                    await joinRoomByCode(normalizedCode);
+                    if (joinRoomBtn) joinRoomBtn.classList.add('hidden');
+                } else {
+                    localStorage.setItem('pendingJoinCode', normalizedCode);
+                    redirectToExternalBrowser('login.html', true);
+                    return;
+                }
+            } else if (guestRoomId) {
                 if (isBanned(guestRoomId)) {
                     showToast('접근이 차단된 방입니다.', 'error');
                     window.location.replace('index.html');
@@ -815,25 +848,31 @@ document.addEventListener('DOMContentLoaded', async () => {
                     redirectToExternalBrowser('login.html', true); 
                     return; 
                 } else {
-                    const pendingId = localStorage.getItem('pendingJoinRoomId');
-                    if (pendingId) {
-                        if (!isBanned(pendingId)) {
-                            saveJoinedRoom(pendingId);
-                            localStorage.removeItem('pendingJoinRoomId');
-                            showToast('이전 방에 자동 참가되었습니다.', 'success');
-                            window.history.replaceState({}, '', `${window.location.pathname}?id=${pendingId}`);
-                            await syncMemberDB(pendingId);
-                            await loadData();
-                            await loadSingleSettlement(pendingId);
-                        }
+                    const pendingCode = localStorage.getItem('pendingJoinCode');
+                    if (pendingCode) {
+                        localStorage.removeItem('pendingJoinCode');
+                        await joinRoomByCode(pendingCode);
                     } else {
-                        await loadData(); 
+                        const pendingId = localStorage.getItem('pendingJoinRoomId');
+                        if (pendingId) {
+                            if (!isBanned(pendingId)) {
+                                saveJoinedRoom(pendingId);
+                                localStorage.removeItem('pendingJoinRoomId');
+                                showToast('이전 방에 자동 참가되었습니다.', 'success');
+                                window.history.replaceState({}, '', `${window.location.pathname}?id=${pendingId}`);
+                                await syncMemberDB(pendingId);
+                                await loadData();
+                                await loadSingleSettlement(pendingId);
+                            }
+                        } else {
+                            await loadData(); 
+                        }
                     }
                 }
             }
 
             supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                if (event === 'SIGNED_OUT' && !guestRoomId) {
+                if (event === 'SIGNED_OUT' && !guestInviteCode && !guestRoomId) {
                     redirectToExternalBrowser('login.html', true);
                 } else {
                     currentUser = session ? session.user : null;
@@ -1009,7 +1048,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let ogDesc = document.querySelector('meta[property="og:description"]');
         let ogUrl = document.querySelector('meta[property="og:url"]');
 
-        const shareUrl = `${window.location.origin}${window.location.pathname}?id=${settlement.id}`;
+        const shareUrl = getSettlementShareUrl(settlement);
         const titleText = `💸 [${settlement.title}] 정산이 도착했어요!`;
         const descText = "내야 할 금액을 확인하고 간편하게 송금하세요.";
 
@@ -1807,8 +1846,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             resultString = transfers.map(tr => t.sendFormat(tr.from, tr.to, formatNumber(tr.amount, base_currency), base_currency)).join('\n'); 
         }
 
-        const currentUrl = window.location.origin + window.location.pathname;
-        const shareUrl = `${currentUrl}?id=${currentSettlement.id}`;
+        const shareUrl = getSettlementShareUrl(currentSettlement);
         
         const text = `🧾 [${title}] ${t.summary}\n\n💰 ${t.total}: ${formatNumber(totalAmount, base_currency)} ${base_currency}\n🔔 ${t.result}:\n${resultString}\n\n${t.notice}\n${shareUrl}`;
         
@@ -2344,7 +2382,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                         try {
                             const url = new URL(decodedText);
                             const urlParams = new URLSearchParams(url.search);
-                            if (urlParams.has('id')) {
+                            if (urlParams.has('code')) {
+                                parsedCode = urlParams.get('code');
+                            } else if (urlParams.has('id')) {
                                 parsedCode = urlParams.get('id');
                             }
                         } catch(e) {}
