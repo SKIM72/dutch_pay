@@ -24,6 +24,7 @@ header { height: 60px; background: white; border-bottom: 1px solid var(--border)
 #app-icon { width: 28px; height: 28px; object-fit: contain; }
 header h1 { font-size: 1.25rem; color: var(--primary); font-weight: 700; letter-spacing: -0.5px; margin: 0; }
 .header-controls { display: flex; align-items: center; gap: 1rem; }
+.app-version-badge { color: var(--text-muted); border: 1px solid var(--border); background: var(--side-bg); border-radius: 999px; padding: 0.25rem 0.55rem; font-size: 0.72rem; font-weight: 700; line-height: 1; white-space: nowrap; }
 #mobile-menu-btn { display: block; background: transparent; border: none; color: var(--text-main); font-size: 1.4rem; cursor: pointer; padding: 0; transition: color 0.2s; }
 #mobile-menu-btn:hover { color: var(--primary); }
 .language-selector { display: flex; align-items: center; gap: 0.5rem; color: var(--text-muted); }
@@ -255,6 +256,7 @@ button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
     header { padding: 0 1rem; }
     .brand-container h1 { display: none; }
     .header-controls { gap: 0.4rem; }
+    .app-version-badge { font-size: 0.68rem; padding: 0.22rem 0.45rem; }
     
     #user-info-display { max-width: 120px; padding: 0.3rem 0.4rem; } 
     #user-email-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; max-width: 80px; }
