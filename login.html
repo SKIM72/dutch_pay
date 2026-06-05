@@ -15,9 +15,16 @@
     <meta name="theme-color" content="#6366f1">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png" type="image/png">
+    <script>
+        (function() {
+            const mode = localStorage.getItem('settleup-theme-mode') || 'system';
+            const isDark = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+        })();
+    </script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=41">
+    <link rel="stylesheet" href="style.css?v=42">
 
     <style>
         #landing-view {
@@ -166,12 +173,50 @@
             height: 100%;
         }
         .auth-page-wrapper .auth-lang-selector { display: none; }
+
+        html[data-theme="dark"] #landing-view {
+            background-color: var(--main-bg) !important;
+            color: var(--text-main) !important;
+        }
+        html[data-theme="dark"] .landing-header {
+            background: rgba(17, 24, 39, 0.88) !important;
+            border-bottom-color: var(--border) !important;
+        }
+        html[data-theme="dark"] .hero-section {
+            background: linear-gradient(135deg, #111827 0%, #0b1120 100%) !important;
+        }
+        html[data-theme="dark"] .hero-section p,
+        html[data-theme="dark"] .feature-text p {
+            color: var(--text-muted) !important;
+        }
+        html[data-theme="dark"] .feature-section {
+            border-bottom-color: var(--border) !important;
+        }
+        html[data-theme="dark"] .feature-section.reverse {
+            background: var(--side-bg) !important;
+        }
+        html[data-theme="dark"] .feature-text h3 {
+            color: var(--text-main) !important;
+        }
+        html[data-theme="dark"] .mockup-img {
+            border-color: var(--border) !important;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.45) !important;
+        }
+        html[data-theme="dark"] #nav-login-btn,
+        html[data-theme="dark"] .global-lang-selector {
+            background: rgba(17, 24, 39, 0.92) !important;
+            border-color: var(--border) !important;
+            color: var(--text-main) !important;
+        }
+        html[data-theme="dark"] #nav-login-btn:hover {
+            background: var(--hover-bg) !important;
+        }
     </style>
 </head>
 <body>
 
     <div class="top-right-controls">
-        <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.06.06.3</span>
+        <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.06.06.4</span>
         <button id="nav-login-btn" data-i18n="login">로그인</button>
         <div class="global-lang-selector">
             <i class="fas fa-globe"></i>
@@ -302,6 +347,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="auth.js?v=44"></script>
+    <script src="auth.js?v=45"></script>
 </body>
 </html>

@@ -9,6 +9,14 @@
     <meta name="theme-color" content="#6366f1">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" href="icon.png" type="image/png">
+    <script>
+        (function() {
+            const mode = localStorage.getItem('settleup-theme-mode') || 'system';
+            const isDark = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+            document.querySelector('meta[name="theme-color"]').content = isDark ? '#0b1120' : '#6366f1';
+        })();
+    </script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     
@@ -183,6 +191,92 @@
         .modal-btn.confirm { background: #ef4444; color: white; }
         .modal-btn.confirm:hover { background: #dc2626; }
 
+        html[data-theme="dark"] body,
+        html[data-theme="dark"] html {
+            background-color: #020617;
+            color: #e5e7eb;
+        }
+        html[data-theme="dark"] .chat-page-container {
+            background: #111827;
+            box-shadow: 0 0 24px rgba(0,0,0,0.38);
+        }
+        @media (min-width: 601px) {
+            html[data-theme="dark"] body,
+            html[data-theme="dark"] html {
+                background-color: #020617;
+            }
+        }
+        html[data-theme="dark"] .chat-messages-container {
+            background: #0b1120;
+        }
+        html[data-theme="dark"] .chat-input-area {
+            background: #111827;
+            border-top-color: #243044;
+        }
+        html[data-theme="dark"] #chat-input,
+        html[data-theme="dark"] #edit-modal-textarea {
+            background: #172033;
+            color: #e5e7eb;
+            border-color: #243044;
+        }
+        html[data-theme="dark"] #chat-input:focus,
+        html[data-theme="dark"] #edit-modal-textarea:focus {
+            background: #111827;
+            border-color: #8b8ff8;
+        }
+        html[data-theme="dark"] .other .chat-bubble {
+            background: #172033;
+            color: #e5e7eb;
+            border-color: #243044;
+        }
+        html[data-theme="dark"] .chat-bubble.deleted {
+            background: #1f2937 !important;
+            color: #94a3b8 !important;
+            border-color: #243044 !important;
+        }
+        html[data-theme="dark"] .chat-sender,
+        html[data-theme="dark"] .confirm-msg-desc,
+        html[data-theme="dark"] #typing-indicator {
+            color: #94a3b8 !important;
+        }
+        html[data-theme="dark"] .msg-options-menu,
+        html[data-theme="dark"] .custom-modal {
+            background: #111827;
+            border-color: #243044;
+            color: #e5e7eb;
+        }
+        html[data-theme="dark"] .msg-options-menu button,
+        html[data-theme="dark"] .modal-header h3,
+        html[data-theme="dark"] #admin-confirm-msg-desc {
+            color: #e5e7eb !important;
+        }
+        html[data-theme="dark"] .msg-options-menu button:hover,
+        html[data-theme="dark"] .modal-btn.cancel {
+            background: #1f2937;
+            color: #e5e7eb;
+        }
+        html[data-theme="dark"] .msg-options-menu .delete-msg-btn {
+            color: #f87171 !important;
+            border-top-color: #243044;
+        }
+        html[data-theme="dark"] #scroll-bottom-btn {
+            background: rgba(17, 24, 39, 0.95);
+            color: #e5e7eb;
+            border-color: #243044;
+        }
+        html[data-theme="dark"] #chat-lock-overlay {
+            background: rgba(2, 6, 23, 0.96) !important;
+        }
+        html[data-theme="dark"] #lock-back-btn,
+        html[data-theme="dark"] #chat-lock-overlay h2 {
+            color: #e5e7eb !important;
+        }
+        html[data-theme="dark"] #unlock-password-input {
+            background: #172033;
+            color: #e5e7eb;
+            border-color: #243044;
+        }
+
     </style>
 </head>
 <body>
@@ -276,7 +370,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="locales.js?v=26"></script>
+    <script src="locales.js?v=27"></script>
     <script src="chat.js?v=32"></script>
 </body>
 </html>
