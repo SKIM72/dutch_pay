@@ -325,11 +325,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         const isAdmin = currentUser.email.toLowerCase() === 'eowert72@gmail.com';
         const autoLock = localStorage.getItem('adminAutoLock') === 'true';
 
-        const { data: myProfile } = await supabaseClient.from('profiles').select('nickname, admin_pin').eq('user_id', currentUser.id).single();
+        const { data: myProfile } = await supabaseClient.from('profiles').select('nickname').eq('user_id', currentUser.id).single();
         if (myProfile) {
             myNickname = myProfile.nickname || currentUser.email.split('@')[0];
-            if (isAdmin && myProfile.admin_pin) {
-                dbAdminPin = myProfile.admin_pin;
+        }
+
+        if (isAdmin) {
+            const { data: adminPin, error: adminPinError } = await supabaseClient.rpc('get_my_admin_pin');
+            if (!adminPinError && adminPin) {
+                dbAdminPin = adminPin;
+            } else if (adminPinError) {
+                console.error('Admin PIN fetch failed:', adminPinError);
             }
         }
         

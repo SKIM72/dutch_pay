@@ -1,10 +1,12 @@
-const CACHE_NAME = 'settle-up-cache-v110'; // 코드가 변경될 때마다 버전 번호를 올려주세요!
+const CACHE_NAME = 'settle-up-cache-v111'; // 코드가 변경될 때마다 버전 번호를 올려주세요!
 const urlsToCache = [
   './',
   './index.html',
   './login.html',
+  './chat.html',
   './style.css',
   './main.js',
+  './chat.js',
   './auth.js',
   './locales.js',
   './config.js',
@@ -19,14 +21,35 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) {
+  if (event.request.method !== 'GET') return;
+
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.origin !== self.location.origin) return;
+
+  const networkFirstTargets = ['document', 'script', 'style', 'worker'];
+  const useNetworkFirst = event.request.mode === 'navigate' || networkFirstTargets.includes(event.request.destination);
+
+  if (useNetworkFirst) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
           return response;
-        }
-        return fetch(event.request);
-      })
+        })
+        .catch(() => caches.match(event.request).then(response => response || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(event.request).then(response => {
+      return response || fetch(event.request).then(networkResponse => {
+        const responseClone = networkResponse.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseClone));
+        return networkResponse;
+      });
+    })
   );
 });
 
