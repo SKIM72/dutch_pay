@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.06.2';
+    const APP_VERSION = 'v2026.06.06.3';
 
     function escapeHTML(value) {
         return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -131,6 +131,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const expenseTableBody = document.querySelector('#expense-table tbody');
     const expenseTableHeaderRow = document.getElementById('expense-table-header-row');
+    const expenseCardList = document.getElementById('expense-card-list');
     const totalExpenseP = document.getElementById('total-expense');
     const finalSettlementContainer = document.getElementById('final-settlement-container');
     const completeSettlementBtn = document.getElementById('complete-settlement-btn');
@@ -1786,13 +1787,109 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    function getExpenseDateLabel(expense) {
+        if (!expense.expense_date) return '';
+        const date = new Date(expense.expense_date);
+        const localeCode = currentLang === 'en' ? 'en-US' : (currentLang === 'ja' ? 'ja-JP' : 'ko-KR');
+        return date.toLocaleDateString(localeCode, {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+    }
+
+    function renderExpenseCards(expenses, participants, isLocked) {
+        if (!expenseCardList || !currentSettlement) return;
+        expenseCardList.innerHTML = '';
+
+        if (!expenses.length) {
+            const emptyText = getLocale('noExpenseYet', '아직 지출 내역이 없습니다.');
+            expenseCardList.innerHTML = `<p class="expense-card-empty">${escapeHTML(emptyText)}</p>`;
+            return;
+        }
+
+        const baseCurrency = currentSettlement.base_currency;
+        const cardsHtml = expenses.map(exp => {
+            const shares = exp.shares || {};
+            const expenseId = escapeHTML(exp.id);
+            const expenseName = escapeHTML(exp.name);
+            const payerName = escapeHTML(exp.payer);
+            const dateLabel = escapeHTML(getExpenseDateLabel(exp));
+            const originalAmount = `${escapeHTML(formatNumber(exp.original_amount, exp.currency))} ${escapeHTML(exp.currency)}`;
+            const amountLabel = exp.currency !== baseCurrency
+                ? `<button type="button" class="expense-card-amount clickable-amount" data-id="${expenseId}" title="적용 환율 보기"><i class="fas fa-info-circle"></i> ${originalAmount}</button>`
+                : `<span class="expense-card-amount">${originalAmount}</span>`;
+
+            const shareRows = participants.map(participant => `
+                <div class="expense-card-share-row">
+                    <span>${escapeHTML(participant)}</span>
+                    <strong>${escapeHTML(formatNumber(shares[participant] || 0, baseCurrency))} ${escapeHTML(baseCurrency)}</strong>
+                </div>
+            `).join('');
+
+            const actionButton = isLocked ? '' : `
+                <button type="button" class="expense-card-delete delete-expense-btn" data-id="${expenseId}" title="지출 삭제">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            `;
+
+            return `
+                <article class="expense-card ${isLocked ? 'is-settled' : ''}" data-id="${expenseId}">
+                    <div class="expense-card-top">
+                        <div class="expense-card-title-group">
+                            ${dateLabel ? `<span class="expense-card-date">${dateLabel}</span>` : ''}
+                            <h3>${expenseName}</h3>
+                        </div>
+                        ${actionButton}
+                    </div>
+                    <div class="expense-card-meta">
+                        ${amountLabel}
+                        <span class="expense-card-payer"><i class="fas fa-credit-card"></i> ${payerName}</span>
+                    </div>
+                    <div class="expense-card-shares">
+                        ${shareRows}
+                    </div>
+                </article>
+            `;
+        }).join('');
+
+        expenseCardList.innerHTML = cardsHtml;
+
+        expenseCardList.querySelectorAll('.clickable-amount').forEach(el => {
+            el.addEventListener('click', (event) => {
+                event.stopPropagation();
+                showExpenseExchangeRate(parseInt(event.currentTarget.dataset.id, 10));
+            });
+        });
+
+        if (!isLocked) {
+            expenseCardList.querySelectorAll('.expense-card').forEach(card => {
+                card.addEventListener('click', (event) => {
+                    if (event.target.closest('.delete-expense-btn') || event.target.closest('.clickable-amount')) return;
+                    openEditExpenseModal(parseInt(card.dataset.id, 10));
+                });
+            });
+
+            expenseCardList.querySelectorAll('.delete-expense-btn').forEach(btn => {
+                btn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    deleteExpense(parseInt(event.currentTarget.dataset.id, 10));
+                });
+            });
+        }
+    }
+
     function renderExpenses() {
         if(!expenseTableBody) return;
         expenseTableBody.innerHTML = '';
+        if (expenseCardList) expenseCardList.innerHTML = '';
         if (!currentSettlement || !currentSettlement.expenses) return;
         const participants = currentSettlement.participants;
         
         const isLocked = currentSettlement.is_settled || !currentUser;
+        renderExpenseCards(currentSettlement.expenses, participants, isLocked);
 
         currentSettlement.expenses.forEach(exp => {
             const row = expenseTableBody.insertRow();
@@ -1804,12 +1901,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             const expenseCurrency = escapeHTML(exp.currency);
             const baseCurrency = escapeHTML(currentSettlement.base_currency);
             let dateHtml = '';
-            if (exp.expense_date) {
-                const d = new Date(exp.expense_date);
-                let localeCode = currentLang === 'en' ? 'en-US' : (currentLang === 'ja' ? 'ja-JP' : 'ko-KR');
-                const dateStr = d.toLocaleDateString(localeCode, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
-                dateHtml = `<div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">${escapeHTML(dateStr)}</div>`;
-            }
+            const dateStr = getExpenseDateLabel(exp);
+            if (dateStr) dateHtml = `<div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">${escapeHTML(dateStr)}</div>`;
             let amountHtml = `${escapeHTML(formatNumber(exp.original_amount, exp.currency))} ${expenseCurrency}`;
             if (exp.currency !== currentSettlement.base_currency) { 
                 amountHtml = `<span class="clickable-amount" data-id="${expenseId}" title="적용 환율 보기"><i class="fas fa-info-circle"></i> ${amountHtml}</span>`;
