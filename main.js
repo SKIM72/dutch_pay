@@ -686,6 +686,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { data: null, error: error || rpcError };
     }
 
+    async function joinSettlementIdByCode(codeInput) {
+        const code = String(codeInput || '').trim().toUpperCase();
+        if (!code) return { data: null, error: new Error('EMPTY_CODE'), joinedViaRpc: false };
+
+        if (currentUser) {
+            const { data: joinedId, error: joinError } = await safeDB(
+                supabaseClient.rpc('join_settlement_by_invite_code', { p_invite_code: code })
+            );
+
+            if (!joinError && joinedId) {
+                return { data: { id: joinedId }, error: null, joinedViaRpc: true };
+            }
+        }
+
+        const resolved = await resolveSettlementIdByCode(code);
+        return { ...resolved, joinedViaRpc: false };
+    }
+
     async function joinRoomByCode(directCode = null) {
         const joinCodeInput = document.getElementById('join-code-input');
         const codeInput = directCode || (joinCodeInput ? joinCodeInput.value.trim().toUpperCase() : '');
@@ -693,7 +711,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         setLoading(true);
         try {
-            const { data, error } = await resolveSettlementIdByCode(codeInput);
+            const { data, error, joinedViaRpc } = await joinSettlementIdByCode(codeInput);
                 
             if(error || !data) {
                 showToast('유효하지 않은 코드이거나 방을 찾을 수 없습니다.', 'error');
@@ -713,7 +731,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const joinModal = document.getElementById('join-modal');
             if(joinModal) joinModal.classList.add('hidden');
             
-            await syncMemberDB(data.id);
+            if (!joinedViaRpc) {
+                await syncMemberDB(data.id);
+            }
 
             showToast(getLocale('joinSuccess', '성공적으로 방에 참가했습니다!'), 'success');
             
