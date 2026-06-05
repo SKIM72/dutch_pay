@@ -56,7 +56,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.06.3';
+    const APP_VERSION = 'v2026.06.06.4';
+    const THEME_STORAGE_KEY = 'settleup-theme-mode';
+    const VALID_THEME_MODES = new Set(['system', 'light', 'dark']);
+    const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
     function escapeHTML(value) {
         return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -67,6 +70,58 @@ document.addEventListener('DOMContentLoaded', async () => {
             "'": '&#39;'
         }[char]));
     }
+
+    function getPreferredThemeMode() {
+        const savedMode = localStorage.getItem(THEME_STORAGE_KEY);
+        return VALID_THEME_MODES.has(savedMode) ? savedMode : 'system';
+    }
+
+    function getResolvedTheme(mode = getPreferredThemeMode()) {
+        return mode === 'dark' || (mode === 'system' && systemDarkQuery.matches) ? 'dark' : 'light';
+    }
+
+    function applyThemeMode(mode = getPreferredThemeMode()) {
+        const safeMode = VALID_THEME_MODES.has(mode) ? mode : 'system';
+        const resolvedTheme = getResolvedTheme(safeMode);
+        document.documentElement.dataset.theme = resolvedTheme;
+        document.documentElement.dataset.themeMode = safeMode;
+
+        const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+        if (themeColorMeta) themeColorMeta.content = resolvedTheme === 'dark' ? '#0b1120' : '#6366f1';
+
+        const themeModeSelect = document.getElementById('theme-mode-select');
+        if (themeModeSelect) themeModeSelect.value = safeMode;
+    }
+
+    function renderThemeOptions() {
+        const themeModeSelect = document.getElementById('theme-mode-select');
+        if (!themeModeSelect) return;
+
+        const selectedMode = getPreferredThemeMode();
+        const options = [
+            ['system', getLocale('themeSystem', '시스템 설정')],
+            ['light', getLocale('themeLight', '라이트 모드')],
+            ['dark', getLocale('themeDark', '다크 모드')]
+        ];
+
+        themeModeSelect.innerHTML = options.map(([value, label]) =>
+            `<option value="${value}">${escapeHTML(label)}</option>`
+        ).join('');
+        themeModeSelect.value = selectedMode;
+    }
+
+    function setThemeMode(mode) {
+        const safeMode = VALID_THEME_MODES.has(mode) ? mode : 'system';
+        localStorage.setItem(THEME_STORAGE_KEY, safeMode);
+        applyThemeMode(safeMode);
+    }
+
+    applyThemeMode();
+    const handleSystemThemeChange = () => {
+        if (getPreferredThemeMode() === 'system') applyThemeMode('system');
+    };
+    if (systemDarkQuery.addEventListener) systemDarkQuery.addEventListener('change', handleSystemThemeChange);
+    else if (systemDarkQuery.addListener) systemDarkQuery.addListener(handleSystemThemeChange);
 
     // --- Element References ---
     const languageSwitcher = document.getElementById('language-switcher');
@@ -105,6 +160,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const openJoinModalBtn = document.getElementById('open-join-modal-btn'); 
 
     const joinRoomBtn = document.getElementById('join-room-btn'); 
+    const publicPreviewBanner = document.getElementById('public-preview-banner');
+    const publicPreviewSaveBtn = document.getElementById('public-preview-save-btn');
     const copyTextBtn = document.getElementById('copy-text-btn');
     const saveImageBtn = document.getElementById('save-image-btn');
     
@@ -133,6 +190,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const expenseTableHeaderRow = document.getElementById('expense-table-header-row');
     const expenseCardList = document.getElementById('expense-card-list');
     const totalExpenseP = document.getElementById('total-expense');
+    const summaryMeta = document.getElementById('summary-meta');
     const finalSettlementContainer = document.getElementById('final-settlement-container');
     const completeSettlementBtn = document.getElementById('complete-settlement-btn');
     const downloadExcelBtn = document.getElementById('download-excel-btn');
@@ -543,6 +601,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
             });
         }
+        renderThemeOptions();
         updateAuthUI();
         if (currentSettlement) { 
             updateParticipantNames(currentSettlement.participants); 
@@ -641,9 +700,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateSettlementAccessUI() {
         const isGuestPreview = !!currentSettlement && !currentUser;
 
+        document.body.classList.toggle('public-preview-active', isGuestPreview);
+        if (calculatorView) calculatorView.classList.toggle('public-preview-mode', isGuestPreview);
         if (sidebar) sidebar.classList.toggle('hidden', isGuestPreview);
         if (mobileMenuBtn) mobileMenuBtn.classList.toggle('hidden', isGuestPreview);
-        if (joinRoomBtn) joinRoomBtn.classList.toggle('hidden', !isGuestPreview);
+        if (joinRoomBtn) joinRoomBtn.classList.add('hidden');
+        if (publicPreviewBanner) publicPreviewBanner.classList.toggle('hidden', !isGuestPreview);
         [openShareModalBtn, copyTextBtn, saveImageBtn, downloadExcelBtn, viewParticipantsBtn].forEach(el => {
             if (el) el.classList.toggle('hidden', isGuestPreview);
         });
@@ -1002,9 +1064,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (joinRoomBtn) joinRoomBtn.classList.add('hidden');
                 } else {
                     localStorage.setItem('pendingJoinRoomId', guestRoomId);
-                    if (!getJoinedRooms().includes(guestRoomId) && joinRoomBtn) {
-                        joinRoomBtn.classList.remove('hidden');
-                    }
+                    if (joinRoomBtn) joinRoomBtn.classList.add('hidden');
                 }
             } else {
                 if (!currentUser) {
@@ -1960,8 +2020,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentSettlement) return;
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
         const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
+        const isGuestPreview = !!currentSettlement && !currentUser;
         
         if(totalExpenseP) totalExpenseP.textContent = `${getLocale('totalExpense', 'Total Expense')}: ${formatNumber(totalAmount, base_currency)} ${base_currency}`;
+        if(summaryMeta) {
+            const metaItems = [
+                getLocale('summaryParticipants', '참가자 {count}명').replace('{count}', participants.length),
+                getLocale('summaryExpenses', '지출 {count}건').replace('{count}', expenses.length)
+            ];
+            if (isGuestPreview) metaItems.push(getLocale('readOnlyPreview', '읽기 전용'));
+            summaryMeta.innerHTML = metaItems.map(item => `<span>${escapeHTML(item)}</span>`).join('');
+        }
         if(finalSettlementContainer) finalSettlementContainer.innerHTML = '';
         if(completeSettlementBtn) completeSettlementBtn.classList.add('hidden');
 
@@ -2038,7 +2107,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 completeSettlementBtn.classList.remove('hidden');
             }
         } else {
-            finalSettlementContainer.innerHTML = `<div class="transfer-item text-muted">${getLocale('settlementInProgress', 'Settlement in progress...')}</div>`;
+            const statusClass = isGuestPreview ? 'summary-status-pill' : 'transfer-item text-muted';
+            finalSettlementContainer.innerHTML = `<div class="${statusClass}"><i class="fas fa-receipt"></i> ${escapeHTML(getLocale('settlementInProgress', 'Settlement in progress...'))}</div>`;
             if (expenses.length > 0 && currentUser) { 
                 completeSettlementBtn.textContent = getLocale('completeSettlement', 'Complete Settlement');
                 completeSettlementBtn.classList.remove('edit-mode'); 
@@ -2470,8 +2540,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                         if (currentNicknameDisplay) currentNicknameDisplay.textContent = '-';
                     }
 
+                    renderThemeOptions();
+                    applyThemeMode();
                     profileModal.classList.remove('hidden');
                 }
+            });
+        }
+
+        const themeModeSelect = document.getElementById('theme-mode-select');
+        if (themeModeSelect) {
+            renderThemeOptions();
+            themeModeSelect.addEventListener('change', (event) => {
+                setThemeMode(event.target.value);
             });
         }
         
@@ -2629,7 +2709,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(titleInput) titleInput.focus();
         });
 
-        if(joinRoomBtn) joinRoomBtn.addEventListener('click', async () => {
+        const handleSaveCurrentRoom = async () => {
             if (!currentSettlement) return;
             
             if (!currentUser) { 
@@ -2643,10 +2723,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             saveJoinedRoom(currentSettlement.id);
-            joinRoomBtn.classList.add('hidden');
+            if (joinRoomBtn) joinRoomBtn.classList.add('hidden');
+            if (publicPreviewBanner) publicPreviewBanner.classList.add('hidden');
             showToast('내 정산 목록에 저장되었습니다!', 'success');
             loadData(); 
-        });
+        };
+
+        if(joinRoomBtn) joinRoomBtn.addEventListener('click', handleSaveCurrentRoom);
+        if(publicPreviewSaveBtn) publicPreviewSaveBtn.addEventListener('click', handleSaveCurrentRoom);
 
         const openShareModalBtn = document.getElementById('open-share-modal-btn');
         if(openShareModalBtn) openShareModalBtn.addEventListener('click', openShareModal);

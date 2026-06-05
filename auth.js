@@ -2,7 +2,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
     let currentLang = 'ko';
-    const APP_VERSION = 'v2026.06.06.3';
+    const APP_VERSION = 'v2026.06.06.4';
+    const THEME_STORAGE_KEY = 'settleup-theme-mode';
+    const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    function applyThemeMode() {
+        const mode = localStorage.getItem(THEME_STORAGE_KEY) || 'system';
+        const isDark = mode === 'dark' || (mode === 'system' && systemDarkQuery.matches);
+        document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+        const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+        if (themeColorMeta) themeColorMeta.content = isDark ? '#0b1120' : '#6366f1';
+    }
+
+    applyThemeMode();
+    const handleSystemThemeChange = () => {
+        if ((localStorage.getItem(THEME_STORAGE_KEY) || 'system') === 'system') applyThemeMode();
+    };
+    if (systemDarkQuery.addEventListener) systemDarkQuery.addEventListener('change', handleSystemThemeChange);
+    else if (systemDarkQuery.addListener) systemDarkQuery.addListener(handleSystemThemeChange);
 
     // 🚀 [추가됨] 인앱 브라우저 강제 탈출 로직 (CleanURL 적용)
     function redirectToExternalBrowser(targetPage) {
