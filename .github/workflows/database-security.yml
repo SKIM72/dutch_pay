@@ -28,6 +28,9 @@ jobs:
           version: 2.105.0
           github-token: ${{ github.token }}
 
+      - name: Test schema audit tool
+        run: npm run test:schema-audit
+
       - name: Start isolated local database
         run: npm run db:start:test
 

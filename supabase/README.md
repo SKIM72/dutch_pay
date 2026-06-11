@@ -30,3 +30,35 @@ The tests create fixtures inside transactions and roll them back. They verify:
   the expected access.
 - `profiles.admin_pin` is accessible only through the authenticated user's own
   RPC calls.
+
+## Read-only production schema audit
+
+Create a fresh schema-only dump in a directory outside this repository. Never
+commit a production dump because it can reveal internal policy and function
+details.
+
+```bash
+supabase db dump --db-url "$SUPABASE_DB_URL" -f "$BACKUP_DIR/schema.sql"
+```
+
+Audit the dump against the local security baseline:
+
+```bash
+npm run db:audit:schema -- \
+  "$BACKUP_DIR/schema.sql" \
+  --baseline supabase/migrations/20260611130000_local_security_baseline.sql \
+  --output "$BACKUP_DIR/schema-audit.md"
+```
+
+The audit reads SQL files only. It never opens a database connection and never
+executes SQL. It exits with code `2` when critical or high findings exist.
+Use `--fail-on none` when reviewing a known historical dump.
+
+The report checks:
+
+- required application tables, columns, RLS, RPCs, and indexes;
+- unconditional public or authenticated RLS policies;
+- broad anonymous table and default privileges;
+- anonymous access to private/destructive RPCs;
+- unsafe `SECURITY DEFINER` search paths;
+- table, function, policy, and index drift from the local baseline.
