@@ -30,7 +30,7 @@
     </script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=53">
+    <link rel="stylesheet" href="style.css?v=54">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -76,7 +76,7 @@
                 <h1>Settle Up</h1>
             </div>
             <div class="header-controls">
-                <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.06.06.4</span>
+                <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.06.11.1</span>
                 <div id="user-info-display" class="hidden" style="cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-muted); margin-right: 0.5rem; background: var(--side-bg); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid var(--border); max-width: 150px;" title="마이페이지 열기">
                     <i class="fas fa-user-circle"></i> <span id="user-email-text" style="display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;"></span>
                 </div>
@@ -145,7 +145,7 @@
                                 <i class="fas fa-star"></i> <span data-i18n="saveToMyList">내 목록에 저장</span>
                             </button>
                             <button id="open-share-modal-btn" class="btn-outline">
-                                <i class="fas fa-share-alt"></i> <span data-i18n="inviteShareBtn">초대 & 공유</span>
+                                <i class="fas fa-share-alt"></i> <span data-i18n="inviteShareBtn">초대 &amp; 공유</span>
                             </button>
                             <button id="copy-text-btn" class="btn-outline">
                                 <i class="fas fa-copy"></i> <span data-i18n="copyText">텍스트 복사</span>
@@ -239,7 +239,19 @@
                     <div class="card" id="expense-list-card">
                         <div class="card-header">
                             <h2><i class="fas fa-list"></i><span data-i18n="detailedExpenseList"></span></h2>
-                            <button id="download-excel-btn"><i class="fas fa-download"></i> <span data-i18n="downloadExcel">엑셀 다운로드</span></button>
+                            <div class="expense-list-actions">
+                                <label class="expense-sort-control" for="expense-sort-select">
+                                    <i class="fas fa-arrow-down-wide-short" aria-hidden="true"></i>
+                                    <span class="sr-only" data-i18n="sortExpenses">지출 내역 정렬</span>
+                                    <select id="expense-sort-select">
+                                        <option value="date-desc" data-i18n="sortDateDesc">지출일자 최신순</option>
+                                        <option value="date-asc" data-i18n="sortDateAsc">지출일자 오래된순</option>
+                                        <option value="amount-desc" data-i18n="sortAmountDesc">금액 높은순</option>
+                                        <option value="amount-asc" data-i18n="sortAmountAsc">금액 낮은순</option>
+                                    </select>
+                                </label>
+                                <button id="download-excel-btn"><i class="fas fa-download"></i> <span data-i18n="downloadExcel">엑셀 다운로드</span></button>
+                            </div>
                         </div>
                         <div id="expense-table-container">
                             <table id="expense-table">
@@ -555,7 +567,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
     <script src="locales.js"></script>
-    <script src="main.js?v=90"></script>
+    <script src="main.js?v=91"></script>
     <script src="chat.js?v=32"></script>
 </body>
 </html>
