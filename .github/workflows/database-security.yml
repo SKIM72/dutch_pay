@@ -1,0 +1,39 @@
+name: Database security
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: database-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pgtap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.105.0
+          github-token: ${{ github.token }}
+
+      - name: Start isolated local database
+        run: npm run db:start:test
+
+      - name: Run RLS and RPC security tests
+        run: npm run test:db
+
+      - name: Stop local database
+        if: always()
+        run: npm run db:stop

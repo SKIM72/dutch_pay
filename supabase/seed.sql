@@ -1,0 +1,2 @@
+-- Intentionally empty.
+-- Database security tests create isolated fixtures inside transactions.
