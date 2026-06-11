@@ -11,6 +11,8 @@
     "db:start:test": "supabase start -x edge-runtime,gotrue,imgproxy,kong,logflare,mailpit,postgres-meta,postgrest,realtime,storage-api,studio,supavisor,vector",
     "db:reset:test": "supabase db reset --local",
     "test:db": "supabase test db --local supabase/tests/database",
+    "test:schema-audit": "node --test tests/unit/schema-audit.test.mjs",
+    "db:audit:schema": "node scripts/audit-supabase-schema.mjs",
     "db:stop": "supabase stop"
   },
   "devDependencies": {

@@ -53,3 +53,7 @@ npm run db:stop
 
 중요: 로컬 기준선을 운영 DB와 별도로 검증하는 단계입니다. 검토 없이
 `supabase link`, `supabase db push`, `supabase migration up --linked`를 실행하지 마세요.
+
+운영 DB의 스키마 덤프를 수정 없이 감사하는 방법은
+[`supabase/README.md`](supabase/README.md)의 `Read-only production schema audit`
+절을 참고하세요.
