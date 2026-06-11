@@ -57,6 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const MESSAGES_PER_PAGE = 50;
     let hasMoreMessages = true;
     let isFetchingMessages = false;
+    const pendingMessages = new Map();
 
     // 타이핑 상태 관리를 위한 변수들
     let currentlyTypingUsers = {};
@@ -165,6 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const adminConfirmModal = document.getElementById('admin-confirm-modal');
     const adminConfirmMsgDesc = document.getElementById('admin-confirm-msg-desc');
+    const adminConfirmMsgNote = document.getElementById('admin-confirm-msg-note');
     let adminActionCallback = null;
     
     let targetMessageId = null;
@@ -185,6 +187,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const openAdminConfirmModal = (message, callback) => {
         if (adminConfirmMsgDesc) adminConfirmMsgDesc.textContent = message;
+        if (adminConfirmMsgNote) {
+            adminConfirmMsgNote.textContent = getLocale(
+                'adminRecordPreserved',
+                '(데이터베이스에는 기록이 보존됩니다.)'
+            );
+        }
         adminActionCallback = callback;
         if (adminConfirmModal) adminConfirmModal.classList.add('show');
     };
@@ -219,10 +227,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const submitEditBtn = document.getElementById('submit-edit-modal-btn');
     if (submitEditBtn) {
-        submitEditBtn.addEventListener('click', () => {
+        submitEditBtn.addEventListener('click', async () => {
             const newContent = editTextarea ? editTextarea.value.trim() : '';
             if (newContent && newContent !== originalMessageContent && targetMessageId) {
-                editMessageInDB(targetMessageId, newContent);
+                submitEditBtn.disabled = true;
+                await editMessageInDB(targetMessageId, newContent);
+                submitEditBtn.disabled = false;
             }
             closeAllModals(); 
         });
@@ -230,9 +240,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const submitDeleteBtn = document.getElementById('submit-delete-modal-btn');
     if (submitDeleteBtn) {
-        submitDeleteBtn.addEventListener('click', () => {
+        submitDeleteBtn.addEventListener('click', async () => {
             if (targetMessageId) {
-                deleteMessageInDB(targetMessageId);
+                submitDeleteBtn.disabled = true;
+                await deleteMessageInDB(targetMessageId);
+                submitDeleteBtn.disabled = false;
             }
             closeAllModals(); 
         });
@@ -240,8 +252,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const submitAdminConfirmBtn = document.getElementById('submit-admin-confirm-btn');
     if (submitAdminConfirmBtn) {
-        submitAdminConfirmBtn.addEventListener('click', () => {
-            if (adminActionCallback) adminActionCallback();
+        submitAdminConfirmBtn.addEventListener('click', async () => {
+            const callback = adminActionCallback;
+            if (callback) {
+                submitAdminConfirmBtn.disabled = true;
+                await callback();
+                submitAdminConfirmBtn.disabled = false;
+            }
             closeAllModals(); 
         });
     }
@@ -405,7 +422,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (adminClearBtn) {
             adminClearBtn.addEventListener('click', () => {
                 openAdminConfirmModal(
-                    getLocale('adminClearChatConfirm', '이 채팅방의 모든 대화 내역을 화면에서 즉시 삭제하시겠습니까?<br><span style="font-size:0.8rem; color:#64748b; font-weight:normal;">(데이터베이스에는 기록이 보존됩니다.)</span>'),
+                    getLocale('adminClearChatConfirm', '이 채팅방의 모든 대화 내역을 화면에서 즉시 삭제하시겠습니까?'),
                     async () => {
                         const { error } = await supabaseClient
                             .from('chat_messages')
@@ -610,24 +627,43 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function editMessageInDB(msgId, newContent) {
+        const { data, error } = await supabaseClient
+            .from('chat_messages')
+            .update({ content: newContent, is_edited: true })
+            .eq('id', msgId)
+            .select('id')
+            .maybeSingle();
+        
+        if (error || !data) {
+            console.error(error);
+            alert(getLocale('msgSaveFail', '메시지 수정에 실패했습니다.'));
+            return false;
+        }
+
         const msgDiv = document.querySelector(`.chat-msg-wrapper[data-id="${msgId}"]`);
         if (msgDiv) {
             const bubble = msgDiv.querySelector('.chat-bubble');
-            if (bubble) bubble.innerHTML = `${escapeHTML(newContent)}<span class="edited-tag">${escapeHTML(getLocale('editedTag', '(수정됨)'))}</span>`;
+            if (bubble) {
+                bubble.innerHTML = `${escapeHTML(newContent)}<span class="edited-tag">${escapeHTML(getLocale('editedTag', '(수정됨)'))}</span>`;
+            }
         }
-
-        const { error } = await supabaseClient
-            .from('chat_messages')
-            .update({ content: newContent, is_edited: true })
-            .eq('id', msgId);
-        
-        if (error) {
-            console.error(error);
-            alert(getLocale('msgSaveFail', '메시지 수정에 실패했습니다.'));
-        }
+        return true;
     }
 
     async function deleteMessageInDB(msgId) {
+        const { data, error } = await supabaseClient
+            .from('chat_messages')
+            .update({ is_deleted: true })
+            .eq('id', msgId)
+            .select('id')
+            .maybeSingle();
+            
+        if (error || !data) {
+            console.error(error);
+            alert(getLocale('msgDeleteFail', '메시지 삭제에 실패했습니다.'));
+            return false;
+        }
+
         const msgDiv = document.querySelector(`.chat-msg-wrapper[data-id="${msgId}"]`);
         if (msgDiv) {
             const bubble = msgDiv.querySelector('.chat-bubble');
@@ -636,16 +672,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 bubble.className = 'chat-bubble deleted';
             }
         }
-
-        const { error } = await supabaseClient
-            .from('chat_messages')
-            .update({ is_deleted: true })
-            .eq('id', msgId);
-            
-        if (error) {
-            console.error(error);
-            alert(getLocale('msgDeleteFail', '메시지 삭제에 실패했습니다.'));
-        }
+        return true;
     }
 
     // 🚀 [추가 및 수정] 처음 접속 시 최신 50개의 메시지만 불러오는 페이징 기능
@@ -738,6 +765,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     const { data: profile } = await supabaseClient.from('profiles').select('nickname').eq('user_id', newMsg.user_id).single();
                     newMsg.profiles = profile || { nickname: getLocale('unknownUser', '알 수 없음') };
+
+                    if (container.querySelector(`.chat-msg-wrapper[data-id="${newMsg.id}"]`)) {
+                        return;
+                    }
+
+                    if (newMsg.user_id === currentUser.id) {
+                        const matchingPending = [...pendingMessages.entries()].find(([, pending]) => {
+                            const sentAt = new Date(pending.message.created_at).getTime();
+                            const receivedAt = new Date(newMsg.created_at).getTime();
+                            return pending.message.content === newMsg.content
+                                && Math.abs(receivedAt - sentAt) < 60000;
+                        });
+
+                        if (matchingPending) {
+                            reconcilePendingMessage(matchingPending[0], newMsg, container);
+                            return;
+                        }
+                    }
                     
                     appendMessageUI(newMsg, container);
                     currentOffset++; // 🚀 새 메시지가 추가되면 오프셋 증가 보정
@@ -764,7 +809,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (updatedMsg.is_hidden_admin) {
                     if (msgDiv) msgDiv.remove();
                 } 
-                else if (msgDiv && updatedMsg.user_id !== currentUser.id) {
+                else if (msgDiv) {
                     const { data: profile } = await supabaseClient.from('profiles').select('nickname').eq('user_id', updatedMsg.user_id).single();
                     updatedMsg.profiles = profile || { nickname: getLocale('unknownUser', '알 수 없음') };
                     renderMessageContent(msgDiv, updatedMsg, container);
@@ -800,9 +845,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             created_at: new Date().toISOString(),
             is_edited: false,
             is_deleted: false,
+            is_hidden_admin: false,
+            pending: true,
             profiles: { nickname: myNickname }
         };
         appendMessageUI(tempMsg, chatMessages);
+        pendingMessages.set(tempId, { message: tempMsg });
         currentOffset++; // 🚀 내가 메시지를 보내도 오프셋 증가 보정
         scrollToBottom(chatMessages);
 
@@ -810,14 +858,48 @@ document.addEventListener('DOMContentLoaded', async () => {
             settlement_id: currentSettlementId,
             user_id: currentUser.id,
             content: content
-        }]).select('id').single();
+        }]).select('id, content, created_at, user_id, is_edited, is_deleted, is_hidden_admin').single();
         
         if (!error && data) {
+            data.profiles = { nickname: myNickname };
+            reconcilePendingMessage(tempId, data, chatMessages);
+        } else {
+            pendingMessages.delete(tempId);
             const tempDiv = document.querySelector(`.chat-msg-wrapper[data-id="${tempId}"]`);
-            if (tempDiv) tempDiv.dataset.id = data.id; 
+            if (tempDiv) tempDiv.remove();
+            currentOffset = Math.max(0, currentOffset - 1);
+            if (!inputEl.value) inputEl.value = content;
+            console.error(error);
+            alert(getLocale('msgSendFail', '메시지 전송에 실패했습니다.'));
         }
         
         updateMyReadTime();
+    }
+
+    function reconcilePendingMessage(tempId, persistedMessage, container) {
+        const pending = pendingMessages.get(tempId);
+        const tempDiv = document.querySelector(`.chat-msg-wrapper[data-id="${tempId}"]`);
+        const persistedDiv = document.querySelector(`.chat-msg-wrapper[data-id="${persistedMessage.id}"]`);
+
+        if (persistedDiv && tempDiv && persistedDiv !== tempDiv) {
+            tempDiv.remove();
+            currentOffset = Math.max(0, currentOffset - 1);
+            pendingMessages.delete(tempId);
+            return;
+        }
+
+        if (!tempDiv || !pending) {
+            pendingMessages.delete(tempId);
+            return;
+        }
+
+        Object.assign(pending.message, persistedMessage, {
+            pending: false,
+            profiles: persistedMessage.profiles || pending.message.profiles
+        });
+        tempDiv.dataset.id = persistedMessage.id;
+        renderMessageContent(tempDiv, pending.message, container);
+        pendingMessages.delete(tempId);
     }
 
     function appendMessageUI(msg, container) {
@@ -834,8 +916,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function renderMessageContent(msgDiv, msg, container) {
         msgDiv.dataset.uid = msg.user_id; 
+        msgDiv.dataset.pending = msg.pending ? 'true' : 'false';
+        msgDiv.classList.toggle('pending', Boolean(msg.pending));
         msgDiv.innerHTML = '';
         const isMine = msg.user_id === currentUser.id;
+        const isPending = Boolean(msg.pending);
         const nickname = msg.profiles?.nickname || getLocale('unknownUser', '알 수 없음');
         const timeStr = new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
         
@@ -859,8 +944,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!isMine) html += `<div class="chat-sender">${escapeHTML(nickname)}</div>`;
         
         const isAdmin = currentUser.email.toLowerCase() === 'eowert72@gmail.com';
-        const canEditOrDelete = isMine && !msg.is_deleted;
-        const showMenuOptions = canEditOrDelete || isAdmin;
+        const canEditOrDelete = isMine && !msg.is_deleted && !isPending;
+        const showMenuOptions = !isPending && (canEditOrDelete || isAdmin);
 
         html += `<div class="chat-content-wrapper">`;
         if (isMine) {
@@ -914,14 +999,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             if(editBtn) {
                 editBtn.addEventListener('click', () => {
                     menu.classList.remove('show');
-                    openEditModal(msg.id, msg.content);
+                    openEditModal(msgDiv.dataset.id, msg.content);
                 });
             }
 
             if(deleteBtn) {
                 deleteBtn.addEventListener('click', () => {
                     menu.classList.remove('show');
-                    openDeleteModal(msg.id);
+                    openDeleteModal(msgDiv.dataset.id);
                 });
             }
 
@@ -929,13 +1014,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                 adminHideBtn.addEventListener('click', () => {
                     menu.classList.remove('show');
                     openAdminConfirmModal(
-                        getLocale('adminHideMsgConfirm', '이 메시지를 화면에서 완전히 삭제하시겠습니까?<br><span style="font-size:0.8rem; color:#64748b; font-weight:normal;">(데이터베이스에는 기록이 보존됩니다.)</span>'),
+                        getLocale('adminHideMsgConfirm', '이 메시지를 화면에서 완전히 삭제하시겠습니까?'),
                         async () => {
-                            const { error } = await supabaseClient
+                            const messageId = msgDiv.dataset.id;
+                            const { data, error } = await supabaseClient
                                 .from('chat_messages')
                                 .update({ is_hidden_admin: true })
-                                .eq('id', msg.id);
-                            if(error) alert(getLocale('hideFail', '숨기기 실패 (SQL 권한 확인): ') + error.message);
+                                .eq('id', messageId)
+                                .select('id')
+                                .maybeSingle();
+                            if (error || !data) {
+                                alert(
+                                    getLocale('hideFail', '숨기기 실패 (SQL 권한 확인): ')
+                                    + (error?.message || getLocale('noUpdatedMessage', '변경된 메시지가 없습니다.'))
+                                );
+                                return false;
+                            }
+                            msgDiv.remove();
+                            return true;
                         }
                     );
                 });
