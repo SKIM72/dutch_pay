@@ -1,0 +1,16 @@
+{
+  "name": "settle-up-web",
+  "version": "2026.6.11",
+  "private": true,
+  "scripts": {
+    "serve": "http-server . -a 127.0.0.1 -p 4173 -c-1 --silent",
+    "test": "npm run test:e2e",
+    "test:e2e": "playwright test",
+    "test:e2e:desktop": "playwright test --project=desktop-chromium",
+    "test:e2e:mobile": "playwright test --project=mobile-chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.60.0",
+    "http-server": "^14.1.1"
+  }
+}
