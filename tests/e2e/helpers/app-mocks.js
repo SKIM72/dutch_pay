@@ -119,6 +119,145 @@ const SUPABASE_SDK_MOCK = `
 })();
 `;
 
+const CHAT_SUPABASE_SDK_MOCK = `
+(() => {
+  const currentUser = {
+    id: 'e27daa07-bbda-4c62-91ce-e6586163b5c6',
+    email: 'eowert72@gmail.com'
+  };
+  let messageSequence = 1;
+
+  const nextMessageId = () => {
+    const suffix = String(messageSequence++).padStart(12, '0');
+    return '10000000-0000-4000-8000-' + suffix;
+  };
+
+  const createQuery = (table) => {
+    let operation = 'select';
+    let values = null;
+    const filters = {};
+
+    const execute = () => {
+      if (table === 'profiles' && operation === 'select') {
+        return { data: { user_id: currentUser.id, nickname: '관리자' }, error: null };
+      }
+
+      if (table === 'settlements' && operation === 'select') {
+        return { data: { title: '채팅 테스트방' }, error: null };
+      }
+
+      if (table === 'chat_messages' && operation === 'select') {
+        return { data: [], error: null };
+      }
+
+      if (table === 'chat_messages' && operation === 'insert') {
+        const message = {
+          id: nextMessageId(),
+          settlement_id: Number(values[0].settlement_id),
+          user_id: values[0].user_id,
+          content: values[0].content,
+          created_at: new Date().toISOString(),
+          is_edited: false,
+          is_deleted: false,
+          is_hidden_admin: false
+        };
+        window.__CHAT_MESSAGES__.push(message);
+        window.__CHAT_MUTATIONS__.push({ operation, table, values, filters: { ...filters }, result: message });
+        setTimeout(() => {
+          (window.__CHAT_REALTIME_HANDLERS__.INSERT || []).forEach((handler) => {
+            handler({ new: { ...message } });
+          });
+        }, 0);
+        return { data: message, error: null };
+      }
+
+      if (table === 'chat_messages' && operation === 'update') {
+        const id = filters.id;
+        window.__CHAT_MUTATIONS__.push({ operation, table, values, filters: { ...filters } });
+        if (!id || String(id).startsWith('temp-')) {
+          return {
+            data: null,
+            error: { message: 'invalid input syntax for type uuid: "' + id + '"' }
+          };
+        }
+        const message = window.__CHAT_MESSAGES__.find((item) => item.id === id);
+        if (!message) return { data: null, error: null };
+        Object.assign(message, values);
+        return { data: { id }, error: null };
+      }
+
+      if (table === 'settlement_members' && operation === 'upsert') {
+        return { data: values, error: null };
+      }
+
+      return { data: [], error: null, count: 0 };
+    };
+
+    const query = {
+      select() { return query; },
+      eq(column, value) { filters[column] = value; return query; },
+      neq() { return query; },
+      gt() { return query; },
+      in() { return query; },
+      is() { return query; },
+      order() { return query; },
+      range() { return query; },
+      limit() { return query; },
+      insert(nextValues) { operation = 'insert'; values = nextValues; return query; },
+      update(nextValues) { operation = 'update'; values = nextValues; return query; },
+      upsert(nextValues) { operation = 'upsert'; values = nextValues; return query; },
+      delete() { operation = 'delete'; return query; },
+      single() { return Promise.resolve(execute()); },
+      maybeSingle() { return Promise.resolve(execute()); },
+      then(resolve, reject) { return Promise.resolve(execute()).then(resolve, reject); }
+    };
+    return query;
+  };
+
+  const createChannel = () => {
+    const channel = {
+      on(_type, config, handler) {
+        if (config?.table === 'chat_messages' && window.__CHAT_REALTIME_HANDLERS__[config.event]) {
+          window.__CHAT_REALTIME_HANDLERS__[config.event].push(handler);
+        }
+        return channel;
+      },
+      subscribe(callback) {
+        if (typeof callback === 'function') setTimeout(() => callback('SUBSCRIBED'), 0);
+        return channel;
+      },
+      unsubscribe() { return Promise.resolve(); },
+      track() { return Promise.resolve(); },
+      send() { return Promise.resolve(); },
+      presenceState() { return {}; }
+    };
+    return channel;
+  };
+
+  const client = {
+    auth: {
+      getSession: async () => ({
+        data: { session: { user: currentUser } },
+        error: null
+      }),
+      onAuthStateChange: () => ({
+        data: { subscription: { unsubscribe() {} } }
+      })
+    },
+    rpc: async (name) => {
+      if (name === 'get_my_admin_pin') return { data: null, error: null };
+      return { data: null, error: null };
+    },
+    from: (table) => createQuery(table),
+    channel: () => createChannel(),
+    removeChannel: async () => {},
+    realtime: { connect() {} }
+  };
+
+  window.supabase = { createClient: () => client };
+})();
+`;
+
 async function installAppMocks(page, settlement = PUBLIC_SETTLEMENT) {
   await page.addInitScript((fixture) => {
     window.__PUBLIC_SETTLEMENT__ = fixture;
@@ -181,6 +320,38 @@ async function installAppMocks(page, settlement = PUBLIC_SETTLEMENT) {
   });
 }
 
+async function installChatMocks(page) {
+  await page.addInitScript(() => {
+    window.__CHAT_MESSAGES__ = [];
+    window.__CHAT_MUTATIONS__ = [];
+    window.__CHAT_REALTIME_HANDLERS__ = {
+      INSERT: [],
+      UPDATE: [],
+      DELETE: []
+    };
+
+    Object.defineProperty(window, 'Notification', {
+      configurable: true,
+      value: {
+        permission: 'denied',
+        requestPermission: async () => 'denied'
+      }
+    });
+  });
+
+  await page.route('**/@supabase/supabase-js@2', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/javascript',
+    body: CHAT_SUPABASE_SDK_MOCK
+  }));
+
+  await page.route('**/font-awesome/**', (route) => route.fulfill({
+    status: 200,
+    contentType: 'text/css',
+    body: ''
+  }));
+}
+
 async function firstVisibleExpenseName(page) {
   const mobileCards = page.locator('#expense-card-list');
   if (await mobileCards.isVisible()) {
@@ -193,5 +364,6 @@ async function firstVisibleExpenseName(page) {
 module.exports = {
   PUBLIC_SETTLEMENT,
   firstVisibleExpenseName,
-  installAppMocks
+  installAppMocks,
+  installChatMocks
 };
