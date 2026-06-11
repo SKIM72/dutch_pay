@@ -56,10 +56,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.06.4';
+    const APP_VERSION = 'v2026.06.11.1';
     const THEME_STORAGE_KEY = 'settleup-theme-mode';
     const VALID_THEME_MODES = new Set(['system', 'light', 'dark']);
     const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const VALID_EXPENSE_SORT_MODES = new Set(['date-desc', 'date-asc', 'amount-desc', 'amount-asc']);
+    let expenseSortMode = 'date-desc';
 
     function escapeHTML(value) {
         return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -189,6 +191,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const expenseTableBody = document.querySelector('#expense-table tbody');
     const expenseTableHeaderRow = document.getElementById('expense-table-header-row');
     const expenseCardList = document.getElementById('expense-card-list');
+    const expenseSortSelect = document.getElementById('expense-sort-select');
     const totalExpenseP = document.getElementById('total-expense');
     const summaryMeta = document.getElementById('summary-meta');
     const finalSettlementContainer = document.getElementById('final-settlement-container');
@@ -1839,12 +1842,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function render() { 
         if (currentSettlement) { 
-            currentSettlement.expenses.sort((a, b) => new Date(a.expense_date || a.created_at) - new Date(b.expense_date || b.created_at));
             renderExpenses(); updateSummary(); 
             const isLocked = currentSettlement.is_settled || !currentUser; 
             toggleExpenseForm(isLocked);
             updateSettlementAccessUI();
         }
+    }
+
+    function getExpenseTimestamp(expense) {
+        const timestamp = new Date(expense.expense_date || expense.created_at || 0).getTime();
+        return Number.isFinite(timestamp) ? timestamp : 0;
+    }
+
+    function getExpenseBaseAmount(expense) {
+        const amount = Number(expense.amount);
+        return Number.isFinite(amount) ? amount : 0;
+    }
+
+    function getSortedExpenses(expenses) {
+        const safeExpenses = Array.isArray(expenses) ? [...expenses] : [];
+        const mode = VALID_EXPENSE_SORT_MODES.has(expenseSortMode) ? expenseSortMode : 'date-desc';
+
+        return safeExpenses.sort((a, b) => {
+            const dateDifference = getExpenseTimestamp(b) - getExpenseTimestamp(a);
+            const amountDifference = getExpenseBaseAmount(b) - getExpenseBaseAmount(a);
+
+            if (mode === 'date-asc') return -dateDifference;
+            if (mode === 'amount-desc') return amountDifference || dateDifference;
+            if (mode === 'amount-asc') return -amountDifference || dateDifference;
+            return dateDifference;
+        });
     }
 
     function getExpenseDateLabel(expense) {
@@ -1947,11 +1974,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (expenseCardList) expenseCardList.innerHTML = '';
         if (!currentSettlement || !currentSettlement.expenses) return;
         const participants = currentSettlement.participants;
+        const sortedExpenses = getSortedExpenses(currentSettlement.expenses);
         
         const isLocked = currentSettlement.is_settled || !currentUser;
-        renderExpenseCards(currentSettlement.expenses, participants, isLocked);
+        renderExpenseCards(sortedExpenses, participants, isLocked);
 
-        currentSettlement.expenses.forEach(exp => {
+        sortedExpenses.forEach(exp => {
             const row = expenseTableBody.insertRow();
             row.dataset.id = exp.id;
             row.classList.toggle('is-settled', isLocked);
@@ -2248,11 +2276,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         rightPane.style.overflowY = 'visible';
         
         targetView.classList.add('capture-mode');
-        await new Promise(resolve => setTimeout(resolve, 300));
+        if (document.fonts && document.fonts.ready) await document.fonts.ready;
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         
         try {
             const dataUrl = await htmlToImage.toPng(targetView, { 
                 backgroundColor: '#ffffff', 
+                cacheBust: true,
                 pixelRatio: window.devicePixelRatio > 1 ? window.devicePixelRatio + 1 : 3, 
                 width: targetView.scrollWidth, 
                 height: targetView.scrollHeight,
@@ -2552,6 +2582,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderThemeOptions();
             themeModeSelect.addEventListener('change', (event) => {
                 setThemeMode(event.target.value);
+            });
+        }
+
+        if (expenseSortSelect) {
+            expenseSortSelect.value = expenseSortMode;
+            expenseSortSelect.addEventListener('change', (event) => {
+                expenseSortMode = VALID_EXPENSE_SORT_MODES.has(event.target.value)
+                    ? event.target.value
+                    : 'date-desc';
+                expenseSortSelect.value = expenseSortMode;
+                renderExpenses();
             });
         }
         
