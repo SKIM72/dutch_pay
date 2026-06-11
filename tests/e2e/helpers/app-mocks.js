@@ -97,7 +97,49 @@ const SUPABASE_SDK_MOCK = `
       getSession: async () => ({ data: { session: null }, error: null }),
       onAuthStateChange: () => ({
         data: { subscription: { unsubscribe() {} } }
-      })
+      }),
+      signInWithPassword: async ({ email, password }) => {
+        window.__SUPABASE_CALLS__.push({
+          type: 'auth',
+          name: 'signInWithPassword',
+          args: { email, hasPassword: Boolean(password) }
+        });
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        const message = window.__AUTH_SCENARIO__?.loginError || 'Invalid login credentials';
+        return { data: { session: null }, error: { message } };
+      },
+      signUp: async ({ email, password }) => {
+        window.__SUPABASE_CALLS__.push({
+          type: 'auth',
+          name: 'signUp',
+          args: { email, hasPassword: Boolean(password) }
+        });
+        return { data: { session: null }, error: null };
+      },
+      resetPasswordForEmail: async (email) => {
+        window.__SUPABASE_CALLS__.push({
+          type: 'auth',
+          name: 'resetPasswordForEmail',
+          args: { email }
+        });
+        return { data: {}, error: null };
+      },
+      updateUser: async ({ password }) => {
+        window.__SUPABASE_CALLS__.push({
+          type: 'auth',
+          name: 'updateUser',
+          args: { hasPassword: Boolean(password) }
+        });
+        return { data: { user: {} }, error: null };
+      },
+      signInWithOAuth: async ({ provider }) => {
+        window.__SUPABASE_CALLS__.push({
+          type: 'auth',
+          name: 'signInWithOAuth',
+          args: { provider }
+        });
+        return { data: {}, error: { message: 'MOCK_OAUTH_ERROR' } };
+      }
     },
     rpc: async (name, args) => {
       window.__SUPABASE_CALLS__.push({ type: 'rpc', name, args });
@@ -262,6 +304,9 @@ async function installAppMocks(page, settlement = PUBLIC_SETTLEMENT) {
   await page.addInitScript((fixture) => {
     window.__PUBLIC_SETTLEMENT__ = fixture;
     window.__SUPABASE_CALLS__ = [];
+    window.__AUTH_SCENARIO__ = {
+      loginError: 'Invalid login credentials'
+    };
 
     Object.defineProperty(window, 'Notification', {
       configurable: true,
