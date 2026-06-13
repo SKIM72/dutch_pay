@@ -12,7 +12,7 @@ test('소개 화면에서 로그인 폼으로 자연스럽게 전환된다', asy
   await page.goto('/login.html');
 
   await expect(page.locator('#landing-view')).toBeVisible();
-  await expect(page.locator('#app-version-badge')).toHaveText('v2026.06.12.2');
+  await expect(page.locator('#app-version-badge')).toHaveText('v2026.06.13.4');
   await expect(page.locator('.hero-section h1')).toBeVisible();
 
   await page.locator('#hero-start-btn').click();

@@ -30,7 +30,7 @@
     </script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=55">
+    <link rel="stylesheet" href="style.css?v=60">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -76,7 +76,7 @@
                 <h1>Settle Up</h1>
             </div>
             <div class="header-controls">
-                <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.06.12.2</span>
+                <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.06.13.4</span>
                 <div id="user-info-display" class="hidden" style="cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-muted); margin-right: 0.5rem; background: var(--side-bg); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid var(--border); max-width: 150px;" title="마이페이지 열기">
                     <i class="fas fa-user-circle"></i> <span id="user-email-text" style="display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;"></span>
                 </div>
@@ -101,26 +101,52 @@
         <div id="main-container">
             <aside id="left-pane">
                 <div class="sidebar-content">
-                    <h2 data-i18n="settlementHistory">정산 내역 조회</h2>
-                    
-                    <div style="margin-bottom: 0.8rem; position: relative;">
-                        <i class="fas fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.9rem;"></i>
-                        <input type="text" id="settlement-search-input" data-i18n-placeholder="searchSettlementPlaceholder" placeholder="제목 또는 날짜 검색..." style="width: 100%; padding: 0.6rem 0.6rem 0.6rem 32px; font-size: 0.9rem; border-radius: 8px;">
+                    <div class="sidebar-heading">
+                        <div>
+                            <span class="sidebar-eyebrow" data-i18n="settlementHistory">정산 내역 조회</span>
+                            <h2 data-i18n="sidebarMySettlements">내 정산</h2>
+                        </div>
+                        <span id="sidebar-settlement-count" class="sidebar-count-badge">0개</span>
                     </div>
-                    
-                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1.2rem;">
-                        <button id="open-join-modal-btn" style="flex: 1; padding: 0.8rem 0;"><i class="fas fa-keyboard"></i> <span data-i18n="joinByCodeBtn">코드 참가</span></button>
-                        <button id="open-qr-scanner-btn" class="btn-outline" style="flex: 1; padding: 0.8rem 0; border-color: var(--primary); color: var(--primary);"><i class="fas fa-camera"></i> <span data-i18n="scanQrCodeBtn">QR 스캔</span></button>
+
+                    <label class="sidebar-search-control" for="settlement-search-input">
+                        <i class="fas fa-search" aria-hidden="true"></i>
+                        <input type="text" id="settlement-search-input" data-i18n-placeholder="searchSettlementPlaceholder" placeholder="제목 또는 날짜 검색..." autocomplete="off">
+                    </label>
+
+                    <div class="sidebar-join-actions">
+                        <button id="open-join-modal-btn" class="sidebar-tool-btn">
+                            <i class="fas fa-keyboard"></i>
+                            <span data-i18n="joinByCodeBtn">코드 참가</span>
+                        </button>
+                        <button id="open-qr-scanner-btn" class="sidebar-tool-btn">
+                            <i class="fas fa-qrcode"></i>
+                            <span data-i18n="scanQrCodeBtn">QR 스캔</span>
+                        </button>
                     </div>
-                    
+
                     <div id="settlement-list-container"></div>
                 </div>
             </aside>
 
             <main id="right-pane">
                 <div id="placeholder-right-pane">
-                    <i class="fas fa-wallet"></i>
-                    <p data-i18n="selectOrCreateSettlement">정산 건을 선택하거나 새로운 정산을 시작하세요.</p>
+                    <div class="empty-workspace">
+                        <span class="empty-workspace-icon"><i class="fas fa-route"></i></span>
+                        <span class="empty-workspace-eyebrow" data-i18n="emptyWorkspaceEyebrow">여행 정산 시작</span>
+                        <h2 data-i18n="emptyWorkspaceTitle">새 여행 정산을 시작해 볼까요?</h2>
+                        <p data-i18n="selectOrCreateSettlement">정산 건을 선택하거나 새로운 정산을 시작하세요.</p>
+                        <div class="empty-workspace-actions">
+                            <button id="empty-create-settlement-btn" class="empty-primary-action">
+                                <i class="fas fa-plus"></i>
+                                <span data-i18n="createSettlementAction">새 정산 만들기</span>
+                            </button>
+                            <button id="empty-join-settlement-btn" class="btn-outline empty-secondary-action">
+                                <i class="fas fa-keyboard"></i>
+                                <span data-i18n="joinSettlementAction">초대 코드로 참가</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 
                 <div id="calculator" class="hidden">
@@ -171,7 +197,13 @@
                     <div class="card" id="summary-card">
                         <div class="summary-left">
                             <h2><i class="fas fa-chart-pie"></i><span data-i18n="settlementResult"></span></h2>
-                            <div id="total-expense" data-i18n="totalExpense">총 지출: 0 JPY</div>
+                            <div id="total-expense" class="summary-total">
+                                <span id="summary-total-label" data-i18n="totalExpense">총 지출</span>
+                                <div class="summary-total-row">
+                                    <strong id="summary-total-value">0</strong>
+                                    <span id="summary-total-currency">JPY</span>
+                                </div>
+                            </div>
                             <div id="summary-meta" class="summary-meta"></div>
                         </div>
                         <div class="summary-right">
@@ -181,30 +213,68 @@
                     </div>
 
                     <div class="card" id="expense-form-card">
-                        <h2><i class="fas fa-plus-circle"></i><span data-i18n="addExpense"></span></h2>
+                        <div class="expense-entry-header">
+                            <span class="expense-entry-icon" aria-hidden="true"><i class="fas fa-receipt"></i></span>
+                            <div class="expense-entry-copy">
+                                <h2><span data-i18n="addExpense"></span></h2>
+                            </div>
+                        </div>
                         <div id="expense-form">
-                            <div class="form-grid-row">
-                                <div style="display: flex; gap: 0.5rem;">
-                                    <input type="datetime-local" id="item-date" title="지출 일시" style="flex: 1;">
-                                    <button type="button" id="set-current-time-btn" class="btn-outline" title="현재 시간으로 변경" style="margin: 0; padding: 0 0.8rem; height: 100%;"><i class="fas fa-clock"></i></button>
+                            <div class="expense-field expense-amount-field">
+                                <label for="item-amount" data-i18n="amount">금액</label>
+                                <div class="amount-input-wrapper amount-primary-control">
+                                    <input type="text" id="item-amount" data-i18n-placeholder="amount" inputmode="decimal" autocomplete="off">
+                                    <select id="item-currency" aria-label="통화">
+                                        <option value="JPY">JPY</option>
+                                        <option value="KRW">KRW</option>
+                                        <option value="USD">USD</option>
+                                        <option value="CNY">CNY</option>
+                                        <option value="GBP">GBP</option>
+                                        <option value="CAD">CAD</option>
+                                        <option value="AUD">AUD</option>
+                                        <option value="HKD">HKD</option>
+                                        <option value="TWD">TWD</option>
+                                    </select>
                                 </div>
-                                <input type="text" id="item-name" data-i18n-placeholder="expenseItem">
                             </div>
-                            <div class="amount-input-wrapper" style="margin-bottom: 1rem;">
-                                <input type="text" id="item-amount" data-i18n-placeholder="amount" inputmode="decimal">
-                                <select id="item-currency">
-                                    <option value="JPY">JPY</option>
-                                    <option value="KRW">KRW</option>
-                                    <option value="USD">USD</option>
-                                    <option value="CNY">CNY</option>
-                                    <option value="GBP">GBP</option>
-                                    <option value="CAD">CAD</option>
-                                    <option value="AUD">AUD</option>
-                                    <option value="HKD">HKD</option>
-                                    <option value="TWD">TWD</option>
-                                </select>
+
+                            <div class="form-grid-row expense-detail-grid">
+                                <div class="expense-field">
+                                    <label for="item-name" data-i18n="expenseItem">항목명</label>
+                                    <div class="field-control">
+                                        <i class="fas fa-tag" aria-hidden="true"></i>
+                                        <input type="text" id="item-name" data-i18n-placeholder="expenseItem" autocomplete="off">
+                                    </div>
+                                </div>
+                                <div class="expense-field expense-date-field">
+                                    <label for="item-date" data-i18n="expenseDateTime">지출 일시</label>
+                                    <div class="date-time-control">
+                                        <input type="datetime-local" id="item-date" title="지출 일시">
+                                        <button type="button" id="set-current-time-btn" class="btn-outline date-now-btn" title="현재 시간으로 변경" aria-label="현재 시간으로 변경">
+                                            <i class="fas fa-clock"></i>
+                                            <span data-i18n="setCurrentTime">현재</span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
-                            
+
+                            <div class="form-grid-row expense-choice-grid">
+                                <div class="expense-field">
+                                    <label for="item-payer" data-i18n="payer">결제자</label>
+                                    <div class="field-control">
+                                        <i class="fas fa-user" aria-hidden="true"></i>
+                                        <select id="item-payer"></select>
+                                    </div>
+                                </div>
+                                <div class="expense-field">
+                                    <label for="split-method" data-i18n="splitMethod">분담 방식</label>
+                                    <div class="field-control">
+                                        <i class="fas fa-chart-pie" aria-hidden="true"></i>
+                                        <select id="split-method" data-i18n-options="splitEqually,splitByAmount"></select>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div id="add-rate-config-wrapper" class="rate-config-wrapper hidden">
                                 <div class="rate-config-inner">
                                     <div class="rate-input-row">
@@ -226,19 +296,24 @@
                                 </div>
                             </div>
 
-                            <div class="form-grid-row">
-                                <select id="item-payer"></select>
-                                <select id="split-method" data-i18n-options="splitEqually,splitByAmount"></select>
-                            </div>
                             <div id="split-amount-inputs" class="hidden dynamic-split-grid"></div>
                             
-                            <button id="add-expense-btn" data-i18n="recordExpense"></button>
+                            <button id="add-expense-btn" class="expense-submit-btn">
+                                <span class="expense-submit-copy">
+                                    <span data-i18n="recordExpense">기록하기</span>
+                                    <strong id="expense-submit-value" class="hidden" aria-live="polite"></strong>
+                                </span>
+                                <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                            </button>
                         </div>
                     </div>
 
                     <div class="card" id="expense-list-card">
                         <div class="card-header">
-                            <h2><i class="fas fa-list"></i><span data-i18n="detailedExpenseList"></span></h2>
+                            <div class="expense-list-heading">
+                                <h2><i class="fas fa-list"></i><span data-i18n="detailedExpenseList"></span></h2>
+                                <span id="expense-list-count" class="expense-list-count">0건</span>
+                            </div>
                             <div class="expense-list-actions">
                                 <label class="expense-sort-control" for="expense-sort-select">
                                     <i class="fas fa-arrow-down-wide-short" aria-hidden="true"></i>
@@ -275,35 +350,71 @@
         <button id="add-settlement-fab" class="hidden"><i class="fas fa-plus"></i></button>
 
         <div id="add-settlement-modal" class="hidden">
-             <div class="modal-content card">
-                <span class="close-modal-btn"><i class="fas fa-times"></i></span>
-                <div class="modal-header" style="justify-content: space-between;">
-                    <h2 data-i18n="newSettlement">새로운 정산</h2>
-                    <input type="date" id="new-settlement-date" class="modal-date-picker">
+            <div class="modal-content card modal-tool-card settlement-create-modal">
+                <button type="button" class="close-modal-btn" aria-label="닫기"><i class="fas fa-times"></i></button>
+                <div class="modal-tool-header">
+                    <span class="modal-tool-icon"><i class="fas fa-route"></i></span>
+                    <div class="modal-tool-heading">
+                        <span class="modal-tool-eyebrow">SETTLE UP</span>
+                        <h2 data-i18n="newSettlement">새로운 정산</h2>
+                    </div>
                 </div>
-                <input type="text" id="new-settlement-title" data-i18n-placeholder="settlementTitlePlaceholder" style="margin-bottom: 1rem;">
-                <div class="participant-section" style="margin-bottom: 1.5rem;">
-                    <label style="display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.9rem; font-weight: 600;" data-i18n="participantList">참가자 명단</label>
-                    <div id="participant-list-container" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.8rem;"></div>
-                    <button type="button" id="add-participant-btn" class="btn-outline" style="width: 100%; justify-content: center; border-style: dashed;">
-                        <i class="fas fa-plus"></i> <span data-i18n="addParticipant">참가자 추가</span>
-                    </button>
+
+                <div class="modal-form-stack">
+                    <div class="modal-detail-grid settlement-info-grid">
+                        <div class="modal-field">
+                            <label class="modal-field-label" for="new-settlement-title" data-i18n="settlementTitle">정산 제목</label>
+                            <div class="field-control">
+                                <i class="fas fa-suitcase-rolling"></i>
+                                <input type="text" id="new-settlement-title" data-i18n-placeholder="settlementTitlePlaceholder" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="modal-field">
+                            <label class="modal-field-label" for="new-settlement-date" data-i18n="settlementDate">정산 날짜</label>
+                            <div class="field-control">
+                                <i class="fas fa-calendar-day"></i>
+                                <input type="date" id="new-settlement-date" class="modal-date-picker">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-field">
+                        <label class="modal-field-label" for="base-currency" data-i18n="baseCurrency">기준 통화</label>
+                        <div class="field-control">
+                            <i class="fas fa-coins"></i>
+                            <select id="base-currency">
+                                <option value="JPY" data-i18n="currencyJPY">JPY (일본 엔)</option>
+                                <option value="KRW" data-i18n="currencyKRW">KRW (한국 원)</option>
+                                <option value="USD" data-i18n="currencyUSD">USD (미국 달러)</option>
+                                <option value="CNY" data-i18n="currencyCNY">CNY (중국 위안)</option>
+                                <option value="GBP" data-i18n="currencyGBP">GBP (영국 파운드)</option>
+                                <option value="CAD" data-i18n="currencyCAD">CAD (캐나다 달러)</option>
+                                <option value="AUD" data-i18n="currencyAUD">AUD (호주 달러)</option>
+                                <option value="HKD" data-i18n="currencyHKD">HKD (홍콩 달러)</option>
+                                <option value="TWD" data-i18n="currencyTWD">TWD (대만 달러)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <section class="modal-section participant-section">
+                        <div class="modal-section-heading">
+                            <div>
+                                <span class="modal-section-kicker"><i class="fas fa-user-friends"></i></span>
+                                <h3 data-i18n="participantList">참가자 명단</h3>
+                            </div>
+                            <span id="participant-count-badge" class="participant-count-badge">2명</span>
+                        </div>
+                        <div id="participant-list-container"></div>
+                        <button type="button" id="add-participant-btn" class="btn-outline">
+                            <i class="fas fa-plus"></i> <span data-i18n="addParticipant">참가자 추가</span>
+                        </button>
+                    </section>
                 </div>
-                <div class="currency-select-wrapper">
-                    <label for="base-currency" data-i18n="baseCurrency">기준 통화:</label>
-                    <select id="base-currency">
-                        <option value="JPY" data-i18n="currencyJPY">JPY (일본 엔)</option>
-                        <option value="KRW" data-i18n="currencyKRW">KRW (한국 원)</option>
-                        <option value="USD" data-i18n="currencyUSD">USD (미국 달러)</option>
-                        <option value="CNY" data-i18n="currencyCNY">CNY (중국 위안)</option>
-                        <option value="GBP" data-i18n="currencyGBP">GBP (영국 파운드)</option>
-                        <option value="CAD" data-i18n="currencyCAD">CAD (캐나다 달러)</option>
-                        <option value="AUD" data-i18n="currencyAUD">AUD (호주 달러)</option>
-                        <option value="HKD" data-i18n="currencyHKD">HKD (홍콩 달러)</option>
-                        <option value="TWD" data-i18n="currencyTWD">TWD (대만 달러)</option>
-                    </select>
-                </div>
-                <button id="create-settlement-btn" data-i18n="create"></button>
+
+                <button id="create-settlement-btn" class="modal-primary-action">
+                    <span data-i18n="create">생성</span>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
             </div>
         </div>
 
@@ -336,45 +447,91 @@
         </div>
 
         <div id="edit-expense-modal" class="hidden">
-            <div class="modal-content card">
-                <span class="close-modal-btn"><i class="fas fa-times"></i></span>
+            <div class="modal-content card modal-tool-card edit-expense-modal-card">
+                <button type="button" class="close-modal-btn" aria-label="닫기"><i class="fas fa-times"></i></button>
                 <input type="hidden" id="edit-expense-id">
-                <h2 data-i18n="editExpense">지출 수정</h2>
-                <div class="form-grid-row" style="margin-top: 1rem;">
-                    <div style="display: flex; gap: 0.5rem;">
-                        <input type="datetime-local" id="edit-item-date" title="지출 일시" style="flex: 1;">
-                        <button type="button" id="edit-set-current-time-btn" class="btn-outline" title="현재 시간으로 변경" style="margin: 0; padding: 0 0.8rem; height: 100%;"><i class="fas fa-clock"></i></button>
+                <div class="modal-tool-header">
+                    <span class="modal-tool-icon"><i class="fas fa-receipt"></i></span>
+                    <div class="modal-tool-heading">
+                        <span class="modal-tool-eyebrow">EXPENSE</span>
+                        <h2 data-i18n="editExpense">지출 내역 수정</h2>
                     </div>
-                    <input type="text" id="edit-item-name" data-i18n-placeholder="expenseItem">
                 </div>
-                <div class="amount-input-wrapper" style="margin-bottom: 1rem;">
-                    <input type="text" id="edit-item-amount" data-i18n-placeholder="amount" inputmode="decimal">
-                    <select id="edit-item-currency"></select>
-                </div>
-                <div id="edit-rate-config-wrapper" class="rate-config-wrapper hidden">
-                    <div class="rate-config-inner">
-                        <div class="rate-input-row">
-                            <span class="rate-label" data-i18n="customRateLabel">적용 환율</span>
-                            <div class="rate-input-box">
-                                <span>1 <span id="edit-currency-from"></span> =</span>
-                                <input type="number" id="edit-custom-rate" step="0.0001">
-                                <span id="edit-currency-to"></span>
+
+                <div class="modal-form-stack">
+                    <div class="modal-field edit-amount-field">
+                        <label class="modal-field-label" for="edit-item-amount" data-i18n="amount">금액</label>
+                        <div class="amount-input-wrapper amount-primary-control">
+                            <input type="text" id="edit-item-amount" data-i18n-placeholder="amount" inputmode="decimal">
+                            <select id="edit-item-currency"></select>
+                        </div>
+                    </div>
+
+                    <div id="edit-rate-config-wrapper" class="rate-config-wrapper hidden">
+                        <div class="rate-config-inner">
+                            <div class="rate-input-row">
+                                <span class="rate-label" data-i18n="customRateLabel">적용 환율</span>
+                                <div class="rate-input-box">
+                                    <span>1 <span id="edit-currency-from"></span> =</span>
+                                    <input type="number" id="edit-custom-rate" step="0.0001">
+                                    <span id="edit-currency-to"></span>
+                                </div>
+                            </div>
+                            <div class="rate-action-buttons">
+                                <button type="button" id="edit-expense-rate-btn" class="rate-btn btn-outline-small"><i class="fas fa-clock"></i> <span data-i18n="applyExpenseRate">지출일</span></button>
+                                <button type="button" id="edit-settlement-rate-btn" class="rate-btn btn-outline-small"><i class="fas fa-calendar-check"></i> <span data-i18n="applySettlementRate">정산일</span></button>
+                                <button type="button" id="edit-live-rate-btn" class="rate-btn btn-outline-small"><i class="fas fa-bolt"></i> <span data-i18n="applyLiveRate">실시간</span></button>
                             </div>
                         </div>
-                        <div class="rate-action-buttons">
-                            <button type="button" id="edit-expense-rate-btn" class="rate-btn btn-outline-small"><i class="fas fa-clock"></i> <span data-i18n="applyExpenseRate">지출일</span></button>
-                            <button type="button" id="edit-settlement-rate-btn" class="rate-btn btn-outline-small"><i class="fas fa-calendar-check"></i> <span data-i18n="applySettlementRate">정산일</span></button>
-                            <button type="button" id="edit-live-rate-btn" class="rate-btn btn-outline-small"><i class="fas fa-bolt"></i> <span data-i18n="applyLiveRate">실시간</span></button>
+                        <div class="converted-preview"><span data-i18n="convertedAmount">최종 변환 금액</span>: <strong id="edit-converted-total">0</strong></div>
+                    </div>
+
+                    <div class="modal-detail-grid">
+                        <div class="modal-field">
+                            <label class="modal-field-label" for="edit-item-name" data-i18n="expenseItem">항목명</label>
+                            <div class="field-control">
+                                <i class="fas fa-pen"></i>
+                                <input type="text" id="edit-item-name" data-i18n-placeholder="expenseItem" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="modal-field">
+                            <label class="modal-field-label" for="edit-item-date" data-i18n="expenseDateTime">지출 일시</label>
+                            <div class="date-time-control">
+                                <div class="field-control">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    <input type="datetime-local" id="edit-item-date" title="지출 일시">
+                                </div>
+                                <button type="button" id="edit-set-current-time-btn" class="btn-outline date-now-btn" title="현재 시간으로 변경">
+                                    <i class="fas fa-clock"></i>
+                                    <span data-i18n="setCurrentTime">현재</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <div class="converted-preview"><span data-i18n="convertedAmount">최종 변환 금액</span>: <strong id="edit-converted-total">0</strong></div>
+
+                    <div class="modal-detail-grid">
+                        <div class="modal-field">
+                            <label class="modal-field-label" for="edit-item-payer" data-i18n="payer">결제자</label>
+                            <div class="field-control">
+                                <i class="fas fa-user-check"></i>
+                                <select id="edit-item-payer"></select>
+                            </div>
+                        </div>
+                        <div class="modal-field">
+                            <label class="modal-field-label" for="edit-split-method" data-i18n="splitMethod">분담 방식</label>
+                            <div class="field-control">
+                                <i class="fas fa-chart-pie"></i>
+                                <select id="edit-split-method" data-i18n-options="splitEqually,splitByAmount"></select>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="edit-split-amount-inputs" class="hidden dynamic-split-grid"></div>
                 </div>
-                <div class="form-grid-row">
-                    <select id="edit-item-payer"></select>
-                    <select id="edit-split-method" data-i18n-options="splitEqually,splitByAmount"></select>
-                </div>
-                <div id="edit-split-amount-inputs" class="hidden dynamic-split-grid"></div>
-                <button id="save-expense-changes-btn" data-i18n="saveChanges"></button>
+
+                <button id="save-expense-changes-btn" class="modal-primary-action">
+                    <span data-i18n="saveChanges">변경사항 저장</span>
+                    <i class="fas fa-check"></i>
+                </button>
             </div>
         </div>
 
@@ -566,8 +723,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="locales.js?v=29"></script>
-    <script src="main.js?v=93"></script>
+    <script src="locales.js?v=33"></script>
+    <script src="main.js?v=98"></script>
     <script src="chat.js?v=33"></script>
 </body>
 </html>

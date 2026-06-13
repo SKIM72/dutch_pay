@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.12.2';
+    const APP_VERSION = 'v2026.06.13.4';
     const THEME_STORAGE_KEY = 'settleup-theme-mode';
     const VALID_THEME_MODES = new Set(['system', 'light', 'dark']);
     const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -135,7 +135,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const appTitle = document.querySelector('.brand-container');
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
     const settlementListContainer = document.getElementById('settlement-list-container');
+    const sidebarSettlementCount = document.getElementById('sidebar-settlement-count');
     const addSettlementFab = document.getElementById('add-settlement-fab');
+    const emptyCreateSettlementBtn = document.getElementById('empty-create-settlement-btn');
+    const emptyJoinSettlementBtn = document.getElementById('empty-join-settlement-btn');
     const placeholderRightPane = document.getElementById('placeholder-right-pane');
     const calculatorView = document.getElementById('calculator');
     
@@ -192,12 +195,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const expenseTableHeaderRow = document.getElementById('expense-table-header-row');
     const expenseCardList = document.getElementById('expense-card-list');
     const expenseSortSelect = document.getElementById('expense-sort-select');
+    const expenseListCount = document.getElementById('expense-list-count');
     const totalExpenseP = document.getElementById('total-expense');
+    const summaryTotalValue = document.getElementById('summary-total-value');
+    const summaryTotalCurrency = document.getElementById('summary-total-currency');
     const summaryMeta = document.getElementById('summary-meta');
     const finalSettlementContainer = document.getElementById('final-settlement-container');
     const completeSettlementBtn = document.getElementById('complete-settlement-btn');
     const downloadExcelBtn = document.getElementById('download-excel-btn');
     const addExpenseBtn = document.getElementById('add-expense-btn');
+    const expenseSubmitValue = document.getElementById('expense-submit-value');
     const itemNameInput = document.getElementById('item-name');
     const itemAmountInput = document.getElementById('item-amount');
     const itemCurrencySelect = document.getElementById('item-currency');
@@ -648,6 +655,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         const btns = participantListContainer.querySelectorAll('.remove-participant-btn');
         if (btns.length <= 2) { btns.forEach(btn => btn.disabled = true); } 
         else { btns.forEach(btn => btn.disabled = false); }
+        const participantCountBadge = document.getElementById('participant-count-badge');
+        if (participantCountBadge) {
+            participantCountBadge.textContent = getLocale('participantsCount', '{count}명').replace('{count}', btns.length);
+        }
     }
 
     function getParticipantNamesFromModal() {
@@ -655,6 +666,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         const inputs = participantListContainer.querySelectorAll('.participant-name-input');
         const names = Array.from(inputs).map(input => input.value.trim()).filter(val => val !== '');
         return names.length >= 2 ? names : ['A', 'B']; 
+    }
+
+    function openAddSettlementModal() {
+        if(newSettlementDateInput) newSettlementDateInput.value = getLocalDateString();
+        renderParticipantInputs(2);
+        if(addSettlementModal) addSettlementModal.classList.remove('hidden');
+        requestAnimationFrame(() => newSettlementTitleInput?.focus());
+    }
+
+    function openJoinModal() {
+        const joinModal = document.getElementById('join-modal');
+        if(joinModal) joinModal.classList.remove('hidden');
     }
 
     function getSettlementInviteCode(settlement) {
@@ -1194,9 +1217,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function renderSettlementList() {
         if(!settlementListContainer) return;
+
+        if(sidebarSettlementCount) {
+            sidebarSettlementCount.textContent = getLocale('settlementCount', '{count}개').replace('{count}', settlements.length);
+        }
         
         if (currentUser && currentUser.email === 'eowert72@gmail.com' && localStorage.getItem('adminHideList') === 'true') {
-            settlementListContainer.innerHTML = `<div style="padding: 2.5rem 1rem; text-align: center; color: var(--text-muted);"><i class="fas fa-eye-slash" style="font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.5;"></i><p style="font-size: 0.9rem; font-weight: 600;">목록이 숨김 처리되었습니다.</p></div>`;
+            if(sidebarSettlementCount) sidebarSettlementCount.textContent = '—';
+            settlementListContainer.innerHTML = `
+                <div class="sidebar-empty-state">
+                    <span class="sidebar-empty-icon"><i class="fas fa-eye-slash"></i></span>
+                    <strong>목록이 숨김 처리되었습니다.</strong>
+                </div>
+            `;
             return;
         }
         
@@ -1212,17 +1245,57 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         if (displaySettlements.length === 0) {
-            const fallbackText = query ? getLocale('noSearchResult', '검색 결과가 없습니다.') : getLocale('noHistory', '참여 중인 정산 내역이 없습니다.');
-            settlementListContainer.innerHTML = `<p class="subtitle" style="text-align: center; color: var(--text-muted); margin-top: 1.5rem; font-size: 0.9rem;">${escapeHTML(fallbackText)}</p>`;
+            const emptyTitle = query
+                ? getLocale('noSearchResult', '검색 결과가 없습니다.')
+                : getLocale('emptySettlementListTitle', '아직 정산 내역이 없어요.');
+            const emptyDescription = query
+                ? getLocale('searchNoResultDesc', '다른 제목이나 날짜로 다시 검색해 보세요.')
+                : getLocale('emptySettlementListDesc', '새 정산을 만들면 이곳에서 여행별 내역을 빠르게 찾을 수 있어요.');
+            const actionLabel = query
+                ? getLocale('clearSearch', '검색 지우기')
+                : getLocale('createSettlementAction', '새 정산 만들기');
+            const actionIcon = query ? 'fa-times' : 'fa-plus';
+            const action = query ? 'clear-search' : 'create-settlement';
+
+            settlementListContainer.innerHTML = `
+                <div class="sidebar-empty-state">
+                    <span class="sidebar-empty-icon"><i class="fas ${actionIcon}"></i></span>
+                    <strong>${escapeHTML(emptyTitle)}</strong>
+                    <p>${escapeHTML(emptyDescription)}</p>
+                    <button type="button" class="btn-outline sidebar-empty-action" data-action="${action}">
+                        <i class="fas ${actionIcon}"></i>
+                        <span>${escapeHTML(actionLabel)}</span>
+                    </button>
+                </div>
+            `;
+
+            const emptyActionBtn = settlementListContainer.querySelector('.sidebar-empty-action');
+            emptyActionBtn?.addEventListener('click', () => {
+                if(emptyActionBtn.dataset.action === 'clear-search') {
+                    if(settlementSearchInput) {
+                        settlementSearchInput.value = '';
+                        settlementSearchInput.focus();
+                    }
+                    renderSettlementList();
+                    return;
+                }
+                openAddSettlementModal();
+            });
             return;
         }
         
         settlementListContainer.innerHTML = displaySettlements.map(s => {
             const settlementId = escapeHTML(s.id);
-            const title = escapeHTML(s.title);
+            const title = escapeHTML(s.title || '');
             const date = escapeHTML(formatDisplayDate(s.date));
-            const participantsText = escapeHTML((s.participants || []).join(', '));
-            const baseCurrency = escapeHTML(s.base_currency);
+            const participants = Array.isArray(s.participants) ? s.participants : [];
+            const participantsText = escapeHTML(participants.join(', ') || '-');
+            const participantCount = escapeHTML(participants.length);
+            const baseCurrency = escapeHTML(s.base_currency || '-');
+            const statusLabel = escapeHTML(getLocale(
+                s.is_settled ? 'settlementDoneShort' : 'settlementInProgressShort',
+                s.is_settled ? '완료' : '진행중'
+            ));
             const roleBadge = s.is_host
                 ? `<span class="badge badge-host"><i class="fas fa-crown"></i> ${escapeHTML(getLocale('host', '방장'))}</span>`
                 : `<span class="badge badge-guest"><i class="fas fa-users"></i> ${escapeHTML(getLocale('participating', '참여중'))}</span>`;
@@ -1232,22 +1305,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <button class="settlement-item ${s.is_settled ? 'is-settled' : ''}" data-id="${settlementId}">
                     <div class="item-content">
                         <div class="item-text-group">
-                            <div class="item-badges">
-                                ${roleBadge}
-                            </div>
-                            <div class="date-row">
-                                ${s.is_settled ? '<i class="fas fa-check-circle settled-icon"></i>' : ''}
-                                <span class="item-date-badge"><i class="far fa-calendar-alt"></i> ${date}</span>
+                            <div class="settlement-item-top">
+                                <div class="item-badges">${roleBadge}</div>
+                                <span class="settlement-status ${s.is_settled ? 'is-complete' : ''}">${statusLabel}</span>
                             </div>
                             <span class="item-title">${title}</span>
-                            <span class="item-participants">(${participantsText}) - ${baseCurrency}</span>
+                            <span class="item-participants" title="${participantsText}">${participantsText}</span>
+                            <div class="settlement-item-meta">
+                                <span><i class="far fa-calendar-alt"></i>${date}</span>
+                                <span><i class="fas fa-user-friends"></i>${participantCount}</span>
+                                <span><i class="fas fa-coins"></i>${baseCurrency}</span>
+                            </div>
                         </div>
                     </div>
-                    <i class="fas fa-chevron-right"></i>
+                    <i class="fas fa-chevron-right settlement-item-arrow"></i>
                 </button>
                 ${s.is_host 
-                    ? `<button class="delete-settlement-btn" data-id="${settlementId}" title="방 삭제"><i class="fas fa-trash-alt"></i></button>`
-                    : `<button class="leave-settlement-btn" data-id="${settlementId}" title="방 나가기"><i class="fas fa-sign-out-alt"></i></button>`
+                    ? `<button class="delete-settlement-btn" data-id="${settlementId}" title="방 삭제" aria-label="방 삭제"><i class="fas fa-trash-alt"></i></button>`
+                    : `<button class="leave-settlement-btn" data-id="${settlementId}" title="방 나가기" aria-label="방 나가기"><i class="fas fa-sign-out-alt"></i></button>`
                 }
             </div>
         `;
@@ -1308,6 +1383,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(calculatorView) calculatorView.classList.remove('hidden');
         if(settlementDisplay) settlementDisplay.textContent = settlement.title;
         if(itemCurrencySelect) itemCurrencySelect.value = settlement.base_currency;
+        updateExpenseSubmitValue();
         
         if(editSettlementTitleBtn) {
             if(currentUser) editSettlementTitleBtn.classList.remove('hidden');
@@ -1463,11 +1539,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateAddPreview() {
         if(!itemAmountInput) return;
         const amount = parseFormattedNumber(itemAmountInput.value);
+        updateExpenseSubmitValue();
         const rateInput = document.getElementById('add-custom-rate');
         const rate = rateInput ? parseFloat(rateInput.value) || 0 : 0;
         const base = currentSettlement ? currentSettlement.base_currency : '';
         const previewEl = document.getElementById('add-converted-total');
         if(previewEl) previewEl.textContent = `${formatNumber(amount * rate, base)} ${base}`;
+    }
+
+    function updateExpenseSubmitValue() {
+        if (!expenseSubmitValue || !itemAmountInput || !itemCurrencySelect) return;
+        const amount = parseFormattedNumber(itemAmountInput.value);
+        expenseSubmitValue.classList.toggle('hidden', !(amount > 0));
+        expenseSubmitValue.textContent = amount > 0
+            ? `${formatNumber(amount, itemCurrencySelect.value)} ${itemCurrencySelect.value}`
+            : '';
     }
 
     async function handleEditCurrencyChange() {
@@ -1641,6 +1727,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         handleSplitMethodChange(editSplitMethodSelect, editItemAmountInput, editSplitAmountInputs, true);
         if(editExpenseModal) editExpenseModal.classList.remove('hidden');
+        requestAnimationFrame(() => editItemAmountInput?.focus());
     }
 
     async function handleSaveExpenseChanges() {
@@ -1915,6 +2002,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <strong>${escapeHTML(formatNumber(shares[participant] || 0, baseCurrency))} ${escapeHTML(baseCurrency)}</strong>
                 </div>
             `).join('');
+            const splitDetailsLabel = getLocale('splitDetails', '분담 내역');
+            const participantCountLabel = getLocale('participantsCount', '{count}명')
+                .replace('{count}', participants.length);
 
             const actionButton = isLocked ? '' : `
                 <button type="button" class="expense-card-delete delete-expense-btn" data-id="${expenseId}" title="지출 삭제">
@@ -1935,9 +2025,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                         ${amountLabel}
                         <span class="expense-card-payer"><i class="fas fa-credit-card"></i> ${payerName}</span>
                     </div>
-                    <div class="expense-card-shares">
-                        ${shareRows}
-                    </div>
+                    <details class="expense-card-share-details">
+                        <summary>
+                            <span>${escapeHTML(splitDetailsLabel)}</span>
+                            <span class="expense-card-share-count">${escapeHTML(participantCountLabel)}</span>
+                            <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                        </summary>
+                        <div class="expense-card-shares">${shareRows}</div>
+                    </details>
                 </article>
             `;
         }).join('');
@@ -1954,7 +2049,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!isLocked) {
             expenseCardList.querySelectorAll('.expense-card').forEach(card => {
                 card.addEventListener('click', (event) => {
-                    if (event.target.closest('.delete-expense-btn') || event.target.closest('.clickable-amount')) return;
+                    if (
+                        event.target.closest('.delete-expense-btn')
+                        || event.target.closest('.clickable-amount')
+                        || event.target.closest('.expense-card-share-details')
+                    ) return;
                     openEditExpenseModal(parseInt(card.dataset.id, 10));
                 });
             });
@@ -1972,6 +2071,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(!expenseTableBody) return;
         expenseTableBody.innerHTML = '';
         if (expenseCardList) expenseCardList.innerHTML = '';
+        const expenseCount = currentSettlement && Array.isArray(currentSettlement.expenses)
+            ? currentSettlement.expenses.length
+            : 0;
+        if (expenseListCount) {
+            expenseListCount.textContent = getLocale('expenseCount', '{count}건')
+                .replace('{count}', expenseCount);
+        }
         if (!currentSettlement || !currentSettlement.expenses) return;
         const participants = currentSettlement.participants;
         const sortedExpenses = getSortedExpenses(currentSettlement.expenses);
@@ -2044,13 +2150,109 @@ document.addEventListener('DOMContentLoaded', async () => {
         return { transfers, balances }; 
     }
 
+    function getPaymentActions(baseCurrency, linkAmount) {
+        if (currentLang === 'en') return '';
+        if (currentLang === 'ja') {
+            return `
+                <div class="transfer-pay-actions">
+                    <a href="paypay://" class="payment-action payment-action-paypay">PayPay</a>
+                </div>
+            `;
+        }
+        if (currentLang === 'ko') {
+            return `
+                <div class="transfer-pay-actions">
+                    <a href="supertoss://send?amount=${linkAmount}" class="payment-action payment-action-toss"><i class="fas fa-paper-plane"></i> 토스 송금</a>
+                    <a href="kakaotalk://kakaopay/home" class="payment-action payment-action-kakao"><i class="fas fa-comment-dollar"></i> 카카오페이</a>
+                </div>
+            `;
+        }
+        if (baseCurrency === 'JPY') {
+            return `
+                <div class="transfer-pay-actions">
+                    <a href="paypay://" class="payment-action payment-action-paypay">PayPay</a>
+                </div>
+            `;
+        }
+        if (baseCurrency === 'KRW') {
+            return `
+                <div class="transfer-pay-actions">
+                    <a href="supertoss://send?amount=${linkAmount}" class="payment-action payment-action-toss"><i class="fas fa-paper-plane"></i> 토스 송금</a>
+                    <a href="kakaotalk://kakaopay/home" class="payment-action payment-action-kakao"><i class="fas fa-comment-dollar"></i> 카카오페이</a>
+                </div>
+            `;
+        }
+        return `
+            <div class="transfer-pay-actions">
+                <a href="venmo://paycharge?txn=pay&amount=${linkAmount}" class="payment-action payment-action-venmo">Venmo</a>
+                <a href="https://www.paypal.com/myaccount/transfer/homepage" target="_blank" rel="noopener noreferrer" class="payment-action payment-action-paypal">PayPal</a>
+            </div>
+        `;
+    }
+
+    function renderSettlementTransfers(transfers, baseCurrency, { isEstimate = false, showPaymentActions = false } = {}) {
+        if(!finalSettlementContainer) return;
+
+        const heading = document.createElement('div');
+        heading.className = `settlement-result-heading ${isEstimate ? 'is-estimate' : 'is-final'}`;
+        const headingLabel = isEstimate
+            ? getLocale('expectedSettlement', '예상 정산')
+            : getLocale('finalSettlement', '최종 정산');
+        const headingDescription = isEstimate
+            ? getLocale('expectedSettlementDesc', '현재 지출 기준이며 변경 시 자동으로 다시 계산됩니다.')
+            : getLocale('finalSettlementDesc', '확정된 송금 금액입니다.');
+        heading.innerHTML = `
+            <div class="settlement-result-label">
+                <i class="fas ${isEstimate ? 'fa-calculator' : 'fa-circle-check'}" aria-hidden="true"></i>
+                <span>${escapeHTML(headingLabel)}</span>
+            </div>
+            <small>${escapeHTML(headingDescription)}</small>
+        `;
+        finalSettlementContainer.appendChild(heading);
+
+        if (transfers.length === 0) {
+            const balancedState = document.createElement('div');
+            balancedState.className = `summary-complete-state ${isEstimate ? 'is-estimate' : ''}`;
+            balancedState.innerHTML = `
+                <i class="fas fa-check-circle"></i>
+                <span>${escapeHTML(getLocale(
+                    isEstimate ? 'balancedEstimate' : 'settlementDone',
+                    isEstimate ? '현재 추가 송금 없이 정산이 맞아요.' : '정산이 완료되었습니다.'
+                ))}</span>
+            `;
+            finalSettlementContainer.appendChild(balancedState);
+            return;
+        }
+
+        transfers.forEach(tr => {
+            const div = document.createElement('div');
+            div.className = `transfer-item ${isEstimate ? 'is-estimate' : 'is-final'}`;
+            const linkAmount = (['KRW', 'JPY', 'TWD'].includes(baseCurrency)) ? Math.round(tr.amount) : tr.amount.toFixed(2);
+            div.innerHTML = `
+                <div class="transfer-route">
+                    <span class="transfer-person">${escapeHTML(tr.from)}</span>
+                    <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                    <span class="transfer-person">${escapeHTML(tr.to)}</span>
+                </div>
+                <strong class="transfer-amount">${escapeHTML(formatNumber(tr.amount, baseCurrency))} ${escapeHTML(baseCurrency)}</strong>
+                ${showPaymentActions ? getPaymentActions(baseCurrency, linkAmount) : ''}
+            `;
+            finalSettlementContainer.appendChild(div);
+        });
+    }
+
     function updateSummary() {
         if (!currentSettlement) return;
         const { expenses, participants, base_currency, is_settled } = currentSettlement;
         const totalAmount = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
         const isGuestPreview = !!currentSettlement && !currentUser;
         
-        if(totalExpenseP) totalExpenseP.textContent = `${getLocale('totalExpense', 'Total Expense')}: ${formatNumber(totalAmount, base_currency)} ${base_currency}`;
+        if (summaryTotalValue && summaryTotalCurrency) {
+            summaryTotalValue.textContent = formatNumber(totalAmount, base_currency);
+            summaryTotalCurrency.textContent = base_currency;
+        } else if (totalExpenseP) {
+            totalExpenseP.textContent = `${getLocale('totalExpense', 'Total Expense')}: ${formatNumber(totalAmount, base_currency)} ${base_currency}`;
+        }
         if(summaryMeta) {
             const metaItems = [
                 getLocale('summaryParticipants', '참가자 {count}명').replace('{count}', participants.length),
@@ -2067,77 +2269,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(!finalSettlementContainer || !completeSettlementBtn) return;
 
         if (is_settled) {
-            if (transfers.length === 0) {
-                finalSettlementContainer.innerHTML = `<div class="transfer-item">${getLocale('settlementDone', 'Settlement complete')}</div>`;
-            } else {
-                transfers.forEach(tr => {
-                    const div = document.createElement('div');
-                    div.className = 'transfer-item';
-                    
-                    let payButtons = '';
-                    
-                    const linkAmount = (['KRW', 'JPY', 'TWD'].includes(base_currency)) ? Math.round(tr.amount) : tr.amount.toFixed(2);
-
-                    if (currentLang === 'ja') {
-                        payButtons = `
-                            <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%; justify-content: flex-end;">
-                                <a href="paypay://" style="text-decoration:none; text-align:center; width:calc(50% - 0.25rem); font-size:0.9rem; font-weight:600; background-color:#FF0033; color:white; border-radius:8px; padding:0.6rem;">PayPay</a>
-                            </div>
-                        `;
-                    } 
-                    else if (currentLang === 'ko') {
-                        payButtons = `
-                            <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%;">
-                                <a href="supertoss://send?amount=${linkAmount}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#3182f6; color:white; border-radius:8px; padding:0.6rem;"><i class="fas fa-paper-plane"></i> 토스 송금</a>
-                                <a href="kakaotalk://kakaopay/home" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#FEE500; color:#191919; border-radius:8px; padding:0.6rem;"><i class="fas fa-comment-dollar"></i> 카카오페이</a>
-                            </div>
-                        `;
-                    } 
-                    else if (currentLang === 'en') {
-                        payButtons = '';
-                    } 
-                    else {
-                        if (base_currency === 'JPY') {
-                            payButtons = `
-                                <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%; justify-content: flex-end;">
-                                    <a href="paypay://" style="text-decoration:none; text-align:center; width:calc(50% - 0.25rem); font-size:0.9rem; font-weight:600; background-color:#FF0033; color:white; border-radius:8px; padding:0.6rem;">PayPay</a>
-                                </div>
-                            `;
-                        } else if (base_currency === 'KRW') {
-                            payButtons = `
-                                <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%;">
-                                    <a href="supertoss://send?amount=${linkAmount}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#3182f6; color:white; border-radius:8px; padding:0.6rem;"><i class="fas fa-paper-plane"></i> 토스 송금</a>
-                                    <a href="kakaotalk://kakaopay/home" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#FEE500; color:#191919; border-radius:8px; padding:0.6rem;"><i class="fas fa-comment-dollar"></i> 카카오페이</a>
-                                </div>
-                            `;
-                        } else {
-                            payButtons = `
-                                <div style="display:inline-flex; gap:0.5rem; margin-top: 0.6rem; width: 260px; max-width: 100%;">
-                                    <a href="venmo://paycharge?txn=pay&amount=${linkAmount}" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#008CFF; color:white; border-radius:8px; padding:0.6rem;">Venmo</a>
-                                    <a href="https://www.paypal.com/myaccount/transfer/homepage" target="_blank" style="text-decoration:none; text-align:center; flex:1; font-size:0.9rem; font-weight:600; background-color:#003087; color:white; border-radius:8px; padding:0.6rem;">PayPal</a>
-                                </div>
-                            `;
-                        }
-                    }
-
-                    div.innerHTML = `
-                        <div style="font-weight: 700; color: white;">
-                            ${escapeHTML(tr.from)} ➡️ ${escapeHTML(tr.to)} (${escapeHTML(formatNumber(tr.amount, base_currency))} ${escapeHTML(base_currency)})
-                        </div>
-                        ${payButtons}
-                    `;
-                    finalSettlementContainer.appendChild(div);
-                });
-            }
+            renderSettlementTransfers(transfers, base_currency, { showPaymentActions: true });
             if (currentUser) { 
                 completeSettlementBtn.textContent = getLocale('editSettlement', 'Reopen Settlement');
                 completeSettlementBtn.classList.add('edit-mode'); 
                 completeSettlementBtn.classList.remove('hidden');
             }
         } else {
-            const statusClass = isGuestPreview ? 'summary-status-pill' : 'transfer-item text-muted';
-            finalSettlementContainer.innerHTML = `<div class="${statusClass}"><i class="fas fa-receipt"></i> ${escapeHTML(getLocale('settlementInProgress', 'Settlement in progress...'))}</div>`;
-            if (expenses.length > 0 && currentUser) { 
+            if (expenses.length > 0) {
+                renderSettlementTransfers(transfers, base_currency, { isEstimate: true });
+            } else {
+                finalSettlementContainer.innerHTML = `
+                    <div class="summary-status-pill">
+                        <i class="fas fa-receipt"></i>
+                        <span>${escapeHTML(getLocale('expectedSettlementEmpty', '지출을 추가하면 예상 정산 금액이 표시됩니다.'))}</span>
+                    </div>
+                `;
+            }
+            if (expenses.length > 0 && currentUser) {
                 completeSettlementBtn.textContent = getLocale('completeSettlement', 'Complete Settlement');
                 completeSettlementBtn.classList.remove('edit-mode'); 
                 completeSettlementBtn.classList.remove('hidden');
@@ -2167,7 +2316,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(splitAmountInputs) splitAmountInputs.querySelectorAll('input').forEach(inp => inp.value = '');
         if(currentSettlement && itemCurrencySelect) { itemCurrencySelect.value = currentSettlement.base_currency; }
         handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs, false); 
-        if(itemNameInput) itemNameInput.focus();
+        updateExpenseSubmitValue();
+        if(itemAmountInput) itemAmountInput.focus();
     }
 
     function attachDynamicSplitInputListeners(container, totalAmountInput, previewUpdater, isEdit = false) {
@@ -2741,14 +2891,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        if(addSettlementFab) addSettlementFab.addEventListener('click', () => {
-            const dateInput = document.getElementById('new-settlement-date');
-            if(dateInput) dateInput.value = getLocalDateString();
-            renderParticipantInputs(2);
-            if(addSettlementModal) addSettlementModal.classList.remove('hidden');
-            const titleInput = document.getElementById('new-settlement-title');
-            if(titleInput) titleInput.focus();
-        });
+        if(addSettlementFab) addSettlementFab.addEventListener('click', openAddSettlementModal);
+        if(emptyCreateSettlementBtn) emptyCreateSettlementBtn.addEventListener('click', openAddSettlementModal);
+        if(emptyJoinSettlementBtn) emptyJoinSettlementBtn.addEventListener('click', openJoinModal);
 
         const handleSaveCurrentRoom = async () => {
             if (!currentSettlement) return;
@@ -2791,11 +2936,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const shareEmailBtn = document.getElementById('share-email-btn');
         if(shareEmailBtn) shareEmailBtn.addEventListener('click', sendEmailInvite);
 
-        const openJoinModalBtn = document.getElementById('open-join-modal-btn');
-        if(openJoinModalBtn) openJoinModalBtn.addEventListener('click', () => {
-            const joinModal = document.getElementById('join-modal');
-            if(joinModal) joinModal.classList.remove('hidden');
-        });
+        if(openJoinModalBtn) openJoinModalBtn.addEventListener('click', openJoinModal);
 
         const submitJoinCodeBtn = document.getElementById('submit-join-code-btn');
         if(submitJoinCodeBtn) submitJoinCodeBtn.addEventListener('click', () => joinRoomByCode());
@@ -2937,6 +3078,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(itemCurrencySelect) itemCurrencySelect.addEventListener('change', () => { 
             const rateInput = document.getElementById('add-custom-rate');
             if(rateInput) rateInput.value = ''; 
+            updateExpenseSubmitValue();
             handleAddCurrencyChange(); 
         });
         if(itemAmountInput) itemAmountInput.addEventListener('input', () => { 
