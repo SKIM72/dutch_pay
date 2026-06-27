@@ -56,12 +56,32 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.13.4';
+    const APP_VERSION = 'v2026.06.27.1';
     const THEME_STORAGE_KEY = 'settleup-theme-mode';
     const VALID_THEME_MODES = new Set(['system', 'light', 'dark']);
     const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const VALID_EXPENSE_SORT_MODES = new Set(['date-desc', 'date-asc', 'amount-desc', 'amount-asc']);
     let expenseSortMode = 'date-desc';
+
+    function syncAppViewportHeight() {
+        const viewportHeight = window.visualViewport?.height || window.innerHeight;
+        document.documentElement.style.setProperty('--app-height', `${Math.round(viewportHeight)}px`);
+    }
+
+    function dismissVirtualKeyboard() {
+        const activeElement = document.activeElement;
+        if (activeElement?.matches?.('input, textarea, select')) activeElement.blur();
+        syncAppViewportHeight();
+        window.setTimeout(syncAppViewportHeight, 250);
+    }
+
+    syncAppViewportHeight();
+    window.addEventListener('resize', syncAppViewportHeight);
+    window.addEventListener('orientationchange', () => window.setTimeout(syncAppViewportHeight, 200));
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', syncAppViewportHeight);
+        window.visualViewport.addEventListener('scroll', syncAppViewportHeight);
+    }
 
     function escapeHTML(value) {
         return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -208,6 +228,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     const itemNameInput = document.getElementById('item-name');
     const itemAmountInput = document.getElementById('item-amount');
     const itemCurrencySelect = document.getElementById('item-currency');
+
+    const openReceiptScanBtn = document.getElementById('open-receipt-scan-btn');
+    const receiptScanModal = document.getElementById('receipt-scan-modal');
+    const receiptSourceStep = document.getElementById('receipt-source-step');
+    const receiptAnalysisStep = document.getElementById('receipt-analysis-step');
+    const receiptReviewStep = document.getElementById('receipt-review-step');
+    const receiptCameraInput = document.getElementById('receipt-camera-input');
+    const receiptGalleryInput = document.getElementById('receipt-gallery-input');
+    const receiptAnalysisPreview = document.getElementById('receipt-analysis-preview');
+    const receiptReviewImage = document.getElementById('receipt-review-image');
+    const receiptFileName = document.getElementById('receipt-file-name');
+    const receiptResultAmount = document.getElementById('receipt-result-amount');
+    const receiptResultCurrency = document.getElementById('receipt-result-currency');
+    const receiptResultName = document.getElementById('receipt-result-name');
+    const receiptResultDate = document.getElementById('receipt-result-date');
+    const retryReceiptScanBtn = document.getElementById('retry-receipt-scan-btn');
+    const applyReceiptResultBtn = document.getElementById('apply-receipt-result-btn');
+    let receiptPreviewUrl = '';
+    let receiptAnalysisTimer = null;
     
     const editSettlementTitleBtn = document.getElementById('edit-settlement-title-btn');
     const editTitleModal = document.getElementById('edit-title-modal');
@@ -361,6 +400,122 @@ document.addEventListener('DOMContentLoaded', async () => {
         container.appendChild(toast);
         setTimeout(() => toast.classList.add('show'), 10);
         setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    function showReceiptStep(stepName) {
+        if (receiptSourceStep) receiptSourceStep.classList.toggle('hidden', stepName !== 'source');
+        if (receiptAnalysisStep) receiptAnalysisStep.classList.toggle('hidden', stepName !== 'analysis');
+        if (receiptReviewStep) receiptReviewStep.classList.toggle('hidden', stepName !== 'review');
+    }
+
+    function clearReceiptPreview() {
+        if (receiptPreviewUrl) {
+            URL.revokeObjectURL(receiptPreviewUrl);
+            receiptPreviewUrl = '';
+        }
+        if (receiptAnalysisPreview) receiptAnalysisPreview.removeAttribute('src');
+        if (receiptReviewImage) receiptReviewImage.removeAttribute('src');
+    }
+
+    function resetReceiptScan({ clearFile = true } = {}) {
+        if (receiptAnalysisTimer) {
+            clearTimeout(receiptAnalysisTimer);
+            receiptAnalysisTimer = null;
+        }
+        clearReceiptPreview();
+        showReceiptStep('source');
+        if (clearFile) {
+            if (receiptCameraInput) receiptCameraInput.value = '';
+            if (receiptGalleryInput) receiptGalleryInput.value = '';
+        }
+        if (receiptFileName) receiptFileName.textContent = '';
+        if (receiptResultAmount) receiptResultAmount.value = '';
+        if (receiptResultName) receiptResultName.value = '';
+        if (receiptResultDate) receiptResultDate.value = '';
+    }
+
+    function openReceiptScanModal() {
+        if (!receiptScanModal || !currentSettlement) return;
+        resetReceiptScan();
+        receiptScanModal.classList.remove('hidden');
+    }
+
+    function closeReceiptScanModal() {
+        if (!receiptScanModal) return;
+        receiptScanModal.classList.add('hidden');
+        resetReceiptScan();
+    }
+
+    function getReceiptDemoAmount(currency) {
+        if (currency === 'KRW') return 32800;
+        if (currency === 'JPY') return 3850;
+        if (currency === 'TWD') return 760;
+        return 24.5;
+    }
+
+    function populateReceiptDemoResult(file) {
+        const currency = currentSettlement?.base_currency || itemCurrencySelect?.value || 'JPY';
+        const amount = getReceiptDemoAmount(currency);
+        if (receiptResultCurrency) receiptResultCurrency.value = SUPPORTED_CURRENCIES.includes(currency) ? currency : 'JPY';
+        if (receiptResultAmount) receiptResultAmount.value = formatNumber(amount, currency);
+        if (receiptResultName) receiptResultName.value = getLocale('receiptDemoItem', '영수증 스캔 항목');
+        if (receiptResultDate) receiptResultDate.value = getLocalISOString();
+        if (receiptFileName) receiptFileName.textContent = file.name;
+    }
+
+    function handleReceiptFile(file) {
+        if (!file || !file.type.startsWith('image/')) {
+            showToast(getLocale('receiptInvalidFile', '이미지 파일을 선택해 주세요.'), 'error');
+            return;
+        }
+
+        clearReceiptPreview();
+        receiptPreviewUrl = URL.createObjectURL(file);
+        if (receiptAnalysisPreview) {
+            receiptAnalysisPreview.src = receiptPreviewUrl;
+            receiptAnalysisPreview.alt = file.name;
+        }
+        if (receiptReviewImage) {
+            receiptReviewImage.src = receiptPreviewUrl;
+            receiptReviewImage.alt = file.name;
+        }
+        showReceiptStep('analysis');
+
+        receiptAnalysisTimer = setTimeout(() => {
+            receiptAnalysisTimer = null;
+            populateReceiptDemoResult(file);
+            showReceiptStep('review');
+        }, 900);
+    }
+
+    async function applyReceiptResult() {
+        const amount = receiptResultAmount ? parseFormattedNumber(receiptResultAmount.value) : 0;
+        const name = receiptResultName ? receiptResultName.value.trim() : '';
+        const date = receiptResultDate ? receiptResultDate.value : '';
+        const currency = receiptResultCurrency ? receiptResultCurrency.value : '';
+
+        if (!(amount > 0) || !name || !date || !SUPPORTED_CURRENCIES.includes(currency)) {
+            showToast(getLocale('receiptResultInvalid', '금액, 항목명, 지출 일시를 확인해 주세요.'), 'error');
+            return;
+        }
+
+        if (itemAmountInput) {
+            itemAmountInput.value = formatNumber(amount, currency);
+            itemAmountInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        if (itemNameInput) itemNameInput.value = name;
+        if (itemDateInput) itemDateInput.value = date;
+        if (itemCurrencySelect) {
+            itemCurrencySelect.value = currency;
+            itemCurrencySelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        closeReceiptScanModal();
+        showToast(
+            getLocale('receiptApplied', '영수증 결과를 입력칸에 적용했습니다. 기록하기 전에 내용을 확인해 주세요.'),
+            'success'
+        );
+        if (itemAmountInput) itemAmountInput.focus();
     }
 
     function showConfirm(message) {
@@ -1455,7 +1610,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         fillPayerSelect(addPayerSelect);
         fillPayerSelect(editItemPayerSelect);
 
-        const helperHtml = `<div style="grid-column: 1 / -1; font-size: 0.85rem; color: #4f46e5; margin-bottom: 0.8rem; background: #eef2ff; padding: 0.6rem; border-radius: 8px; text-align: center; border: 1px solid #c7d2fe;"><i class="fas fa-info-circle"></i> <span data-i18n="manualInputHelper">${getLocale('manualInputHelper', '👇 아래에 각자 쓴 금액을 입력하면 총액이 자동 계산됩니다.')}</span></div>`;
+        const helperHtml = `<div class="manual-split-helper"><i class="fas fa-info-circle" aria-hidden="true"></i><span data-i18n="manualInputHelper">${getLocale('manualInputHelper', '아래에 각자 쓴 금액을 입력하면 총액이 자동 계산됩니다.')}</span></div>`;
 
         if(splitAmountInputs) {
             splitAmountInputs.innerHTML = helperHtml; 
@@ -1665,6 +1820,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (Math.abs(sumCheck - originalAmount) > 0.01) { showToast(getLocale('amountMismatch', '금액이 일치하지 않습니다.'), "error"); return; }
         }
 
+        dismissVirtualKeyboard();
         setLoading(true);
         try {
             const { data, error } = await safeDB(supabaseClient.from('expenses').insert([{ 
@@ -1680,7 +1836,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 currentSettlement.is_settled = false;
                 await safeDB(supabaseClient.from('settlements').update({ is_settled: false }).eq('id', currentSettlement.id));
             }
-            render(); clearInputs();
+            render();
+            clearInputs({ focusAmount: false });
         } catch(e) {
             console.error(e);
             if (e.message === 'TIMEOUT_DB' || e.name === 'AbortError' || e.message === 'OFFLINE') showToast('네트워크가 불안정합니다. 다시 버튼을 눌러주세요.', 'error');
@@ -1768,6 +1925,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (Math.abs(sumCheck - originalAmount) > 0.01) { showToast(getLocale('amountMismatch', '금액이 일치하지 않습니다.'), 'error'); return; }
         }
         
+        dismissVirtualKeyboard();
         setLoading(true);
         try {
             const { data, error } = await safeDB(supabaseClient.from('expenses').update({ 
@@ -2304,7 +2462,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         expenseFormCard.querySelectorAll('input, select, button').forEach(el => { el.disabled = isLocked; }); 
     }
     
-    function clearInputs() {
+    function clearInputs({ focusAmount = window.innerWidth > 768 } = {}) {
         if(itemNameInput) itemNameInput.value = ''; 
         if(itemAmountInput) itemAmountInput.value = ''; 
         const rateInput = document.getElementById('add-custom-rate');
@@ -2317,7 +2475,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(currentSettlement && itemCurrencySelect) { itemCurrencySelect.value = currentSettlement.base_currency; }
         handleSplitMethodChange(splitMethodSelect, itemAmountInput, splitAmountInputs, false); 
         updateExpenseSubmitValue();
-        if(itemAmountInput) itemAmountInput.focus();
+        if(focusAmount && itemAmountInput) itemAmountInput.focus({ preventScroll: true });
+        else syncAppViewportHeight();
     }
 
     function attachDynamicSplitInputListeners(container, totalAmountInput, previewUpdater, isEdit = false) {
@@ -2355,8 +2514,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         amountEl.readOnly = isManualAmount;
         
         if (isManualAmount) {
-            amountEl.style.backgroundColor = '#f8fafc'; 
-            amountEl.style.color = '#94a3b8';
+            amountEl.style.backgroundColor = 'var(--surface-muted)';
+            amountEl.style.color = 'var(--text-muted)';
             amountEl.style.borderStyle = 'dashed'; 
             amountEl.placeholder = getLocale('autoCalculated', '자동 계산됨');
             
@@ -2988,6 +3147,27 @@ document.addEventListener('DOMContentLoaded', async () => {
                 stopQrScanner();
                 if(qrScannerModal) qrScannerModal.classList.add('hidden');
             });
+        }
+
+        if (openReceiptScanBtn) openReceiptScanBtn.addEventListener('click', openReceiptScanModal);
+        [receiptCameraInput, receiptGalleryInput].forEach(input => {
+            if (!input) return;
+            input.addEventListener('change', () => {
+                const file = input.files && input.files[0];
+                if (file) handleReceiptFile(file);
+            });
+        });
+        if (receiptResultAmount) {
+            receiptResultAmount.addEventListener('input', () => handleAmountInput(receiptResultAmount));
+        }
+        if (retryReceiptScanBtn) retryReceiptScanBtn.addEventListener('click', () => resetReceiptScan());
+        if (applyReceiptResultBtn) applyReceiptResultBtn.addEventListener('click', applyReceiptResult);
+        if (receiptScanModal) {
+            receiptScanModal.addEventListener('click', (event) => {
+                if (event.target === receiptScanModal) closeReceiptScanModal();
+            });
+            const receiptCloseBtn = receiptScanModal.querySelector('.close-modal-btn');
+            if (receiptCloseBtn) receiptCloseBtn.addEventListener('click', closeReceiptScanModal);
         }
 
         if(copyTextBtn) copyTextBtn.addEventListener('click', copySummaryText);
