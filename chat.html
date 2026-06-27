@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Settle Up | 채팅방</title>
     
     <link rel="manifest" href="manifest.json">
@@ -33,6 +33,8 @@
             display: flex; flex-direction: column; 
             height: calc(var(--vh, 1vh) * 100); 
             width: 100vw;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
             background: #fff; 
             position: relative;
         }
@@ -371,7 +373,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="locales.js?v=33"></script>
+    <script src="locales.js?v=34"></script>
     <script src="chat.js?v=33"></script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title data-i18n="appTitle">Settle Up | 해외여행 다중환율 간편 정산</title>
     
     <meta name="description" content="친구들과의 해외 여행 정산, 이제 스트레스 받지 마세요! 복잡한 엔화, 달러 환율 계산부터 토스/카카오페이 송금까지 Settle Up으로 한 번에 해결하세요.">
@@ -30,7 +30,7 @@
     </script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=60">
+    <link rel="stylesheet" href="style.css?v=62">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -76,7 +76,7 @@
                 <h1>Settle Up</h1>
             </div>
             <div class="header-controls">
-                <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.06.13.4</span>
+                <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.06.27.1</span>
                 <div id="user-info-display" class="hidden" style="cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-muted); margin-right: 0.5rem; background: var(--side-bg); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid var(--border); max-width: 150px;" title="마이페이지 열기">
                     <i class="fas fa-user-circle"></i> <span id="user-email-text" style="display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;"></span>
                 </div>
@@ -214,10 +214,16 @@
 
                     <div class="card" id="expense-form-card">
                         <div class="expense-entry-header">
-                            <span class="expense-entry-icon" aria-hidden="true"><i class="fas fa-receipt"></i></span>
-                            <div class="expense-entry-copy">
-                                <h2><span data-i18n="addExpense"></span></h2>
+                            <div class="expense-entry-heading">
+                                <span class="expense-entry-icon" aria-hidden="true"><i class="fas fa-receipt"></i></span>
+                                <div class="expense-entry-copy">
+                                    <h2><span data-i18n="addExpense"></span></h2>
+                                </div>
                             </div>
+                            <button type="button" id="open-receipt-scan-btn" class="receipt-scan-trigger">
+                                <i class="fas fa-camera" aria-hidden="true"></i>
+                                <span data-i18n="scanReceipt">영수증 스캔</span>
+                            </button>
                         </div>
                         <div id="expense-form">
                             <div class="expense-field expense-amount-field">
@@ -591,6 +597,125 @@
             </div>
         </div>
 
+        <div id="receipt-scan-modal" class="hidden">
+            <div class="modal-content card receipt-scan-modal-card">
+                <button type="button" class="close-modal-btn receipt-modal-close" aria-label="닫기">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+
+                <div class="receipt-modal-header">
+                    <span class="receipt-modal-icon" aria-hidden="true"><i class="fas fa-camera"></i></span>
+                    <div>
+                        <div class="receipt-modal-title-row">
+                            <h2 data-i18n="receiptScanTitle">영수증으로 빠르게 입력</h2>
+                            <span class="receipt-demo-badge" data-i18n="receiptDemoBadge">UI 데모</span>
+                        </div>
+                        <p data-i18n="receiptScanDesc">영수증을 촬영하거나 사진을 선택하면 입력값을 먼저 확인할 수 있어요.</p>
+                    </div>
+                </div>
+
+                <div id="receipt-source-step" class="receipt-modal-body">
+                    <div class="receipt-capture-guide">
+                        <div class="receipt-guide-corners" aria-hidden="true">
+                            <i class="fas fa-receipt"></i>
+                        </div>
+                        <strong data-i18n="receiptCaptureGuideTitle">영수증 전체가 화면에 들어오게 촬영해 주세요</strong>
+                        <span data-i18n="receiptCaptureGuideDesc">그림자와 빛 반사를 줄이면 금액과 날짜를 더 정확하게 읽을 수 있어요.</span>
+                    </div>
+
+                    <div class="receipt-source-actions">
+                        <label class="receipt-source-button receipt-source-primary" for="receipt-camera-input">
+                            <i class="fas fa-camera" aria-hidden="true"></i>
+                            <span data-i18n="takeReceiptPhoto">카메라로 촬영</span>
+                        </label>
+                        <label class="receipt-source-button" for="receipt-gallery-input">
+                            <i class="fas fa-images" aria-hidden="true"></i>
+                            <span data-i18n="chooseReceiptPhoto">앨범에서 선택</span>
+                        </label>
+                    </div>
+                    <input type="file" id="receipt-camera-input" class="sr-only" accept="image/*" capture="environment">
+                    <input type="file" id="receipt-gallery-input" class="sr-only" accept="image/*">
+
+                    <p class="receipt-privacy-note">
+                        <i class="fas fa-shield-alt" aria-hidden="true"></i>
+                        <span data-i18n="receiptPrivacyNote">이번 단계에서는 사진이 서버나 데이터베이스로 전송되지 않습니다.</span>
+                    </p>
+                </div>
+
+                <div id="receipt-analysis-step" class="receipt-modal-body hidden" aria-live="polite">
+                    <div class="receipt-preview-frame">
+                        <img id="receipt-analysis-preview" alt="">
+                    </div>
+                    <div class="receipt-analysis-copy">
+                        <span class="receipt-analysis-spinner" aria-hidden="true"></span>
+                        <div>
+                            <strong data-i18n="receiptAnalyzing">영수증을 확인하고 있어요</strong>
+                            <p id="receipt-analysis-status" data-i18n="receiptAnalyzingDesc">금액, 항목명, 지출 일시를 찾는 중입니다.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="receipt-review-step" class="receipt-modal-body hidden">
+                    <div class="receipt-review-banner">
+                        <i class="fas fa-circle-check" aria-hidden="true"></i>
+                        <div>
+                            <strong data-i18n="receiptReviewTitle">입력 전에 결과를 확인해 주세요</strong>
+                            <p data-i18n="receiptReviewDemoDesc">현재는 화면 흐름을 확인하기 위한 샘플 결과입니다.</p>
+                        </div>
+                    </div>
+
+                    <div class="receipt-review-layout">
+                        <div class="receipt-preview-frame receipt-review-preview">
+                            <img id="receipt-review-image" alt="">
+                            <span id="receipt-file-name" class="receipt-file-name"></span>
+                        </div>
+
+                        <div class="receipt-result-fields">
+                            <div class="expense-field">
+                                <label for="receipt-result-amount" data-i18n="amount">금액</label>
+                                <div class="amount-input-wrapper receipt-result-amount">
+                                    <input type="text" id="receipt-result-amount" inputmode="decimal" autocomplete="off">
+                                    <select id="receipt-result-currency" aria-label="통화">
+                                        <option value="JPY">JPY</option>
+                                        <option value="KRW">KRW</option>
+                                        <option value="USD">USD</option>
+                                        <option value="CNY">CNY</option>
+                                        <option value="GBP">GBP</option>
+                                        <option value="CAD">CAD</option>
+                                        <option value="AUD">AUD</option>
+                                        <option value="HKD">HKD</option>
+                                        <option value="TWD">TWD</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="expense-field">
+                                <label for="receipt-result-name" data-i18n="expenseItem">항목명</label>
+                                <div class="field-control">
+                                    <i class="fas fa-tag" aria-hidden="true"></i>
+                                    <input type="text" id="receipt-result-name" autocomplete="off">
+                                </div>
+                            </div>
+                            <div class="expense-field">
+                                <label for="receipt-result-date" data-i18n="expenseDateTime">지출 일시</label>
+                                <input type="datetime-local" id="receipt-result-date">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="receipt-review-actions">
+                        <button type="button" id="retry-receipt-scan-btn" class="btn-outline">
+                            <i class="fas fa-rotate-left" aria-hidden="true"></i>
+                            <span data-i18n="chooseAnotherReceipt">다른 사진 선택</span>
+                        </button>
+                        <button type="button" id="apply-receipt-result-btn">
+                            <span data-i18n="applyReceiptResult">입력값 적용</span>
+                            <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div id="profile-modal" class="hidden">
             <div class="modal-content card" style="max-width: 400px;">
                 <span class="close-modal-btn"><i class="fas fa-times"></i></span>
@@ -723,8 +848,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="locales.js?v=33"></script>
-    <script src="main.js?v=98"></script>
+    <script src="locales.js?v=34"></script>
+    <script src="main.js?v=100"></script>
     <script src="chat.js?v=33"></script>
 </body>
 </html>
