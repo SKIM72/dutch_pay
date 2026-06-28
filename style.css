@@ -249,7 +249,7 @@ button:hover { background: var(--primary-hover); }
 button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid var(--primary-soft-border); outline-offset: 2px; }
 
-#complete-settlement-btn { width: 220px; min-height: 44px; margin-top: 0.2rem; text-align: center; box-shadow: 0 12px 24px -18px rgba(15, 23, 42, 0.75); }
+#complete-settlement-btn { width: 220px; min-height: 44px; margin-top: 0.95rem; text-align: center; box-shadow: 0 12px 24px -18px rgba(15, 23, 42, 0.75); }
 #complete-settlement-btn.edit-mode { background-color: var(--secondary); }
 #complete-settlement-btn.edit-mode:hover { background-color: var(--secondary-hover); }
 
@@ -398,10 +398,13 @@ button.expense-card-amount { cursor: pointer; border-bottom: 1px dashed var(--pr
 .receipt-analysis-copy strong { color: var(--text-main); font-size: 0.92rem; }
 .receipt-analysis-copy p { margin-top: 0.2rem; color: var(--text-muted); font-size: 0.78rem; line-height: 1.45; }
 .receipt-analysis-spinner { width: 30px; height: 30px; flex-shrink: 0; border: 3px solid var(--primary-soft-border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.9s linear infinite; }
-.receipt-review-banner { margin-bottom: 1rem; padding: 0.85rem 0.95rem; border: 1px solid rgba(16, 185, 129, 0.24); border-radius: 8px; background: rgba(16, 185, 129, 0.09); display: flex; align-items: flex-start; gap: 0.65rem; }
+.receipt-review-banner { margin-bottom: 1rem; padding: 0.85rem 0.95rem; border: 1px solid rgba(16, 185, 129, 0.24); border-radius: 8px; background: rgba(16, 185, 129, 0.09); display: flex; align-items: flex-start; flex-wrap: wrap; gap: 0.65rem; }
 .receipt-review-banner > i { margin-top: 0.12rem; color: var(--secondary); }
+.receipt-review-banner > div { min-width: 180px; flex: 1; }
 .receipt-review-banner strong { color: var(--text-main); font-size: 0.88rem; }
 .receipt-review-banner p { margin-top: 0.2rem; color: var(--text-muted); font-size: 0.76rem; line-height: 1.45; }
+.receipt-confidence { margin-left: auto; padding: 0.25rem 0.5rem; border: 1px solid rgba(16, 185, 129, 0.24); border-radius: 999px; color: var(--secondary); flex-shrink: 0; font-size: 0.7rem; font-weight: 800; white-space: nowrap; }
+.receipt-confidence.is-low { border-color: rgba(245, 158, 11, 0.3); background: rgba(245, 158, 11, 0.08); color: #b45309; }
 .receipt-review-layout { display: grid; grid-template-columns: minmax(190px, 0.72fr) minmax(0, 1.28fr); gap: 1rem; align-items: start; }
 .receipt-review-preview { min-height: 316px; max-height: 390px; align-items: stretch; }
 .receipt-review-preview img { min-height: 316px; max-height: 390px; }

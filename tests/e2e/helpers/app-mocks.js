@@ -151,6 +151,41 @@ const SUPABASE_SDK_MOCK = `
       }
       throw new Error('TEST_BLOCKED_RPC_' + name);
     },
+    functions: {
+      invoke: async (name, options) => {
+        window.__SUPABASE_CALLS__.push({
+          type: 'function',
+          name,
+          body: {
+            mimeType: options?.body?.mimeType,
+            locale: options?.body?.locale,
+            timezone: options?.body?.timezone,
+            fallbackCurrency: options?.body?.fallbackCurrency,
+            hasImage: Boolean(options?.body?.imageBase64)
+          }
+        });
+        if (name !== 'scan-receipt') {
+          return { data: null, error: { message: 'MOCK_FUNCTION_NOT_FOUND' } };
+        }
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        return {
+          data: {
+            result: {
+              amount: 32800,
+              currency: 'KRW',
+              name: '서울역 식당',
+              merchantName: '서울역 식당',
+              purchasedAt: '2026-06-11T18:30',
+              language: 'ko',
+              confidence: 0.94,
+              warnings: []
+            },
+            meta: { model: 'mock-receipt-ocr', stored: false }
+          },
+          error: null
+        };
+      }
+    },
     from: (table) => createQuery(table),
     channel: (name) => createChannel(name),
     removeChannel: async () => {},

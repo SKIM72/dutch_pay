@@ -8,7 +8,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6초 한계선
+        const isReceiptScan = String(url).includes('/functions/v1/scan-receipt');
+        const timeoutId = setTimeout(() => controller.abort(), isReceiptScan ? 35000 : 6000);
 
         try {
             const response = await fetch(url, { 
@@ -56,7 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.27.1';
+    const APP_VERSION = 'v2026.06.27.2';
     const THEME_STORAGE_KEY = 'settleup-theme-mode';
     const VALID_THEME_MODES = new Set(['system', 'light', 'dark']);
     const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -243,10 +244,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const receiptResultCurrency = document.getElementById('receipt-result-currency');
     const receiptResultName = document.getElementById('receipt-result-name');
     const receiptResultDate = document.getElementById('receipt-result-date');
+    const receiptConfidence = document.getElementById('receipt-confidence');
     const retryReceiptScanBtn = document.getElementById('retry-receipt-scan-btn');
     const applyReceiptResultBtn = document.getElementById('apply-receipt-result-btn');
     let receiptPreviewUrl = '';
-    let receiptAnalysisTimer = null;
+    let receiptScanRequestId = 0;
     
     const editSettlementTitleBtn = document.getElementById('edit-settlement-title-btn');
     const editTitleModal = document.getElementById('edit-title-modal');
@@ -418,10 +420,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function resetReceiptScan({ clearFile = true } = {}) {
-        if (receiptAnalysisTimer) {
-            clearTimeout(receiptAnalysisTimer);
-            receiptAnalysisTimer = null;
-        }
+        receiptScanRequestId += 1;
         clearReceiptPreview();
         showReceiptStep('source');
         if (clearFile) {
@@ -432,6 +431,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (receiptResultAmount) receiptResultAmount.value = '';
         if (receiptResultName) receiptResultName.value = '';
         if (receiptResultDate) receiptResultDate.value = '';
+        if (receiptConfidence) {
+            receiptConfidence.textContent = '';
+            receiptConfidence.classList.add('hidden');
+            receiptConfidence.classList.remove('is-low');
+        }
     }
 
     function openReceiptScanModal() {
@@ -446,24 +450,126 @@ document.addEventListener('DOMContentLoaded', async () => {
         resetReceiptScan();
     }
 
-    function getReceiptDemoAmount(currency) {
-        if (currency === 'KRW') return 32800;
-        if (currency === 'JPY') return 3850;
-        if (currency === 'TWD') return 760;
-        return 24.5;
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = String(reader.result || '');
+                resolve(result.includes(',') ? result.split(',')[1] : result);
+            };
+            reader.onerror = () => reject(reader.error || new Error('FILE_READ_FAILED'));
+            reader.readAsDataURL(file);
+        });
     }
 
-    function populateReceiptDemoResult(file) {
-        const currency = currentSettlement?.base_currency || itemCurrencySelect?.value || 'JPY';
-        const amount = getReceiptDemoAmount(currency);
+    function loadReceiptImage(file) {
+        return new Promise((resolve, reject) => {
+            const image = new Image();
+            const objectUrl = URL.createObjectURL(file);
+            image.onload = () => {
+                URL.revokeObjectURL(objectUrl);
+                resolve(image);
+            };
+            image.onerror = () => {
+                URL.revokeObjectURL(objectUrl);
+                reject(new Error('IMAGE_DECODE_FAILED'));
+            };
+            image.src = objectUrl;
+        });
+    }
+
+    function canvasToBlob(canvas, quality) {
+        return new Promise((resolve, reject) => {
+            canvas.toBlob(
+                (blob) => blob ? resolve(blob) : reject(new Error('IMAGE_ENCODE_FAILED')),
+                'image/jpeg',
+                quality
+            );
+        });
+    }
+
+    async function prepareReceiptImage(file) {
+        const maxUploadBytes = 20 * 1024 * 1024;
+        const directUploadBytes = 4 * 1024 * 1024;
+        const directMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+        if (file.size > maxUploadBytes) throw new Error('IMAGE_TOO_LARGE');
+        if (directMimeTypes.has(file.type) && file.size <= directUploadBytes) {
+            return { imageBase64: await fileToBase64(file), mimeType: file.type };
+        }
+
+        const image = await loadReceiptImage(file);
+        const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
+        const scale = Math.min(1, 2200 / longestSide);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext('2d', { alpha: false });
+        if (!context) throw new Error('CANVAS_UNAVAILABLE');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        let compressed = await canvasToBlob(canvas, 0.86);
+        if (compressed.size > directUploadBytes) compressed = await canvasToBlob(canvas, 0.7);
+        if (compressed.size > 6 * 1024 * 1024) throw new Error('IMAGE_TOO_LARGE');
+        return { imageBase64: await fileToBase64(compressed), mimeType: 'image/jpeg' };
+    }
+
+    function normalizeReceiptDateForInput(value) {
+        if (!value) return '';
+        const normalized = String(value).trim().replace(' ', 'T');
+        const match = normalized.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+        return match ? `${match[1]}T${match[2]}` : '';
+    }
+
+    function populateReceiptResult(file, result) {
+        const fallbackCurrency = currentSettlement?.base_currency || itemCurrencySelect?.value || 'JPY';
+        const currency = SUPPORTED_CURRENCIES.includes(result.currency) ? result.currency : fallbackCurrency;
+        const amount = Number(result.amount);
         if (receiptResultCurrency) receiptResultCurrency.value = SUPPORTED_CURRENCIES.includes(currency) ? currency : 'JPY';
-        if (receiptResultAmount) receiptResultAmount.value = formatNumber(amount, currency);
-        if (receiptResultName) receiptResultName.value = getLocale('receiptDemoItem', '영수증 스캔 항목');
-        if (receiptResultDate) receiptResultDate.value = getLocalISOString();
+        if (receiptResultAmount) receiptResultAmount.value = amount > 0 ? formatNumber(amount, currency) : '';
+        if (receiptResultName) {
+            receiptResultName.value = String(result.name || result.merchantName || '').trim();
+        }
+        if (receiptResultDate) receiptResultDate.value = normalizeReceiptDateForInput(result.purchasedAt);
         if (receiptFileName) receiptFileName.textContent = file.name;
+
+        const confidence = Math.max(0, Math.min(1, Number(result.confidence) || 0));
+        if (receiptConfidence) {
+            const percent = Math.round(confidence * 100);
+            receiptConfidence.textContent = getLocale('receiptConfidence', '인식 신뢰도 {percent}%')
+                .replace('{percent}', String(percent));
+            receiptConfidence.classList.remove('hidden');
+            receiptConfidence.classList.toggle('is-low', confidence < 0.7);
+        }
+        if (confidence < 0.7) {
+            showToast(
+                getLocale('receiptLowConfidence', '인식 신뢰도가 낮습니다. 결과를 꼼꼼히 확인해 주세요.'),
+                'info'
+            );
+        }
     }
 
-    function handleReceiptFile(file) {
+    async function getReceiptScanErrorMessage(error) {
+        let code = '';
+        try {
+            const context = error?.context;
+            if (context?.clone) {
+                const body = await context.clone().json();
+                code = body?.code || '';
+            }
+        } catch (_) {}
+        if (code === 'OCR_NOT_CONFIGURED') {
+            return getLocale('receiptNotConfigured', '영수증 OCR 설정이 아직 완료되지 않았습니다.');
+        }
+        if (code === 'IMAGE_TOO_LARGE' || error?.message === 'IMAGE_TOO_LARGE') {
+            return getLocale('receiptFileTooLarge', '사진 용량이 너무 큽니다. 20MB 이하 이미지를 선택해 주세요.');
+        }
+        return getLocale('receiptScanFailed', '영수증을 읽지 못했습니다. 사진을 다시 촬영하거나 직접 입력해 주세요.');
+    }
+
+    async function handleReceiptFile(file) {
         if (!file || !file.type.startsWith('image/')) {
             showToast(getLocale('receiptInvalidFile', '이미지 파일을 선택해 주세요.'), 'error');
             return;
@@ -481,11 +587,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         showReceiptStep('analysis');
 
-        receiptAnalysisTimer = setTimeout(() => {
-            receiptAnalysisTimer = null;
-            populateReceiptDemoResult(file);
+        const requestId = ++receiptScanRequestId;
+        try {
+            const preparedImage = await prepareReceiptImage(file);
+            const fallbackCurrency = currentSettlement?.base_currency || itemCurrencySelect?.value || 'JPY';
+            const { data, error } = await supabaseClient.functions.invoke('scan-receipt', {
+                body: {
+                    ...preparedImage,
+                    locale: currentLang,
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul',
+                    fallbackCurrency
+                }
+            });
+            if (error) throw error;
+            if (requestId !== receiptScanRequestId) return;
+            if (!data?.result) throw new Error('OCR_NO_RESULT');
+            populateReceiptResult(file, data.result);
             showReceiptStep('review');
-        }, 900);
+        } catch (error) {
+            console.error('Receipt scan failed:', error);
+            if (requestId !== receiptScanRequestId) return;
+            showToast(await getReceiptScanErrorMessage(error), 'error');
+            resetReceiptScan();
+        }
     }
 
     async function applyReceiptResult() {

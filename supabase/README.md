@@ -62,3 +62,21 @@ The report checks:
 - anonymous access to private/destructive RPCs;
 - unsafe `SECURITY DEFINER` search paths;
 - table, function, policy, and index drift from the local baseline.
+
+## Receipt OCR Edge Function
+
+`functions/scan-receipt` accepts authenticated requests only and sends a
+compressed receipt image to Gemini for Korean and Japanese OCR. The function
+does not write receipt images to the database or Supabase Storage.
+
+Configure and deploy the function independently from database migrations:
+
+```bash
+supabase secrets set GEMINI_API_KEY="YOUR_KEY" --project-ref "<production-project-ref>"
+supabase functions deploy scan-receipt --project-ref "<production-project-ref>"
+```
+
+`GEMINI_RECEIPT_MODEL` is optional and defaults to the stable
+`gemini-2.5-flash` model. Never put `GEMINI_API_KEY` in `config.js`, browser
+code, Git, or a database table. Deploying this Edge Function does not require
+`supabase db push`.
