@@ -93,6 +93,7 @@ test('내 목록에 저장 CTA는 로그인 확인만 띄우고 DB를 변경하�
 });
 
 test('영수증 사진은 OCR 분석 후 검토를 거쳐 기존 지출 입력칸에 적용된다', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.locator('#expense-form-card').evaluate((card) => card.classList.remove('hidden'));
   await page.locator('#open-receipt-scan-btn').click();
 
@@ -119,13 +120,21 @@ test('영수증 사진은 OCR 분석 후 검토를 거쳐 기존 지출 입력�
   await expect(page.locator('#receipt-confidence')).toContainText('94%');
   await expect(page.locator('#receipt-processing-badge')).toContainText('이미지 자동 최적화');
 
-  await page.locator('#apply-receipt-result-btn').click();
+  await page.locator('#receipt-result-amount').focus();
+  await page.locator('#apply-receipt-result-btn').evaluate((button) => button.click());
 
   await expect(page.locator('#receipt-scan-modal')).toBeHidden();
   await expect(page.locator('#item-currency')).toHaveValue('KRW');
   await expect(page.locator('#item-amount')).toHaveValue('32,800');
   await expect(page.locator('#item-name')).toHaveValue('서울역 식당');
   await expect(page.locator('#item-date')).toHaveValue('2026-06-11T18:30');
+  await expect(page.locator('.toast-success')).toContainText('영수증 내용을 입력했어요');
+  expect(await page.evaluate(() => document.activeElement?.id || '')).not.toBe('item-amount');
+
+  const toastBox = await page.locator('.toast-success').boundingBox();
+  expect(toastBox).not.toBeNull();
+  expect(toastBox.x).toBeGreaterThanOrEqual(15);
+  expect(toastBox.x + toastBox.width).toBeLessThanOrEqual(307);
 
   const calls = await page.evaluate(() => window.__SUPABASE_CALLS__);
   expect(calls.filter((call) => call.type === 'mutation')).toEqual([]);
@@ -136,6 +145,46 @@ test('영수증 사진은 OCR 분석 후 검토를 거쳐 기존 지출 입력�
     && call.body.mimeType === 'image/jpeg'
     && call.body.imageProcessing?.autoCropped === false
   ))).toBe(true);
+});
+
+test('공유 모달은 정산 요약을 보여주고 방 정보가 포함된 초대문구를 복사한다', async ({ page }) => {
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (text) => {
+          window.__COPIED_INVITE__ = text;
+        }
+      }
+    });
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: async (payload) => {
+        window.__SHARED_INVITE__ = payload;
+      }
+    });
+  });
+  await page.locator('#open-share-modal-btn').evaluate((button) => {
+    button.classList.remove('hidden');
+    button.click();
+  });
+
+  await expect(page.locator('#share-modal')).toBeVisible();
+  await expect(page.locator('#share-room-title')).toHaveText('자동 테스트 여행 정산 내역');
+  await expect(page.locator('#share-room-meta')).toHaveText('47,000 KRW · 2명 · 3건');
+
+  await page.locator('#copy-share-link-btn').click();
+  const copiedInvite = await page.evaluate(() => window.__COPIED_INVITE__);
+  expect(copiedInvite).toContain('자동 테스트 여행 정산 내역');
+  expect(copiedInvite).toContain('총 지출 47,000 KRW');
+  expect(copiedInvite).toContain('읽기 전용');
+  expect(copiedInvite).toContain('index.html?code=TEST01');
+
+  await page.locator('#share-native-btn').click();
+  const sharedInvite = await page.evaluate(() => window.__SHARED_INVITE__);
+  expect(sharedInvite.title).toBe('자동 테스트 여행 정산 내역');
+  expect(sharedInvite.text).toContain('총 지출 47,000 KRW');
+  expect(sharedInvite.url).toContain('index.html?code=TEST01');
 });
 
 test('배경이 포함된 영수증 사진은 자동으로 모서리를 찾아 원근 보정한다', async ({ page }) => {

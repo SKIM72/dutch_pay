@@ -12,10 +12,18 @@
     <meta name="naver-site-verification" content="d34c2bf94ccae9a8a0fe52730dc2a994f846bd63" />
     
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Settle Up | 해외여행 다중환율 간편 정산">
-    <meta property="og:description" content="💸 정산이 도착했어요! 내역을 확인하고 간편하게 송금하세요.">
-    <meta property="og:image" content="icon.png">
-    <meta property="og:url" content="">
+    <meta property="og:title" content="Settle Up 정산 초대 | 여행 정산 내역 확인">
+    <meta property="og:description" content="초대받은 여행 정산 내역을 로그인 없이 읽기 전용으로 안전하게 확인하세요.">
+    <meta property="og:image" content="https://settleupweb.cloud/photo1.png">
+    <meta property="og:image:width" content="940">
+    <meta property="og:image:height" content="640">
+    <meta property="og:image:alt" content="Settle Up 여행 정산 화면">
+    <meta property="og:site_name" content="Settle Up">
+    <meta property="og:url" content="https://settleupweb.cloud/index.html">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Settle Up 정산 초대 | 여행 정산 내역 확인">
+    <meta name="twitter:description" content="초대받은 여행 정산 내역을 로그인 없이 읽기 전용으로 안전하게 확인하세요.">
+    <meta name="twitter:image" content="https://settleupweb.cloud/photo1.png">
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#6366f1">
@@ -30,7 +38,7 @@
     </script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=66">
+    <link rel="stylesheet" href="style.css?v=67">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -72,7 +80,7 @@
                 <h1>Settle Up</h1>
             </div>
             <div class="header-controls">
-                <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.06.28.3</span>
+                <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.06.29.1</span>
                 <div id="user-info-display" class="hidden" style="cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-muted); margin-right: 0.5rem; background: var(--side-bg); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid var(--border); max-width: 150px;" title="마이페이지 열기">
                     <i class="fas fa-user-circle"></i> <span id="user-email-text" style="display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;"></span>
                 </div>
@@ -544,6 +552,14 @@
             <div class="modal-content card" style="max-width: 450px;">
                 <span class="close-modal-btn"><i class="fas fa-times"></i></span>
                 <h2 style="margin-bottom: 1.5rem;"><i class="fas fa-share-alt" style="color: var(--primary);"></i> 친구 초대 및 공유</h2>
+
+                <div class="share-room-preview">
+                    <span class="share-room-preview-icon"><i class="fas fa-receipt"></i></span>
+                    <div>
+                        <strong id="share-room-title">정산 내역</strong>
+                        <span id="share-room-meta"></span>
+                    </div>
+                </div>
                 
                 <div class="share-section" style="text-align: center; margin-bottom: 2rem;">
                     <label data-i18n="shareQrCode">📱 카메라로 QR 스캔하여 참가</label>
@@ -556,7 +572,10 @@
                     <label>🔗 클릭 한 번에 접속하는 마법 링크</label>
                     <div class="share-input-group">
                         <input type="text" id="share-link-input" readonly>
-                        <button id="copy-share-link-btn" class="btn-outline"><i class="fas fa-copy"></i> 복사</button>
+                        <button id="copy-share-link-btn" class="btn-outline">
+                            <i class="fas fa-copy"></i>
+                            <span data-i18n="copyInviteMessage">초대문구 복사</span>
+                        </button>
                     </div>
                 </div>
 
@@ -568,8 +587,12 @@
                     </div>
                 </div>
 
-                <div style="margin-top: 2rem;">
-                    <button id="share-email-btn" style="width: 100%; display: flex; justify-content: center; align-items: center; gap: 0.5rem;">
+                <div class="share-action-stack">
+                    <button id="share-native-btn" class="share-native-btn">
+                        <i class="fas fa-share-square"></i>
+                        <span data-i18n="shareToApp">카카오톡·앱으로 공유</span>
+                    </button>
+                    <button id="share-email-btn" class="btn-outline share-email-btn">
                         <i class="fas fa-envelope"></i> 이메일로 초대장 보내기
                     </button>
                 </div>
@@ -849,9 +872,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="locales.js?v=37"></script>
+    <script src="locales.js?v=38"></script>
     <script src="receipt-image.js?v=1"></script>
-    <script src="main.js?v=104"></script>
+    <script src="main.js?v=105"></script>
     <script src="chat.js?v=33"></script>
 </body>
 </html>
