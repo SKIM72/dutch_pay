@@ -196,6 +196,7 @@ const SUPABASE_SDK_MOCK = `
             locale: options?.body?.locale,
             timezone: options?.body?.timezone,
             fallbackCurrency: options?.body?.fallbackCurrency,
+            imageProcessing: options?.body?.imageProcessing,
             hasImage: Boolean(options?.body?.imageBase64)
           }
         });

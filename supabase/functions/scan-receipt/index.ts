@@ -23,6 +23,7 @@ const SUPPORTED_CURRENCIES = new Set([
   "TWD",
 ]);
 const REQUESTS_PER_MINUTE = 8;
+const PROVIDER_TIMEOUT_MS = 40_000;
 const requestWindows = new Map<string, number[]>();
 
 class ApiError extends Error {
@@ -230,6 +231,7 @@ async function scanReceipt(request: Request): Promise<Response> {
 
   const prompt = [
     "Analyze this Korean or Japanese receipt and extract only evidence visible in the image.",
+    "The image may already be cropped and perspective-corrected. Read the entire visible receipt before choosing the final amount.",
     "The user needs one expense entry, not every line item.",
     "total_amount must be the final amount actually paid. Exclude subtotal, tax-only values, points, cash received, and change.",
     "item_name should be a short useful Korean or Japanese expense label. Prefer the merchant name plus a short category when clear.",
@@ -238,15 +240,23 @@ async function scanReceipt(request: Request): Promise<Response> {
     "Do not guess unreadable values. Use an empty string or zero and explain uncertainty in warnings.",
   ].join("\n");
 
-  const providerResponse = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
+  const providerController = new AbortController();
+  const providerTimeout = setTimeout(
+    () => providerController.abort(),
+    PROVIDER_TIMEOUT_MS,
+  );
+  let providerResponse: Response;
+  try {
+    providerResponse = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        signal: providerController.signal,
+        body: JSON.stringify({
         systemInstruction: {
           parts: [{
             text:
@@ -267,7 +277,7 @@ async function scanReceipt(request: Request): Promise<Response> {
         }],
         generationConfig: {
           temperature: 0.1,
-          maxOutputTokens: 1024,
+          maxOutputTokens: 512,
           responseMimeType: "application/json",
           responseSchema: {
             type: "OBJECT",
@@ -302,16 +312,40 @@ async function scanReceipt(request: Request): Promise<Response> {
             ],
           },
         },
-      }),
-    },
-  );
+        }),
+      },
+    );
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError(504, "OCR_TIMEOUT", "Receipt OCR timed out.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(providerTimeout);
+  }
 
   if (!providerResponse.ok) {
+    const providerStatus = providerResponse.status;
+    const providerBody = await providerResponse.text();
     console.error(
       "Gemini receipt scan failed",
-      providerResponse.status,
-      await providerResponse.text(),
+      providerStatus,
+      providerBody,
     );
+    if (providerStatus === 429) {
+      throw new ApiError(
+        429,
+        "OCR_RATE_LIMITED",
+        "Receipt OCR quota was exceeded.",
+      );
+    }
+    if (providerStatus === 401 || providerStatus === 403) {
+      throw new ApiError(
+        503,
+        "OCR_PROVIDER_AUTH",
+        "Receipt OCR provider authentication failed.",
+      );
+    }
     throw new ApiError(502, "OCR_PROVIDER_ERROR", "OCR provider failed.");
   }
 

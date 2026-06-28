@@ -117,6 +117,7 @@ test('영수증 사진은 OCR 분석 후 검토를 거쳐 기존 지출 입력�
   await expect(page.locator('#receipt-result-name')).toHaveValue('서울역 식당');
   await expect(page.locator('#receipt-result-date')).toHaveValue('2026-06-11T18:30');
   await expect(page.locator('#receipt-confidence')).toContainText('94%');
+  await expect(page.locator('#receipt-processing-badge')).toContainText('이미지 자동 최적화');
 
   await page.locator('#apply-receipt-result-btn').click();
 
@@ -128,7 +129,61 @@ test('영수증 사진은 OCR 분석 후 검토를 거쳐 기존 지출 입력�
 
   const calls = await page.evaluate(() => window.__SUPABASE_CALLS__);
   expect(calls.filter((call) => call.type === 'mutation')).toEqual([]);
-  expect(calls.some((call) => call.type === 'function' && call.name === 'scan-receipt' && call.body.hasImage)).toBe(true);
+  expect(calls.some((call) => (
+    call.type === 'function'
+    && call.name === 'scan-receipt'
+    && call.body.hasImage
+    && call.body.mimeType === 'image/jpeg'
+    && call.body.imageProcessing?.autoCropped === false
+  ))).toBe(true);
+});
+
+test('배경이 포함된 영수증 사진은 자동으로 모서리를 찾아 원근 보정한다', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = 1800;
+    const context = canvas.getContext('2d');
+    context.fillStyle = '#263449';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#f8f5e9';
+    context.beginPath();
+    context.moveTo(310, 120);
+    context.lineTo(940, 210);
+    context.lineTo(850, 1660);
+    context.lineTo(220, 1550);
+    context.closePath();
+    context.fill();
+    context.save();
+    context.translate(360, 280);
+    context.rotate(0.055);
+    context.fillStyle = '#172033';
+    context.font = 'bold 42px sans-serif';
+    context.fillText('TOKYO RECEIPT', 0, 0);
+    context.font = '30px sans-serif';
+    for (let line = 1; line <= 18; line += 1) {
+      context.fillText(`ITEM ${line}                 ${line * 310}`, 0, line * 58);
+    }
+    context.font = 'bold 52px sans-serif';
+    context.fillText('TOTAL 12,480', 0, 1180);
+    context.restore();
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+    const file = new File([blob], 'synthetic-receipt.jpg', { type: 'image/jpeg' });
+    const prepared = await window.SettleUpReceiptImage.prepare(file);
+    return {
+      autoCropped: prepared.autoCropped,
+      width: prepared.width,
+      height: prepared.height,
+      bytes: prepared.blob.size
+    };
+  });
+
+  expect(result.autoCropped).toBe(true);
+  expect(result.width).toBeLessThan(result.height);
+  expect(result.width).toBeLessThanOrEqual(1800);
+  expect(result.height).toBeLessThanOrEqual(1800);
+  expect(result.bytes).toBeLessThanOrEqual(2.5 * 1024 * 1024);
 });
 
 test('모바일 입력 확대를 막고 직접 분담 안내가 다크 테마를 따른다', async ({ page }) => {

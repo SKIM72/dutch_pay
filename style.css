@@ -409,6 +409,10 @@ button.expense-card-amount { cursor: pointer; border-bottom: 1px dashed var(--pr
 .receipt-review-layout { display: grid; grid-template-columns: minmax(190px, 0.72fr) minmax(0, 1.28fr); gap: 1rem; align-items: start; }
 .receipt-review-preview { min-height: 316px; max-height: 390px; align-items: stretch; }
 .receipt-review-preview img { min-height: 316px; max-height: 390px; }
+.receipt-processing-badge { position: absolute; top: 0.55rem; right: 0.55rem; min-height: 28px; padding: 0.32rem 0.55rem; border: 1px solid rgba(16, 185, 129, 0.32); border-radius: 999px; background: rgba(6, 78, 59, 0.88); color: #ecfdf5; display: inline-flex; align-items: center; font-size: 0.68rem; font-weight: 800; box-shadow: 0 8px 20px -14px rgba(15, 23, 42, 0.8); backdrop-filter: blur(8px); }
+.receipt-processing-badge::before { content: ""; width: 6px; height: 6px; margin-right: 0.35rem; border-radius: 50%; background: #6ee7b7; }
+.receipt-processing-badge.is-normalized { border-color: rgba(99, 102, 241, 0.35); background: rgba(49, 46, 129, 0.88); color: #eef2ff; }
+.receipt-processing-badge.is-normalized::before { background: #a5b4fc; }
 .receipt-file-name { position: absolute; left: 0.55rem; right: 0.55rem; bottom: 0.55rem; padding: 0.4rem 0.55rem; overflow: hidden; border-radius: 6px; background: rgba(15, 23, 42, 0.78); color: white; font-size: 0.7rem; text-overflow: ellipsis; white-space: nowrap; }
 .receipt-result-fields { display: grid; gap: 0.9rem; }
 .receipt-result-fields input, .receipt-result-fields select { min-height: 50px; }

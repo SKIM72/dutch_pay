@@ -30,7 +30,7 @@
     </script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=64">
+    <link rel="stylesheet" href="style.css?v=65">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -76,7 +76,7 @@
                 <h1>Settle Up</h1>
             </div>
             <div class="header-controls">
-                <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.06.28.1</span>
+                <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.06.28.2</span>
                 <div id="user-info-display" class="hidden" style="cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-muted); margin-right: 0.5rem; background: var(--side-bg); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid var(--border); max-width: 150px;" title="마이페이지 열기">
                     <i class="fas fa-user-circle"></i> <span id="user-email-text" style="display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;"></span>
                 </div>
@@ -671,6 +671,7 @@
                     <div class="receipt-review-layout">
                         <div class="receipt-preview-frame receipt-review-preview">
                             <img id="receipt-review-image" alt="">
+                            <span id="receipt-processing-badge" class="receipt-processing-badge hidden"></span>
                             <span id="receipt-file-name" class="receipt-file-name"></span>
                         </div>
 
@@ -852,8 +853,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="locales.js?v=36"></script>
-    <script src="main.js?v=102"></script>
+    <script src="locales.js?v=37"></script>
+    <script src="receipt-image.js?v=1"></script>
+    <script src="main.js?v=103"></script>
     <script src="chat.js?v=33"></script>
 </body>
 </html>

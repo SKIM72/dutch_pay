@@ -1,4 +1,4 @@
-const CACHE_NAME = 'settle-up-cache-v136';
+const CACHE_NAME = 'settle-up-cache-v137';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const PRECACHE_URLS = [
   './manifest.json',
   './style.css',
   './main.js',
+  './receipt-image.js',
   './chat.js',
   './auth.js',
   './locales.js',
