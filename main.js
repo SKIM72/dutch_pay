@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.28.3';
+    const APP_VERSION = 'v2026.06.29.1';
     const THEME_STORAGE_KEY = 'settleup-theme-mode';
     const VALID_THEME_MODES = new Set(['system', 'light', 'dark']);
     const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -444,6 +444,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
     }
 
+    function dismissVirtualKeyboard() {
+        const activeElement = document.activeElement;
+        if (activeElement instanceof HTMLElement) activeElement.blur();
+        try {
+            navigator.virtualKeyboard?.hide?.();
+        } catch (_) {}
+    }
+
     function showReceiptStep(stepName) {
         if (receiptSourceStep) receiptSourceStep.classList.toggle('hidden', stepName !== 'source');
         if (receiptAnalysisStep) receiptAnalysisStep.classList.toggle('hidden', stepName !== 'analysis');
@@ -684,12 +692,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             itemCurrencySelect.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
+        dismissVirtualKeyboard();
         closeReceiptScanModal();
         showToast(
-            getLocale('receiptApplied', '영수증 결과를 입력칸에 적용했습니다. 기록하기 전에 내용을 확인해 주세요.'),
+            getLocale('receiptApplied', '영수증 내용을 입력했어요. 저장 전에 확인해 주세요.'),
             'success'
         );
-        if (itemAmountInput) itemAmountInput.focus();
+        requestAnimationFrame(() => {
+            itemAmountInput?.closest('#expense-form-card')?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        });
     }
 
     function showConfirm(message) {
@@ -1053,6 +1067,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         return url.toString();
     }
 
+    function getSettlementShareSummary(settlement) {
+        const expenses = Array.isArray(settlement?.expenses) ? settlement.expenses : [];
+        const participants = Array.isArray(settlement?.participants) ? settlement.participants : [];
+        const currency = settlement?.base_currency || 'JPY';
+        const totalAmount = expenses.reduce(
+            (sum, expense) => sum + (Number(expense?.amount) || 0),
+            0
+        );
+        return {
+            currency,
+            totalAmount,
+            participantCount: participants.length,
+            expenseCount: expenses.length
+        };
+    }
+
+    function buildSettlementShareMessage(settlement) {
+        const shareUrl = getSettlementShareUrl(settlement);
+        const { currency, totalAmount, participantCount, expenseCount } = getSettlementShareSummary(settlement);
+        const title = String(settlement?.title || 'Settle Up').trim();
+        const status = settlement?.is_settled
+            ? getLocale('shareStatusDone', '정산 완료')
+            : getLocale('shareStatusActive', '정산 진행 중');
+
+        if (currentLang === 'ja') {
+            return `🧾 ${title} 精算内容\n${status} · 合計 ${formatNumber(totalAmount, currency)} ${currency}\n参加者 ${participantCount}人 · 支出 ${expenseCount}件\nログイン前でも読み取り専用で内容を確認できます。\n${shareUrl}`;
+        }
+        if (currentLang === 'en') {
+            return `🧾 ${title} settlement\n${status} · Total ${formatNumber(totalAmount, currency)} ${currency}\n${participantCount} people · ${expenseCount} expenses\nOpen the read-only preview before signing in.\n${shareUrl}`;
+        }
+        return `🧾 ${title} 정산 내역\n${status} · 총 지출 ${formatNumber(totalAmount, currency)} ${currency}\n참가자 ${participantCount}명 · 지출 ${expenseCount}건\n로그인 전에도 읽기 전용으로 안전하게 확인할 수 있어요.\n${shareUrl}`;
+    }
+
     function normalizeInviteCode(code) {
         const normalized = String(code || '').trim().toUpperCase();
         return normalized || null;
@@ -1129,9 +1176,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     function openShareModal() {
         if(!currentSettlement) return;
         const shareUrl = getSettlementShareUrl(currentSettlement);
+        const { currency, totalAmount, participantCount, expenseCount } = getSettlementShareSummary(currentSettlement);
         
         const shareLinkInput = document.getElementById('share-link-input');
         if(shareLinkInput) shareLinkInput.value = shareUrl;
+        const shareRoomTitle = document.getElementById('share-room-title');
+        const shareRoomMeta = document.getElementById('share-room-meta');
+        if (shareRoomTitle) {
+            shareRoomTitle.textContent = getLocale('shareSettlementTitle', '{title} 정산 내역')
+                .replace('{title}', currentSettlement.title);
+        }
+        if (shareRoomMeta) {
+            shareRoomMeta.textContent = `${formatNumber(totalAmount, currency)} ${currency} · ${participantCount}명 · ${expenseCount}건`;
+        }
         
         const inviteCode = getSettlementInviteCode(currentSettlement);
         
@@ -1155,6 +1212,34 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const shareModal = document.getElementById('share-modal');
         if(shareModal) shareModal.classList.remove('hidden');
+    }
+
+    async function shareSettlementInvite() {
+        if (!currentSettlement) return;
+        const shareUrl = getSettlementShareUrl(currentSettlement);
+        const shareText = buildSettlementShareMessage(currentSettlement);
+        const shareTitle = `${currentSettlement.title} 정산 내역`;
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: shareTitle,
+                    text: shareText.replace(`\n${shareUrl}`, ''),
+                    url: shareUrl
+                });
+                return;
+            } catch (error) {
+                if (error?.name === 'AbortError') return;
+            }
+        }
+
+        const copied = await fallbackCopyTextToClipboard(shareText);
+        showToast(
+            copied
+                ? getLocale('shareMessageCopied', '정산 정보와 초대 링크를 복사했어요.')
+                : getLocale('copyFailed', '복사에 실패했습니다.'),
+            copied ? 'success' : 'error'
+        );
     }
 
     function sendEmailInvite() {
@@ -1725,8 +1810,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         let ogUrl = document.querySelector('meta[property="og:url"]');
 
         const shareUrl = getSettlementShareUrl(settlement);
-        const titleText = `💸 [${settlement.title}] 정산이 도착했어요!`;
-        const descText = "내야 할 금액을 확인하고 간편하게 송금하세요.";
+        const titleText = `${settlement.title} 정산 내역 | Settle Up`;
+        const descText = "로그인 전에도 읽기 전용으로 정산 내역을 안전하게 확인할 수 있어요.";
 
         if (ogTitle) ogTitle.content = titleText;
         if (ogDesc) ogDesc.content = descText;
@@ -3416,9 +3501,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(openShareModalBtn) openShareModalBtn.addEventListener('click', openShareModal);
         
         const copyShareLinkBtn = document.getElementById('copy-share-link-btn');
-        if(copyShareLinkBtn) copyShareLinkBtn.addEventListener('click', () => {
-            fallbackCopyTextToClipboard(document.getElementById('share-link-input').value);
-            showToast('링크가 복사되었습니다.', 'success');
+        if(copyShareLinkBtn) copyShareLinkBtn.addEventListener('click', async () => {
+            if (!currentSettlement) return;
+            const copied = await fallbackCopyTextToClipboard(buildSettlementShareMessage(currentSettlement));
+            showToast(
+                copied
+                    ? getLocale('shareMessageCopied', '정산 정보와 초대 링크를 복사했어요.')
+                    : getLocale('copyFailed', '복사에 실패했습니다.'),
+                copied ? 'success' : 'error'
+            );
         });
 
         const copyShareCodeBtn = document.getElementById('copy-share-code-btn');
@@ -3429,6 +3520,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         const shareEmailBtn = document.getElementById('share-email-btn');
         if(shareEmailBtn) shareEmailBtn.addEventListener('click', sendEmailInvite);
+        const shareNativeBtn = document.getElementById('share-native-btn');
+        if(shareNativeBtn) shareNativeBtn.addEventListener('click', shareSettlementInvite);
 
         if(openJoinModalBtn) openJoinModalBtn.addEventListener('click', openJoinModal);
 

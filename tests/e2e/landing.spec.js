@@ -16,7 +16,7 @@ test('소개 화면에서 로그인 폼으로 자연스럽게 전환된다', asy
     'content',
     'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
   );
-  await expect(page.locator('#app-version-badge')).toHaveText('v2026.06.28.3');
+  await expect(page.locator('#app-version-badge')).toHaveText('v2026.06.29.1');
   await expect(page.locator('.hero-section h1')).toBeVisible();
 
   await page.locator('#hero-start-btn').click();
@@ -24,6 +24,21 @@ test('소개 화면에서 로그인 폼으로 자연스럽게 전환된다', asy
   await expect(page.locator('#landing-view')).toBeHidden();
   await expect(page.locator('#auth-wrapper')).toBeVisible();
   await expect(page.locator('#login-view')).toBeVisible();
+});
+
+test('공유 기본 카드는 신뢰할 수 있는 정산 초대 문구와 서비스 화면 이미지를 사용한다', async ({ request }) => {
+  const response = await request.get('/index.html');
+  const html = await response.text();
+
+  expect(html).toContain(
+    '<meta property="og:title" content="Settle Up 정산 초대 | 여행 정산 내역 확인">'
+  );
+  expect(html).toContain(
+    '<meta property="og:description" content="초대받은 여행 정산 내역을 로그인 없이 읽기 전용으로 안전하게 확인하세요.">'
+  );
+  expect(html).toContain(
+    '<meta property="og:image" content="https://settleupweb.cloud/photo1.png">'
+  );
 });
 
 test('시스템 다크 모드가 소개 화면에 즉시 반영된다', async ({ page }) => {
