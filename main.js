@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.28.2';
+    const APP_VERSION = 'v2026.06.28.3';
     const THEME_STORAGE_KEY = 'settleup-theme-mode';
     const VALID_THEME_MODES = new Set(['system', 'light', 'dark']);
     const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -2785,28 +2785,140 @@ document.addEventListener('DOMContentLoaded', async () => {
         else showToast('복사에 실패했습니다.', 'error');
     }
 
+    function buildSettlementCaptureReport() {
+        const { title, date, participants, expenses, base_currency, is_settled } = currentSettlement;
+        const sortedExpenses = getSortedExpenses(expenses);
+        const totalAmount = expenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
+        const { transfers } = calculateMinimumTransfers(expenses, participants);
+        const report = document.createElement('section');
+        report.className = 'settlement-capture-report';
+        report.setAttribute('aria-hidden', 'true');
+
+        const transferLabel = is_settled
+            ? getLocale('finalSettlement', '최종 정산')
+            : getLocale('expectedSettlement', '예상 정산');
+        const transfersHtml = transfers.length
+            ? transfers.map((transfer) => `
+                <div class="capture-transfer-item">
+                    <span class="capture-transfer-route">
+                        <strong>${escapeHTML(transfer.from)}</strong>
+                        <span aria-hidden="true">→</span>
+                        <strong>${escapeHTML(transfer.to)}</strong>
+                    </span>
+                    <b>${escapeHTML(formatNumber(transfer.amount, base_currency))} ${escapeHTML(base_currency)}</b>
+                </div>
+            `).join('')
+            : `<div class="capture-balanced-state">${escapeHTML(getLocale(
+                is_settled ? 'settlementDone' : 'balancedEstimate',
+                '추가 송금 없이 정산이 맞아요.'
+            ))}</div>`;
+
+        const expensesHtml = sortedExpenses.map((expense) => {
+            const originalAmount = `${formatNumber(expense.original_amount, expense.currency)} ${expense.currency}`;
+            const convertedAmount = expense.currency !== base_currency
+                ? `<small>${escapeHTML(formatNumber(expense.amount, base_currency))} ${escapeHTML(base_currency)}</small>`
+                : '';
+            const shares = participants.map((participant) => `
+                <div class="capture-share-item">
+                    <span>${escapeHTML(participant)}</span>
+                    <strong>${escapeHTML(formatNumber(expense.shares?.[participant] || 0, base_currency))} ${escapeHTML(base_currency)}</strong>
+                </div>
+            `).join('');
+
+            return `
+                <article class="capture-expense-item">
+                    <div class="capture-expense-main">
+                        <div class="capture-expense-title">
+                            <span>${escapeHTML(getExpenseDateLabel(expense))}</span>
+                            <h3>${escapeHTML(expense.name)}</h3>
+                        </div>
+                        <div class="capture-expense-amount">
+                            <strong>${escapeHTML(originalAmount)}</strong>
+                            ${convertedAmount}
+                            <span>${escapeHTML(getLocale('payer', '결제자'))} · ${escapeHTML(expense.payer)}</span>
+                        </div>
+                    </div>
+                    <div class="capture-share-grid">${shares}</div>
+                </article>
+            `;
+        }).join('');
+
+        report.innerHTML = `
+            <header class="capture-report-header">
+                <div>
+                    <span class="capture-report-brand">SETTLE UP</span>
+                    <h1>${escapeHTML(title)}</h1>
+                </div>
+                <div class="capture-report-date">
+                    <span>${escapeHTML(getLocale('settlementDate', '정산 날짜'))}</span>
+                    <strong>${escapeHTML(formatDisplayDate(date))}</strong>
+                </div>
+            </header>
+            <section class="capture-summary">
+                <div class="capture-summary-total">
+                    <span>${escapeHTML(getLocale('settlementResult', '정산 결과'))}</span>
+                    <small>${escapeHTML(getLocale('totalExpense', '총 지출'))}</small>
+                    <div>
+                        <strong>${escapeHTML(formatNumber(totalAmount, base_currency))}</strong>
+                        <b>${escapeHTML(base_currency)}</b>
+                    </div>
+                    <p>
+                        <span>${escapeHTML(getLocale('summaryParticipants', '참가자 {count}명').replace('{count}', participants.length))}</span>
+                        <span>${escapeHTML(getLocale('summaryExpenses', '지출 {count}건').replace('{count}', expenses.length))}</span>
+                    </p>
+                </div>
+                <div class="capture-summary-transfers">
+                    <h2>${escapeHTML(transferLabel)}</h2>
+                    <div class="capture-transfer-grid">${transfersHtml}</div>
+                </div>
+            </section>
+            <section class="capture-expenses">
+                <div class="capture-section-heading">
+                    <h2>${escapeHTML(getLocale('detailedExpenseList', '상세 지출 내역'))}</h2>
+                    <span>${escapeHTML(getLocale('expenseCount', '{count}건').replace('{count}', expenses.length))}</span>
+                </div>
+                <div class="capture-expense-list">${expensesHtml}</div>
+            </section>
+            <footer class="capture-report-footer">
+                <span>Settle Up</span>
+                <span>${escapeHTML(new Date().toLocaleString(
+                    currentLang === 'ja' ? 'ja-JP' : (currentLang === 'en' ? 'en-US' : 'ko-KR')
+                ))}</span>
+            </footer>
+        `;
+        return report;
+    }
+
+    function getSafeCaptureFileName(value) {
+        const safeName = String(value || 'settlement')
+            .replace(/[\\/:*?"<>|]/g, '_')
+            .replace(/\s+/g, ' ')
+            .trim();
+        return safeName || 'settlement';
+    }
+
     async function saveAsImage() {
         if (!currentSettlement) return;
         setLoading(true);
-        const targetView = document.getElementById('calculator'); 
-        const rightPane = document.getElementById('right-pane');
-        const oldOverflow = rightPane.style.overflowY; 
-        rightPane.style.overflowY = 'visible';
-        
-        targetView.classList.add('capture-mode');
+        const report = buildSettlementCaptureReport();
+        document.body.appendChild(report);
+
         if (document.fonts && document.fonts.ready) await document.fonts.ready;
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        
+
         try {
-            const dataUrl = await htmlToImage.toPng(targetView, { 
-                backgroundColor: '#ffffff', 
+            const reportWidth = 1120;
+            const reportHeight = report.scrollHeight;
+            const pixelRatio = Math.max(1, Math.min(2, 15000 / Math.max(1, reportHeight)));
+            const dataUrl = await htmlToImage.toPng(report, {
+                backgroundColor: '#ffffff',
                 cacheBust: true,
-                pixelRatio: window.devicePixelRatio > 1 ? window.devicePixelRatio + 1 : 3, 
-                width: targetView.scrollWidth, 
-                height: targetView.scrollHeight,
+                pixelRatio,
+                width: reportWidth,
+                height: reportHeight,
                 filter: (node) => {
                     if (node.tagName === 'LINK' && node.href && node.href.includes('font-awesome')) {
-                        return false; 
+                        return false;
                     }
                     return true;
                 }
@@ -2814,17 +2926,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             const now = new Date(); 
             const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
             const link = document.createElement('a'); 
-            link.download = `SettleUp_${currentSettlement.title}_${timestamp}.png`; 
+            link.download = `SettleUp_${getSafeCaptureFileName(currentSettlement.title)}_${timestamp}.png`;
             link.href = dataUrl; 
             link.click();
             showToast('이미지가 성공적으로 저장되었습니다!', 'success');
         } catch(err) { 
             console.error("이미지 캡처 에러: ", err);
             showToast("이미지 저장에 실패했습니다. (브라우저 보안 설정 때문일 수 있습니다)", 'error'); 
-        } finally { 
-            targetView.classList.remove('capture-mode'); 
-            rightPane.style.overflowY = oldOverflow; 
-            setLoading(false); 
+        } finally {
+            report.remove();
+            setLoading(false);
         }
     }
 

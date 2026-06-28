@@ -16,7 +16,7 @@ test('소개 화면에서 로그인 폼으로 자연스럽게 전환된다', asy
     'content',
     'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
   );
-  await expect(page.locator('#app-version-badge')).toHaveText('v2026.06.28.2');
+  await expect(page.locator('#app-version-badge')).toHaveText('v2026.06.28.3');
   await expect(page.locator('.hero-section h1')).toBeVisible();
 
   await page.locator('#hero-start-btn').click();

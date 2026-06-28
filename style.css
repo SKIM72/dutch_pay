@@ -463,54 +463,60 @@ html[data-theme="dark"] .modal-tool-card .remove-participant-btn:hover { backgro
 .calc-result-numbers i { color: var(--border); }
 .calc-result-numbers .text-primary-bold { color: var(--text-main); font-weight: 800; }
 
-.capture-mode {
-    --side-bg: #f8fafc;
-    --main-bg: #ffffff;
-    --app-bg: #f1f5f9;
-    --primary: #6366f1;
-    --primary-hover: #4f46e5;
-    --primary-soft: #eef2ff;
-    --primary-soft-border: #c7d2fe;
-    --text-main: #1e293b;
-    --text-muted: #64748b;
-    --border: #e2e8f0;
-    --surface: #ffffff;
-    --surface-muted: #f8fafc;
-    --hover-bg: #f8fafc;
-    min-width: 800px !important;
-    width: max-content !important;
-    max-width: none !important;
-    background: #ffffff !important;
-    color: #1e293b !important;
+.settlement-capture-report {
+    position: fixed;
+    top: 0;
+    left: -100000px;
+    z-index: -1;
+    width: 1120px;
+    padding: 56px;
+    box-sizing: border-box;
+    background: #ffffff;
+    color: #1e293b;
     color-scheme: light;
-    padding: 40px !important;
-    box-sizing: border-box !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", "Noto Sans JP", sans-serif;
+    letter-spacing: 0;
 }
-/* 🚀 [수정됨] 이미지 저장 시 버튼들을 모두 숨기도록 선택자 추가 */
-.capture-mode .header-action-group, 
-.capture-mode #exchange-rate-info-btn, 
-.capture-mode #expense-form-card, 
-.capture-mode .expense-list-actions,
-.capture-mode th:last-child, 
-.capture-mode td:last-child, 
-.capture-mode #complete-settlement-btn, 
-.capture-mode .transfer-pay-actions { display: none !important; }
-.capture-mode i, .capture-mode .fas, .capture-mode .far, .capture-mode .fab { display: none !important; }
-.capture-mode .settlement-header { flex-direction: row !important; align-items: center !important; border-bottom: 2px solid #e2e8f0 !important; padding-bottom: 1.5rem !important; margin-bottom: 2rem !important; }
-.capture-mode #settlement-display { color: #1e293b !important; font-size: 2.2rem !important; white-space: nowrap !important; }
-.capture-mode .card { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
-.capture-mode #summary-card { background: #5b61e8 !important; color: #ffffff !important; padding: 2.5rem 2rem !important; border-radius: 8px !important; margin-bottom: 2.5rem !important; flex-direction: row !important; }
-.capture-mode #summary-card h2, .capture-mode #total-expense, .capture-mode #final-settlement-container, .capture-mode #final-settlement-container * { color: #ffffff !important; }
-.capture-mode .transfer-item { border-color: rgba(255, 255, 255, 0.2) !important; background: rgba(255, 255, 255, 0.1) !important; }
-.capture-mode .summary-meta span { background: rgba(255, 255, 255, 0.16) !important; color: rgba(255, 255, 255, 0.94) !important; }
-.capture-mode .summary-right { text-align: right !important; margin-top: 0 !important; }
-.capture-mode #expense-list-card { background: #ffffff !important; color: #1e293b !important; }
-.capture-mode #expense-list-card h2 { color: #1e293b !important; }
-.capture-mode #expense-table-container { overflow: visible !important; }
-.capture-mode #expense-table { width: 100% !important; table-layout: auto !important; background: #ffffff !important; color: #1e293b !important; }
-.capture-mode #expense-table th { background: #f8fafc !important; color: #64748b !important; border-bottom-color: #e2e8f0 !important; }
-.capture-mode #expense-table td { background: #ffffff !important; color: #1e293b !important; border-bottom-color: #e2e8f0 !important; }
-.capture-mode .clickable-amount { border-bottom: none !important; color: #1e293b !important; cursor: default !important; }
+.capture-report-header { min-height: 108px; padding-bottom: 28px; border-bottom: 2px solid #e2e8f0; display: flex; align-items: flex-end; justify-content: space-between; gap: 2rem; }
+.capture-report-brand { color: #6366f1; font-size: 13px; line-height: 1; font-weight: 900; }
+.capture-report-header h1 { max-width: 760px; margin-top: 12px; color: #172033; font-size: 38px; line-height: 1.2; font-weight: 900; word-break: break-word; }
+.capture-report-date { flex-shrink: 0; text-align: right; }
+.capture-report-date span { display: block; color: #94a3b8; font-size: 13px; font-weight: 700; }
+.capture-report-date strong { display: block; margin-top: 6px; color: #475569; font-size: 17px; }
+.capture-summary { margin-top: 34px; padding: 34px; border-radius: 8px; background: #5659e6; color: #ffffff; display: grid; grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr); gap: 34px; }
+.capture-summary-total { display: flex; flex-direction: column; justify-content: center; }
+.capture-summary-total > span { font-size: 17px; font-weight: 800; }
+.capture-summary-total > small { margin-top: 22px; color: rgba(255, 255, 255, 0.72); font-size: 13px; font-weight: 700; }
+.capture-summary-total > div { margin-top: 5px; display: flex; align-items: baseline; gap: 10px; }
+.capture-summary-total > div strong { font-size: 44px; line-height: 1.1; font-weight: 900; }
+.capture-summary-total > div b { font-size: 18px; }
+.capture-summary-total p { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px; }
+.capture-summary-total p span { padding: 6px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.16); color: rgba(255, 255, 255, 0.94); font-size: 12px; font-weight: 800; }
+.capture-summary-transfers h2 { margin-bottom: 12px; text-align: right; color: #ffffff; font-size: 17px; }
+.capture-transfer-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.capture-transfer-item { min-width: 0; min-height: 72px; padding: 14px 16px; border: 1px dashed rgba(255, 255, 255, 0.24); border-radius: 8px; background: rgba(255, 255, 255, 0.09); display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+.capture-transfer-route { min-width: 0; display: flex; align-items: center; gap: 7px; color: rgba(255, 255, 255, 0.88); font-size: 13px; }
+.capture-transfer-route strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.capture-transfer-item > b { color: #ffffff; font-size: 16px; }
+.capture-balanced-state { grid-column: 1 / -1; padding: 22px; border: 1px dashed rgba(255, 255, 255, 0.24); border-radius: 8px; background: rgba(255, 255, 255, 0.1); text-align: center; color: #ffffff; font-weight: 800; }
+.capture-expenses { margin-top: 42px; }
+.capture-section-heading { padding-bottom: 15px; border-bottom: 2px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; }
+.capture-section-heading h2 { color: #1e293b; font-size: 24px; }
+.capture-section-heading span { padding: 5px 10px; border-radius: 999px; background: #eef2ff; color: #4f46e5; font-size: 12px; font-weight: 800; }
+.capture-expense-list { display: grid; gap: 14px; margin-top: 18px; }
+.capture-expense-item { padding: 20px; border: 1px solid #dce4ef; border-radius: 8px; background: #ffffff; break-inside: avoid; }
+.capture-expense-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: start; }
+.capture-expense-title span { color: #94a3b8; font-size: 12px; font-weight: 700; }
+.capture-expense-title h3 { margin-top: 5px; color: #1e293b; font-size: 18px; line-height: 1.35; word-break: break-word; }
+.capture-expense-amount { min-width: 180px; text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.capture-expense-amount > strong { color: #4f46e5; font-size: 19px; }
+.capture-expense-amount > small { color: #64748b; font-size: 12px; font-weight: 700; }
+.capture-expense-amount > span { margin-top: 4px; color: #64748b; font-size: 12px; }
+.capture-share-grid { margin-top: 16px; padding-top: 14px; border-top: 1px solid #e2e8f0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.capture-share-item { min-width: 0; padding: 10px 12px; border-radius: 6px; background: #f8fafc; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.capture-share-item span { overflow: hidden; color: #64748b; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.capture-share-item strong { flex-shrink: 0; color: #334155; font-size: 12px; }
+.capture-report-footer { margin-top: 34px; padding-top: 18px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; color: #94a3b8; font-size: 11px; font-weight: 700; }
 
 @container calculator (max-width: 760px) {
     #calculator:not(.capture-mode) #summary-card {
