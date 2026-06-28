@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.27.2';
+    const APP_VERSION = 'v2026.06.28.1';
     const THEME_STORAGE_KEY = 'settleup-theme-mode';
     const VALID_THEME_MODES = new Set(['system', 'light', 'dark']);
     const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -153,6 +153,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const userInfoDisplay = document.getElementById('user-info-display');
     const userEmailText = document.getElementById('user-email-text');
     const sidebar = document.getElementById('left-pane');
+    const sidebarBackdrop = document.getElementById('sidebar-backdrop');
     const appTitle = document.querySelector('.brand-container');
     const mobileMenuBtn = document.getElementById('mobile-menu-btn');
     const settlementListContainer = document.getElementById('settlement-list-container');
@@ -260,6 +261,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     const qrScannerModal = document.getElementById('qr-scanner-modal');
     const closeQrBtn = document.getElementById('close-qr-btn');
     let kickSubscription = null; 
+
+    function updateSidebarVisualState() {
+        if (!sidebar) return;
+
+        const isCollapsed = sidebar.classList.contains('collapsed');
+        const isOverlayOpen = window.innerWidth <= 768
+            && !isCollapsed
+            && !sidebar.classList.contains('hidden');
+
+        if (sidebarBackdrop) {
+            sidebarBackdrop.classList.toggle('is-visible', isOverlayOpen);
+            sidebarBackdrop.setAttribute('aria-hidden', String(!isOverlayOpen));
+        }
+        document.body.classList.toggle('sidebar-open', isOverlayOpen);
+
+        if (mobileMenuBtn) {
+            mobileMenuBtn.setAttribute('aria-expanded', String(!isCollapsed));
+            mobileMenuBtn.setAttribute(
+                'aria-label',
+                isCollapsed
+                    ? getLocale('openSettlementMenu', '정산 목록 열기')
+                    : getLocale('closeSettlementMenu', '정산 목록 닫기')
+            );
+            const icon = mobileMenuBtn.querySelector('i');
+            if (icon) {
+                icon.classList.toggle('fa-bars', isCollapsed);
+                icon.classList.toggle('fa-times', !isCollapsed);
+            }
+        }
+    }
+
+    function setSidebarCollapsed(isCollapsed) {
+        if (!sidebar) return;
+        sidebar.classList.toggle('collapsed', isCollapsed);
+        updateSidebarVisualState();
+    }
 
     // 인앱 브라우저 강제 탈출 및 CleanURL 적용 로직
     function redirectToExternalBrowser(targetPage, isReplace = false) {
@@ -688,8 +725,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function getJoinedRooms() { 
-        try { return JSON.parse(localStorage.getItem(getStorageKey('joinedRooms')) || '[]'); } 
+        try {
+            const rooms = JSON.parse(localStorage.getItem(getStorageKey('joinedRooms')) || '[]');
+            return Array.isArray(rooms) ? rooms : [];
+        }
         catch (e) { localStorage.removeItem(getStorageKey('joinedRooms')); return []; }
+    }
+
+    function saveJoinedRooms(roomIds) {
+        const normalizedIds = [...new Set((roomIds || [])
+            .map(roomId => Number(roomId))
+            .filter(Number.isSafeInteger))];
+        localStorage.setItem(getStorageKey('joinedRooms'), JSON.stringify(normalizedIds));
+        return normalizedIds;
+    }
+
+    async function getSyncedJoinedRooms() {
+        const localRoomIds = getJoinedRooms();
+        if (!currentUser) return localRoomIds;
+
+        try {
+            const { data, error } = await safeDB(supabaseClient
+                .from('settlement_members')
+                .select('settlement_id')
+                .eq('user_id', currentUser.id));
+
+            if (error) {
+                console.error('멤버십 목록 동기화 실패:', error);
+                return localRoomIds;
+            }
+
+            const serverRoomIds = (data || []).map(member => member.settlement_id);
+            return saveJoinedRooms([...localRoomIds, ...serverRoomIds]);
+        } catch (error) {
+            console.error('멤버십 목록 동기화 실패:', error);
+            return localRoomIds;
+        }
     }
     
     function saveJoinedRoom(roomId) {
@@ -1009,6 +1080,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (calculatorView) calculatorView.classList.toggle('public-preview-mode', isGuestPreview);
         if (sidebar) sidebar.classList.toggle('hidden', isGuestPreview);
         if (mobileMenuBtn) mobileMenuBtn.classList.toggle('hidden', isGuestPreview);
+        updateSidebarVisualState();
         if (joinRoomBtn) joinRoomBtn.classList.add('hidden');
         if (publicPreviewBanner) publicPreviewBanner.classList.toggle('hidden', !isGuestPreview);
         [openShareModalBtn, copyTextBtn, saveImageBtn, downloadExcelBtn, viewParticipantsBtn].forEach(el => {
@@ -1422,7 +1494,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     async function loadSingleSettlement(roomId) {
-        if (window.innerWidth > 768 && sidebar) sidebar.classList.add('collapsed'); 
+        if (window.innerWidth > 768 && sidebar) setSidebarCollapsed(true);
         
         try {
             const { data, error } = await safeDB(supabaseClient
@@ -1465,7 +1537,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
 
-        let joinedIds = getJoinedRooms();
+        let joinedIds = await getSyncedJoinedRooms();
         joinedIds = joinedIds.filter(id => !isBanned(id));
 
         if (joinedIds.length > 0) {
@@ -1679,7 +1751,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             item.classList.toggle('active', item.dataset.id == settlement.id);
         });
         
-        if (window.innerWidth <= 768 && sidebar) sidebar.classList.add('collapsed');
+        if (window.innerWidth <= 768 && sidebar) setSidebarCollapsed(true);
         if(itemDateInput) itemDateInput.value = getLocalISOString();
         
         const previewCode = normalizeInviteCode(new URLSearchParams(window.location.search).get('code') || settlement.invite_code);
@@ -3156,7 +3228,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
 
         if(languageSwitcher) languageSwitcher.addEventListener('change', (e) => setLanguage(e.target.value));
-        if(mobileMenuBtn) mobileMenuBtn.addEventListener('click', () => sidebar.classList.toggle('collapsed'));
+        if(mobileMenuBtn) {
+            mobileMenuBtn.addEventListener('click', () => {
+                setSidebarCollapsed(!sidebar.classList.contains('collapsed'));
+            });
+        }
+        if(sidebarBackdrop) {
+            sidebarBackdrop.addEventListener('click', () => setSidebarCollapsed(true));
+        }
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && window.innerWidth <= 768 && !sidebar?.classList.contains('collapsed')) {
+                setSidebarCollapsed(true);
+                mobileMenuBtn?.focus();
+            }
+        });
+        window.addEventListener('resize', updateSidebarVisualState);
+        updateSidebarVisualState();
         if(authBtn) authBtn.addEventListener('click', handleAuthClick); 
 
         // 🚀 [추가] "무료로 시작하기" 버튼 등 다른 진입점에도 인앱 강제 탈출 적용
