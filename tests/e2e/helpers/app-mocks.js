@@ -51,19 +51,54 @@ const PUBLIC_SETTLEMENT = {
 const SUPABASE_SDK_MOCK = `
 (() => {
   const createQuery = (table) => {
+    const filters = {};
+    let inFilter = null;
+
+    const resolveQuery = () => {
+      if (window.__AUTH_SESSION__) {
+        if (table === 'profiles') {
+          return { data: [{ nickname: '기기 동기화 사용자' }], error: null, count: 1 };
+        }
+        if (table === 'settlement_members') {
+          return { data: window.__MEMBERSHIP_ROWS__ || [], error: null, count: (window.__MEMBERSHIP_ROWS__ || []).length };
+        }
+        if (table === 'settlements') {
+          let rows = [...(window.__AUTH_SETTLEMENTS__ || [])];
+          if (filters.user_id !== undefined) {
+            rows = rows.filter((row) => row.user_id === filters.user_id);
+          }
+          if (inFilter) {
+            rows = rows.filter((row) => inFilter.values.map(String).includes(String(row[inFilter.column])));
+          }
+          return { data: rows, error: null, count: rows.length };
+        }
+      }
+      return { data: [], error: null, count: 0 };
+    };
+
     const query = {
       select() { return query; },
-      eq() { return query; },
+      eq(column, value) { filters[column] = value; return query; },
       neq() { return query; },
       gt() { return query; },
-      in() { return query; },
+      in(column, values) { inFilter = { column, values }; return query; },
       is() { return query; },
       order() { return query; },
       limit() { return query; },
-      single() { return Promise.resolve({ data: null, error: { message: 'MOCK_NOT_FOUND' } }); },
-      maybeSingle() { return Promise.resolve({ data: null, error: null }); },
+      single() {
+        const result = resolveQuery();
+        const row = Array.isArray(result.data) ? result.data[0] : result.data;
+        return Promise.resolve(row
+          ? { data: row, error: null }
+          : { data: null, error: { message: 'MOCK_NOT_FOUND' } });
+      },
+      maybeSingle() {
+        const result = resolveQuery();
+        const row = Array.isArray(result.data) ? result.data[0] : result.data;
+        return Promise.resolve({ data: row || null, error: null });
+      },
       then(resolve, reject) {
-        return Promise.resolve({ data: [], error: null, count: 0 }).then(resolve, reject);
+        return Promise.resolve(resolveQuery()).then(resolve, reject);
       }
     };
 
@@ -94,7 +129,7 @@ const SUPABASE_SDK_MOCK = `
 
   const client = {
     auth: {
-      getSession: async () => ({ data: { session: null }, error: null }),
+      getSession: async () => ({ data: { session: window.__AUTH_SESSION__ || null }, error: null }),
       onAuthStateChange: () => ({
         data: { subscription: { unsubscribe() {} } }
       }),
@@ -335,9 +370,12 @@ const CHAT_SUPABASE_SDK_MOCK = `
 })();
 `;
 
-async function installAppMocks(page, settlement = PUBLIC_SETTLEMENT) {
+async function installAppMocks(page, settlement = PUBLIC_SETTLEMENT, options = {}) {
   await page.addInitScript((fixture) => {
-    window.__PUBLIC_SETTLEMENT__ = fixture;
+    window.__PUBLIC_SETTLEMENT__ = fixture.settlement;
+    window.__AUTH_SESSION__ = fixture.session || null;
+    window.__MEMBERSHIP_ROWS__ = fixture.membershipRows || [];
+    window.__AUTH_SETTLEMENTS__ = fixture.authSettlements || [];
     window.__SUPABASE_CALLS__ = [];
     window.__AUTH_SCENARIO__ = {
       loginError: 'Invalid login credentials'
@@ -350,7 +388,12 @@ async function installAppMocks(page, settlement = PUBLIC_SETTLEMENT) {
         requestPermission: async () => 'denied'
       }
     });
-  }, settlement);
+  }, {
+    settlement,
+    session: options.session || null,
+    membershipRows: options.membershipRows || [],
+    authSettlements: options.authSettlements || []
+  });
 
   await page.route('**/@supabase/supabase-js@2', (route) => route.fulfill({
     status: 200,

@@ -2,7 +2,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
     let currentLang = 'ko';
     let authRequestPending = false;
-    const APP_VERSION = 'v2026.06.27.2';
+    const APP_VERSION = 'v2026.06.28.1';
     const THEME_STORAGE_KEY = 'settleup-theme-mode';
     const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
