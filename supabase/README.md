@@ -69,6 +69,12 @@ The report checks:
 compressed receipt image to Gemini for Korean and Japanese OCR. The function
 does not write receipt images to the database or Supabase Storage.
 
+Before upload, the browser detects the bright receipt region, removes the
+surrounding background, corrects perspective, and normalizes the result to a
+compact JPEG. If no reliable document outline is found, it falls back to a
+resized and contrast-adjusted copy instead of blocking the scan. Camera and
+gallery images use the same preprocessing path.
+
 Configure and deploy the function independently from database migrations:
 
 ```bash

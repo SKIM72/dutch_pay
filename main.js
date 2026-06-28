@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         const controller = new AbortController();
         const isReceiptScan = String(url).includes('/functions/v1/scan-receipt');
-        const timeoutId = setTimeout(() => controller.abort(), isReceiptScan ? 35000 : 6000);
+        const timeoutId = setTimeout(() => controller.abort(), isReceiptScan ? 55000 : 6000);
 
         try {
             const response = await fetch(url, { 
@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.28.1';
+    const APP_VERSION = 'v2026.06.28.2';
     const THEME_STORAGE_KEY = 'settleup-theme-mode';
     const VALID_THEME_MODES = new Set(['system', 'light', 'dark']);
     const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -240,6 +240,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const receiptGalleryInput = document.getElementById('receipt-gallery-input');
     const receiptAnalysisPreview = document.getElementById('receipt-analysis-preview');
     const receiptReviewImage = document.getElementById('receipt-review-image');
+    const receiptAnalysisStatus = document.getElementById('receipt-analysis-status');
+    const receiptProcessingBadge = document.getElementById('receipt-processing-badge');
     const receiptFileName = document.getElementById('receipt-file-name');
     const receiptResultAmount = document.getElementById('receipt-result-amount');
     const receiptResultCurrency = document.getElementById('receipt-result-currency');
@@ -250,6 +252,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const applyReceiptResultBtn = document.getElementById('apply-receipt-result-btn');
     let receiptPreviewUrl = '';
     let receiptScanRequestId = 0;
+    let receiptPreparedMeta = null;
     
     const editSettlementTitleBtn = document.getElementById('edit-settlement-title-btn');
     const editTitleModal = document.getElementById('edit-title-modal');
@@ -458,6 +461,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function resetReceiptScan({ clearFile = true } = {}) {
         receiptScanRequestId += 1;
+        receiptPreparedMeta = null;
         clearReceiptPreview();
         showReceiptStep('source');
         if (clearFile) {
@@ -465,6 +469,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (receiptGalleryInput) receiptGalleryInput.value = '';
         }
         if (receiptFileName) receiptFileName.textContent = '';
+        if (receiptProcessingBadge) {
+            receiptProcessingBadge.textContent = '';
+            receiptProcessingBadge.classList.add('hidden');
+            receiptProcessingBadge.classList.remove('is-normalized');
+        }
         if (receiptResultAmount) receiptResultAmount.value = '';
         if (receiptResultName) receiptResultName.value = '';
         if (receiptResultDate) receiptResultDate.value = '';
@@ -479,6 +488,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!receiptScanModal || !currentSettlement) return;
         resetReceiptScan();
         receiptScanModal.classList.remove('hidden');
+        window.SettleUpReceiptImage?.warmup?.();
     }
 
     function closeReceiptScanModal() {
@@ -499,58 +509,41 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    function loadReceiptImage(file) {
-        return new Promise((resolve, reject) => {
-            const image = new Image();
-            const objectUrl = URL.createObjectURL(file);
-            image.onload = () => {
-                URL.revokeObjectURL(objectUrl);
-                resolve(image);
-            };
-            image.onerror = () => {
-                URL.revokeObjectURL(objectUrl);
-                reject(new Error('IMAGE_DECODE_FAILED'));
-            };
-            image.src = objectUrl;
-        });
+    function updateReceiptAnalysisStatus(status) {
+        if (!receiptAnalysisStatus) return;
+        const messages = {
+            detecting: getLocale('receiptDetectingEdges', '영수증 모서리를 찾고 있어요.'),
+            optimizing: getLocale('receiptOptimizingImage', '기울기와 밝기를 보정하고 있어요.'),
+            recognizing: getLocale('receiptRecognizingText', '금액, 항목명, 지출 일시를 읽고 있어요.')
+        };
+        receiptAnalysisStatus.textContent = messages[status]
+            || getLocale('receiptAnalyzingDesc', '금액, 항목명, 지출 일시를 찾는 중입니다.');
     }
 
-    function canvasToBlob(canvas, quality) {
-        return new Promise((resolve, reject) => {
-            canvas.toBlob(
-                (blob) => blob ? resolve(blob) : reject(new Error('IMAGE_ENCODE_FAILED')),
-                'image/jpeg',
-                quality
-            );
-        });
+    function setReceiptPreview(blob, fileName) {
+        clearReceiptPreview();
+        receiptPreviewUrl = URL.createObjectURL(blob);
+        if (receiptAnalysisPreview) {
+            receiptAnalysisPreview.src = receiptPreviewUrl;
+            receiptAnalysisPreview.alt = fileName;
+        }
+        if (receiptReviewImage) {
+            receiptReviewImage.src = receiptPreviewUrl;
+            receiptReviewImage.alt = fileName;
+        }
     }
 
     async function prepareReceiptImage(file) {
-        const maxUploadBytes = 20 * 1024 * 1024;
-        const directUploadBytes = 4 * 1024 * 1024;
-        const directMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
-
-        if (file.size > maxUploadBytes) throw new Error('IMAGE_TOO_LARGE');
-        if (directMimeTypes.has(file.type) && file.size <= directUploadBytes) {
-            return { imageBase64: await fileToBase64(file), mimeType: file.type };
-        }
-
-        const image = await loadReceiptImage(file);
-        const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
-        const scale = Math.min(1, 2200 / longestSide);
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-        const context = canvas.getContext('2d', { alpha: false });
-        if (!context) throw new Error('CANVAS_UNAVAILABLE');
-        context.fillStyle = '#ffffff';
-        context.fillRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
-
-        let compressed = await canvasToBlob(canvas, 0.86);
-        if (compressed.size > directUploadBytes) compressed = await canvasToBlob(canvas, 0.7);
-        if (compressed.size > 6 * 1024 * 1024) throw new Error('IMAGE_TOO_LARGE');
-        return { imageBase64: await fileToBase64(compressed), mimeType: 'image/jpeg' };
+        const processor = window.SettleUpReceiptImage;
+        if (!processor?.prepare) throw new Error('IMAGE_PROCESSOR_UNAVAILABLE');
+        const prepared = await processor.prepare(file, {
+            autoCrop: true,
+            onStatus: updateReceiptAnalysisStatus
+        });
+        return {
+            ...prepared,
+            imageBase64: await fileToBase64(prepared.blob)
+        };
     }
 
     function normalizeReceiptDateForInput(value) {
@@ -560,7 +553,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return match ? `${match[1]}T${match[2]}` : '';
     }
 
-    function populateReceiptResult(file, result) {
+    function populateReceiptResult(file, result, preparedMeta) {
         const fallbackCurrency = currentSettlement?.base_currency || itemCurrencySelect?.value || 'JPY';
         const currency = SUPPORTED_CURRENCIES.includes(result.currency) ? result.currency : fallbackCurrency;
         const amount = Number(result.amount);
@@ -571,6 +564,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if (receiptResultDate) receiptResultDate.value = normalizeReceiptDateForInput(result.purchasedAt);
         if (receiptFileName) receiptFileName.textContent = file.name;
+        if (receiptProcessingBadge) {
+            const autoCropped = Boolean(preparedMeta?.autoCropped);
+            receiptProcessingBadge.textContent = autoCropped
+                ? getLocale('receiptAutoCropped', '모서리 자동 보정')
+                : getLocale('receiptImageOptimized', '이미지 자동 최적화');
+            receiptProcessingBadge.classList.remove('hidden');
+            receiptProcessingBadge.classList.toggle('is-normalized', !autoCropped);
+        }
 
         const confidence = Math.max(0, Math.min(1, Number(result.confidence) || 0));
         if (receiptConfidence) {
@@ -600,6 +601,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (code === 'OCR_NOT_CONFIGURED') {
             return getLocale('receiptNotConfigured', '영수증 OCR 설정이 아직 완료되지 않았습니다.');
         }
+        if (code === 'OCR_RATE_LIMITED' || code === 'RATE_LIMITED') {
+            return getLocale('receiptRateLimited', '요청이 많습니다. 잠시 후 다시 시도해 주세요.');
+        }
+        if (code === 'OCR_TIMEOUT' || error?.name === 'AbortError') {
+            return getLocale('receiptTimeout', '분석 시간이 초과되었습니다. 사진을 다시 선택해 주세요.');
+        }
+        if (code === 'OCR_PROVIDER_AUTH') {
+            return getLocale('receiptProviderConfigError', 'OCR 서비스 연결 설정을 확인해 주세요.');
+        }
         if (code === 'IMAGE_TOO_LARGE' || error?.message === 'IMAGE_TOO_LARGE') {
             return getLocale('receiptFileTooLarge', '사진 용량이 너무 큽니다. 20MB 이하 이미지를 선택해 주세요.');
         }
@@ -612,34 +622,37 @@ document.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
-        clearReceiptPreview();
-        receiptPreviewUrl = URL.createObjectURL(file);
-        if (receiptAnalysisPreview) {
-            receiptAnalysisPreview.src = receiptPreviewUrl;
-            receiptAnalysisPreview.alt = file.name;
-        }
-        if (receiptReviewImage) {
-            receiptReviewImage.src = receiptPreviewUrl;
-            receiptReviewImage.alt = file.name;
-        }
+        setReceiptPreview(file, file.name);
+        updateReceiptAnalysisStatus('detecting');
         showReceiptStep('analysis');
 
         const requestId = ++receiptScanRequestId;
         try {
             const preparedImage = await prepareReceiptImage(file);
+            if (requestId !== receiptScanRequestId) return;
+            receiptPreparedMeta = {
+                autoCropped: preparedImage.autoCropped,
+                cropAreaRatio: preparedImage.cropAreaRatio,
+                width: preparedImage.width,
+                height: preparedImage.height
+            };
+            setReceiptPreview(preparedImage.blob, file.name);
+            updateReceiptAnalysisStatus('recognizing');
             const fallbackCurrency = currentSettlement?.base_currency || itemCurrencySelect?.value || 'JPY';
             const { data, error } = await supabaseClient.functions.invoke('scan-receipt', {
                 body: {
-                    ...preparedImage,
+                    imageBase64: preparedImage.imageBase64,
+                    mimeType: preparedImage.mimeType,
                     locale: currentLang,
                     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul',
-                    fallbackCurrency
+                    fallbackCurrency,
+                    imageProcessing: receiptPreparedMeta
                 }
             });
             if (error) throw error;
             if (requestId !== receiptScanRequestId) return;
             if (!data?.result) throw new Error('OCR_NO_RESULT');
-            populateReceiptResult(file, data.result);
+            populateReceiptResult(file, data.result, receiptPreparedMeta);
             showReceiptStep('review');
         } catch (error) {
             console.error('Receipt scan failed:', error);
