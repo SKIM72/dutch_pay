@@ -1,4 +1,4 @@
-const CACHE_NAME = 'settle-up-cache-v137';
+const CACHE_NAME = 'settle-up-cache-v138';
 const PRECACHE_URLS = [
   './',
   './index.html',

@@ -423,7 +423,24 @@ async function installAppMocks(page, settlement = PUBLIC_SETTLEMENT, options = {
   await page.route('**/html-to-image.min.js', (route) => route.fulfill({
     status: 200,
     contentType: 'application/javascript',
-    body: 'window.htmlToImage={toPng:async()=>\"data:image/png;base64,\"};'
+    body: `
+      window.__CAPTURE_CALLS__ = [];
+      window.htmlToImage = {
+        toPng: async (node, options) => {
+          window.__CAPTURE_CALLS__.push({
+            className: node.className,
+            width: options.width,
+            height: options.height,
+            pixelRatio: options.pixelRatio,
+            tableCount: node.querySelectorAll('table').length,
+            expenseCount: node.querySelectorAll('.capture-expense-item').length,
+            shareCount: node.querySelectorAll('.capture-share-item').length,
+            transferCount: node.querySelectorAll('.capture-transfer-item').length
+          });
+          return 'data:image/png;base64,';
+        }
+      };
+    `
   }));
 
   await page.route('https://unpkg.com/html5-qrcode', (route) => route.fulfill({
