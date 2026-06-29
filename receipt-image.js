@@ -58,6 +58,36 @@
         return canvas;
     }
 
+    function cropCanvas(source, crop) {
+        const x = Math.max(0, Math.min(1, Number(crop?.x) || 0));
+        const y = Math.max(0, Math.min(1, Number(crop?.y) || 0));
+        const width = Math.max(0.05, Math.min(1 - x, Number(crop?.width) || 1));
+        const height = Math.max(0.05, Math.min(1 - y, Number(crop?.height) || 1));
+        const sourceX = Math.round(source.width * x);
+        const sourceY = Math.round(source.height * y);
+        const sourceWidth = Math.max(1, Math.round(source.width * width));
+        const sourceHeight = Math.max(1, Math.round(source.height * height));
+        const canvas = document.createElement('canvas');
+        canvas.width = sourceWidth;
+        canvas.height = sourceHeight;
+        const context = canvas.getContext('2d', { alpha: false });
+        if (!context) throw new Error('CANVAS_UNAVAILABLE');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(
+            source,
+            sourceX,
+            sourceY,
+            sourceWidth,
+            sourceHeight,
+            0,
+            0,
+            sourceWidth,
+            sourceHeight
+        );
+        return canvas;
+    }
+
     function calculateOtsuThreshold(histogram, totalPixels) {
         let weightedTotal = 0;
         for (let value = 0; value < 256; value += 1) weightedTotal += value * histogram[value];
@@ -444,9 +474,17 @@
         const sourceCanvas = createScaledCanvas(image, MAX_SOURCE_SIDE);
         let processedCanvas = sourceCanvas;
         let autoCropped = false;
+        let manuallyCropped = false;
         let cropAreaRatio = 0;
 
-        if (options.autoCrop !== false && Math.min(sourceCanvas.width, sourceCanvas.height) >= 500) {
+        if (options.crop) {
+            processedCanvas = cropCanvas(sourceCanvas, options.crop);
+            manuallyCropped = true;
+            cropAreaRatio = Math.max(
+                0,
+                Math.min(1, Number(options.crop.width) * Number(options.crop.height))
+            );
+        } else if (options.autoCrop !== false && Math.min(sourceCanvas.width, sourceCanvas.height) >= 500) {
             options.onStatus?.('detecting');
             const detectionCanvas = resizeCanvas(sourceCanvas, MAX_DETECTION_SIDE);
             const detection = detectReceiptCorners(detectionCanvas);
@@ -463,6 +501,7 @@
             blob: encoded.blob,
             mimeType: 'image/jpeg',
             autoCropped,
+            manuallyCropped,
             cropAreaRatio,
             width: encoded.canvas.width,
             height: encoded.canvas.height,

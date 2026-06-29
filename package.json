@@ -1,6 +1,6 @@
 {
   "name": "settle-up-web",
-  "version": "2026.6.28",
+  "version": "2026.6.29",
   "private": true,
   "scripts": {
     "serve": "http-server . -a 127.0.0.1 -p 4173 -c-1 --silent",

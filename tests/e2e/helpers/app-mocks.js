@@ -178,6 +178,18 @@ const SUPABASE_SDK_MOCK = `
     },
     rpc: async (name, args) => {
       window.__SUPABASE_CALLS__.push({ type: 'rpc', name, args });
+      if (name === 'get_friend_dashboard') {
+        return { data: window.__FRIEND_DASHBOARD__, error: null };
+      }
+      if (name === 'send_friend_request_by_code') {
+        return { data: 7001, error: null };
+      }
+      if (name === 'respond_friend_request' || name === 'remove_friend') {
+        return { data: null, error: null };
+      }
+      if (name === 'invite_friends_to_settlement') {
+        return { data: args?.p_friend_ids?.length || 0, error: null };
+      }
       if (name === 'get_public_settlement_by_invite_code') {
         return { data: window.__PUBLIC_SETTLEMENT__, error: null };
       }
@@ -377,6 +389,12 @@ async function installAppMocks(page, settlement = PUBLIC_SETTLEMENT, options = {
     window.__AUTH_SESSION__ = fixture.session || null;
     window.__MEMBERSHIP_ROWS__ = fixture.membershipRows || [];
     window.__AUTH_SETTLEMENTS__ = fixture.authSettlements || [];
+    window.__FRIEND_DASHBOARD__ = fixture.friendDashboard || {
+      friendCode: '',
+      friends: [],
+      incoming: [],
+      outgoing: []
+    };
     window.__SUPABASE_CALLS__ = [];
     window.__AUTH_SCENARIO__ = {
       loginError: 'Invalid login credentials'
@@ -393,7 +411,8 @@ async function installAppMocks(page, settlement = PUBLIC_SETTLEMENT, options = {
     settlement,
     session: options.session || null,
     membershipRows: options.membershipRows || [],
-    authSettlements: options.authSettlements || []
+    authSettlements: options.authSettlements || [],
+    friendDashboard: options.friendDashboard || null
   });
 
   await page.route('**/@supabase/supabase-js@2', (route) => route.fulfill({
@@ -427,8 +446,11 @@ async function installAppMocks(page, settlement = PUBLIC_SETTLEMENT, options = {
       window.__CAPTURE_CALLS__ = [];
       window.htmlToImage = {
         toPng: async (node, options) => {
+          const bounds = node.getBoundingClientRect();
           window.__CAPTURE_CALLS__.push({
             className: node.className,
+            stageClassName: node.parentElement?.className || '',
+            bounds: { top: bounds.top, left: bounds.left, width: bounds.width, height: bounds.height },
             width: options.width,
             height: options.height,
             pixelRatio: options.pixelRatio,
@@ -437,7 +459,7 @@ async function installAppMocks(page, settlement = PUBLIC_SETTLEMENT, options = {
             shareCount: node.querySelectorAll('.capture-share-item').length,
             transferCount: node.querySelectorAll('.capture-transfer-item').length
           });
-          return 'data:image/png;base64,';
+          return 'data:image/png;base64,iVBORw0KGgo=';
         }
       };
     `
