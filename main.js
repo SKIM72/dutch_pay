@@ -189,6 +189,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const copyFriendCodeBtn = document.getElementById('copy-friend-code-btn');
     const friendCodeInput = document.getElementById('friend-code-input');
     const sendFriendRequestBtn = document.getElementById('send-friend-request-btn');
+    const friendsSection = document.getElementById('friends-section');
     const friendCountBadge = document.getElementById('friend-count-badge');
     const incomingFriendRequestsWrap = document.getElementById('incoming-friend-requests-wrap');
     const incomingFriendRequests = document.getElementById('incoming-friend-requests');
@@ -1354,11 +1355,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 incoming: Array.isArray(data?.incoming) ? data.incoming : [],
                 outgoing: Array.isArray(data?.outgoing) ? data.outgoing : []
             };
+            friendsSection?.classList.remove('hidden');
             renderFriendDashboard();
             return true;
         } catch (error) {
             console.error('Friend dashboard failed:', error);
             friendDashboard = { friendCode: '', friends: [], incoming: [], outgoing: [] };
+            friendsSection?.classList.add('hidden');
+            createFriendSection?.classList.add('hidden');
             renderFriendDashboard();
             if (!silent) {
                 showToast(getLocale('friendLoadFailed', '친구 목록을 불러오지 못했습니다.'), 'error');
