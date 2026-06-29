@@ -208,8 +208,10 @@ const SUPABASE_SDK_MOCK = `
             locale: options?.body?.locale,
             timezone: options?.body?.timezone,
             fallbackCurrency: options?.body?.fallbackCurrency,
+            currentLocalDate: options?.body?.currentLocalDate,
             imageProcessing: options?.body?.imageProcessing,
-            hasImage: Boolean(options?.body?.imageBase64)
+            hasImage: Boolean(options?.body?.imageBase64),
+            hasEnhancedImage: Boolean(options?.body?.enhancedImageBase64)
           }
         });
         if (name !== 'scan-receipt') {
@@ -226,6 +228,19 @@ const SUPABASE_SDK_MOCK = `
               purchasedAt: '2026-06-11T18:30',
               language: 'ko',
               confidence: 0.94,
+              fieldConfidence: {
+                amount: 0.96,
+                merchant: 0.94,
+                purchasedAt: 0.93
+              },
+              evidence: {
+                total: '결제금액 32,800원',
+                merchant: '서울역 식당',
+                purchasedAt: '2026-06-11 18:30'
+              },
+              amountCandidates: [
+                { label: '결제금액', amount: 32800, kind: 'final' }
+              ],
               warnings: []
             },
             meta: { model: 'mock-receipt-ocr', stored: false }
