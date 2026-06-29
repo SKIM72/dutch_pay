@@ -7,6 +7,8 @@
     const MAX_OUTPUT_SIDE = 1800;
     const MAX_OUTPUT_PIXELS = 2_500_000;
     const MAX_OUTPUT_BYTES = 2.5 * 1024 * 1024;
+    const MAX_ENHANCED_OUTPUT_BYTES = 1.8 * 1024 * 1024;
+    const AUTO_CROP_MIN_CONFIDENCE = 0.7;
 
     function loadImage(file) {
         return new Promise((resolve, reject) => {
@@ -301,7 +303,13 @@
             const centerWeight = Math.max(0.55, 1 - centerDistance * 0.6);
             const score = cells.length * fillRatio * centerWeight;
             if (!best || score > best.score) {
-                best = { cells, score, areaRatio };
+                best = {
+                    cells,
+                    score,
+                    areaRatio,
+                    fillRatio,
+                    centerDistance
+                };
             }
         }
 
@@ -314,8 +322,36 @@
             distance(points[2], points[3]),
             distance(points[3], points[0])
         );
-        if (areaRatio < 0.04 || shortSide < 80) return null;
-        return { points, areaRatio };
+        const topWidth = distance(points[0], points[1]);
+        const rightHeight = distance(points[1], points[2]);
+        const bottomWidth = distance(points[2], points[3]);
+        const leftHeight = distance(points[3], points[0]);
+        const widthBalance = Math.min(topWidth, bottomWidth) / Math.max(1, Math.max(topWidth, bottomWidth));
+        const heightBalance = Math.min(leftHeight, rightHeight) / Math.max(1, Math.max(leftHeight, rightHeight));
+        const diagonalBalance = Math.min(
+            distance(points[0], points[2]),
+            distance(points[1], points[3])
+        ) / Math.max(
+            1,
+            Math.max(distance(points[0], points[2]), distance(points[1], points[3]))
+        );
+        const geometryScore = Math.min(widthBalance, heightBalance, diagonalBalance);
+        const areaScore = Math.min(1, areaRatio / 0.32);
+        const fillScore = Math.max(0, Math.min(1, (best.fillRatio - 0.28) / 0.52));
+        const centerScore = Math.max(0, Math.min(1, 1 - best.centerDistance / 0.72));
+        const confidence = (
+            areaScore * 0.3
+            + fillScore * 0.24
+            + centerScore * 0.16
+            + geometryScore * 0.3
+        );
+
+        if (
+            areaRatio < 0.07
+            || shortSide < 80
+            || geometryScore < 0.42
+        ) return null;
+        return { points, areaRatio, confidence };
     }
 
     function expandQuadrilateral(points, width, height, ratio = 0.012) {
@@ -466,6 +502,27 @@
         return { blob, canvas: outputCanvas };
     }
 
+    async function encodeTextEnhancedCanvas(canvas) {
+        let outputCanvas = resizeCanvas(
+            canvas,
+            MAX_OUTPUT_SIDE,
+            'grayscale(1) contrast(1.58) brightness(1.06)'
+        );
+        let blob = await canvasToBlob(outputCanvas, 0.8);
+        if (blob.size > MAX_ENHANCED_OUTPUT_BYTES) {
+            blob = await canvasToBlob(outputCanvas, 0.68);
+        }
+        if (blob.size > MAX_ENHANCED_OUTPUT_BYTES) {
+            outputCanvas = resizeCanvas(
+                outputCanvas,
+                1500,
+                'grayscale(1) contrast(1.35) brightness(1.04)'
+            );
+            blob = await canvasToBlob(outputCanvas, 0.7);
+        }
+        return { blob, canvas: outputCanvas };
+    }
+
     async function prepare(file, options = {}) {
         if (!file || !file.type?.startsWith('image/')) throw new Error('INVALID_IMAGE');
         if (file.size > MAX_INPUT_BYTES) throw new Error('IMAGE_TOO_LARGE');
@@ -476,6 +533,7 @@
         let autoCropped = false;
         let manuallyCropped = false;
         let cropAreaRatio = 0;
+        let detectionConfidence = 0;
 
         if (options.crop) {
             processedCanvas = cropCanvas(sourceCanvas, options.crop);
@@ -488,7 +546,8 @@
             options.onStatus?.('detecting');
             const detectionCanvas = resizeCanvas(sourceCanvas, MAX_DETECTION_SIDE);
             const detection = detectReceiptCorners(detectionCanvas);
-            if (detection) {
+            detectionConfidence = Number(detection?.confidence) || 0;
+            if (detection && detectionConfidence >= AUTO_CROP_MIN_CONFIDENCE) {
                 processedCanvas = perspectiveCrop(sourceCanvas, detectionCanvas, detection);
                 autoCropped = true;
                 cropAreaRatio = detection.areaRatio;
@@ -497,12 +556,16 @@
 
         options.onStatus?.('optimizing');
         const encoded = await encodeReceiptCanvas(processedCanvas);
+        const enhanced = await encodeTextEnhancedCanvas(processedCanvas);
         return {
             blob: encoded.blob,
+            enhancedBlob: enhanced.blob,
             mimeType: 'image/jpeg',
+            enhancedMimeType: 'image/jpeg',
             autoCropped,
             manuallyCropped,
             cropAreaRatio,
+            detectionConfidence,
             width: encoded.canvas.width,
             height: encoded.canvas.height,
             originalWidth: image.naturalWidth,

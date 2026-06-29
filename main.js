@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.29.2';
+    const APP_VERSION = 'v2026.06.30.1';
     const THEME_STORAGE_KEY = 'settleup-theme-mode';
     const VALID_THEME_MODES = new Set(['system', 'light', 'dark']);
     const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -264,6 +264,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const receiptFileName = document.getElementById('receipt-file-name');
     const receiptResultAmount = document.getElementById('receipt-result-amount');
     const receiptResultCurrency = document.getElementById('receipt-result-currency');
+    const receiptAmountEvidence = document.getElementById('receipt-amount-evidence');
     const receiptResultName = document.getElementById('receipt-result-name');
     const receiptResultDate = document.getElementById('receipt-result-date');
     const receiptConfidence = document.getElementById('receipt-confidence');
@@ -513,6 +514,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             receiptProcessingBadge.classList.remove('is-normalized');
         }
         if (receiptResultAmount) receiptResultAmount.value = '';
+        if (receiptAmountEvidence) {
+            receiptAmountEvidence.classList.add('hidden');
+            const evidenceText = receiptAmountEvidence.querySelector('span');
+            if (evidenceText) evidenceText.textContent = '';
+        }
         if (receiptResultName) receiptResultName.value = '';
         if (receiptResultDate) receiptResultDate.value = '';
         if (receiptConfidence) {
@@ -670,8 +676,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         return {
             ...prepared,
-            imageBase64: await fileToBase64(prepared.blob)
+            imageBase64: await fileToBase64(prepared.blob),
+            enhancedImageBase64: prepared.enhancedBlob
+                ? await fileToBase64(prepared.enhancedBlob)
+                : ''
         };
+    }
+
+    function getReceiptReferenceDate() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
     function normalizeReceiptDateForInput(value) {
@@ -687,6 +704,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         const amount = Number(result.amount);
         if (receiptResultCurrency) receiptResultCurrency.value = SUPPORTED_CURRENCIES.includes(currency) ? currency : 'JPY';
         if (receiptResultAmount) receiptResultAmount.value = amount > 0 ? formatNumber(amount, currency) : '';
+        const totalEvidence = String(result?.evidence?.total || '').trim();
+        if (receiptAmountEvidence) {
+            const evidenceText = receiptAmountEvidence.querySelector('span');
+            if (evidenceText) {
+                evidenceText.textContent = getLocale('receiptAmountEvidence', '금액 근거: {evidence}')
+                    .replace('{evidence}', totalEvidence);
+            }
+            receiptAmountEvidence.classList.toggle('hidden', !totalEvidence);
+        }
         if (receiptResultName) {
             receiptResultName.value = String(result.name || result.merchantName || '').trim();
         }
@@ -766,6 +792,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 autoCropped: preparedImage.autoCropped,
                 manuallyCropped: preparedImage.manuallyCropped,
                 cropAreaRatio: preparedImage.cropAreaRatio,
+                detectionConfidence: preparedImage.detectionConfidence,
                 width: preparedImage.width,
                 height: preparedImage.height,
                 originalWidth: preparedImage.originalWidth,
@@ -794,8 +821,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 body: {
                     imageBase64: preparedImage.imageBase64,
                     mimeType: preparedImage.mimeType,
+                    enhancedImageBase64: preparedImage.enhancedImageBase64,
+                    enhancedMimeType: preparedImage.enhancedMimeType,
                     locale: currentLang,
                     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul',
+                    currentLocalDate: getReceiptReferenceDate(),
                     fallbackCurrency,
                     imageProcessing: receiptPreparedMeta
                 }

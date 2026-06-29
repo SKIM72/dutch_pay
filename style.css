@@ -250,7 +250,7 @@ button:hover { background: var(--primary-hover); }
 button:disabled { background-color: var(--text-muted); cursor: not-allowed; }
 button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid var(--primary-soft-border); outline-offset: 2px; }
 
-#complete-settlement-btn { width: min(220px, 100%); max-width: 100%; min-height: 44px; margin-top: 0.95rem; text-align: center; box-shadow: 0 12px 24px -18px rgba(15, 23, 42, 0.75); }
+#complete-settlement-btn { width: min(220px, 100%); max-width: 100%; min-height: 44px; margin-top: 1.15rem; text-align: center; box-shadow: 0 12px 24px -18px rgba(15, 23, 42, 0.75); }
 #complete-settlement-btn.edit-mode { background-color: var(--secondary); }
 #complete-settlement-btn.edit-mode:hover { background-color: var(--secondary-hover); }
 
@@ -467,6 +467,8 @@ button.expense-card-amount { cursor: pointer; border-bottom: 1px dashed var(--pr
 .receipt-result-fields input, .receipt-result-fields select { min-height: 50px; }
 .receipt-result-amount input { min-width: 0; }
 .receipt-result-amount select { width: 96px; flex-shrink: 0; }
+.receipt-result-evidence { margin-top: 0.45rem; padding: 0.52rem 0.62rem; border: 1px solid var(--primary-soft-border); border-radius: 6px; background: var(--primary-soft); color: var(--text-muted); display: flex; align-items: flex-start; gap: 0.42rem; font-size: 0.74rem; line-height: 1.45; }
+.receipt-result-evidence i { margin-top: 0.12rem; color: var(--primary); flex-shrink: 0; }
 .receipt-review-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.7rem; margin-top: 1rem; }
 .receipt-review-actions button { min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
 .modal-primary-action { width: calc(100% - 2.7rem) !important; min-height: 54px; margin: 0 1.35rem 1.35rem !important; padding: 0.75rem 1rem !important; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.98rem !important; font-weight: 800; box-shadow: 0 14px 28px -22px var(--primary); }

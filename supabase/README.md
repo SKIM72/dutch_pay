@@ -70,10 +70,17 @@ compressed receipt image to Gemini for Korean and Japanese OCR. The function
 does not write receipt images to the database or Supabase Storage.
 
 Before upload, the browser detects the bright receipt region, removes the
-surrounding background, corrects perspective, and normalizes the result to a
-compact JPEG. If no reliable document outline is found, it falls back to a
-resized and contrast-adjusted copy instead of blocking the scan. Camera and
-gallery images use the same preprocessing path.
+surrounding background, corrects perspective, and creates both a natural-color
+JPEG and a grayscale text-enhanced JPEG. Auto-cropping is used only when the
+document geometry passes a confidence threshold; uncertain images are sent to
+the manual crop step. Camera and gallery images use the same preprocessing
+path.
+
+Both image views are compared in one Gemini request, so one scan still consumes
+one API request. The structured response includes visible amount candidates,
+their labels and classifications, exact evidence for the selected total,
+field-level confidence, and warnings. Korean and Japanese subtotal, tax, cash
+received, and change labels are explicitly excluded from the final paid amount.
 
 Configure and deploy the function independently from database migrations:
 
