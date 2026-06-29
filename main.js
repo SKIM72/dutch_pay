@@ -57,7 +57,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.29.1';
+    const APP_VERSION = 'v2026.06.29.2';
     const THEME_STORAGE_KEY = 'settleup-theme-mode';
     const VALID_THEME_MODES = new Set(['system', 'light', 'dark']);
     const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -182,6 +182,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const participantListContainer = document.getElementById('participant-list-container');
     const addParticipantBtn = document.getElementById('add-participant-btn');
+    const createFriendSection = document.getElementById('create-friend-section');
+    const createFriendList = document.getElementById('create-friend-list');
+    const selectedFriendCount = document.getElementById('selected-friend-count');
+    const myFriendCode = document.getElementById('my-friend-code');
+    const copyFriendCodeBtn = document.getElementById('copy-friend-code-btn');
+    const friendCodeInput = document.getElementById('friend-code-input');
+    const sendFriendRequestBtn = document.getElementById('send-friend-request-btn');
+    const friendCountBadge = document.getElementById('friend-count-badge');
+    const incomingFriendRequestsWrap = document.getElementById('incoming-friend-requests-wrap');
+    const incomingFriendRequests = document.getElementById('incoming-friend-requests');
+    const outgoingFriendRequestsWrap = document.getElementById('outgoing-friend-requests-wrap');
+    const outgoingFriendRequests = document.getElementById('outgoing-friend-requests');
+    const friendList = document.getElementById('friend-list');
+    let friendDashboard = { friendCode: '', friends: [], incoming: [], outgoing: [] };
 
     const openShareModalBtn = document.getElementById('open-share-modal-btn'); 
     const openJoinModalBtn = document.getElementById('open-join-modal-btn'); 
@@ -235,10 +249,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const receiptScanModal = document.getElementById('receipt-scan-modal');
     const receiptSourceStep = document.getElementById('receipt-source-step');
     const receiptAnalysisStep = document.getElementById('receipt-analysis-step');
+    const receiptCropStep = document.getElementById('receipt-crop-step');
     const receiptReviewStep = document.getElementById('receipt-review-step');
     const receiptCameraInput = document.getElementById('receipt-camera-input');
     const receiptGalleryInput = document.getElementById('receipt-gallery-input');
     const receiptAnalysisPreview = document.getElementById('receipt-analysis-preview');
+    const receiptCropStage = document.getElementById('receipt-crop-stage');
+    const receiptCropImage = document.getElementById('receipt-crop-image');
+    const receiptCropSelection = document.getElementById('receipt-crop-selection');
     const receiptReviewImage = document.getElementById('receipt-review-image');
     const receiptAnalysisStatus = document.getElementById('receipt-analysis-status');
     const receiptProcessingBadge = document.getElementById('receipt-processing-badge');
@@ -249,10 +267,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const receiptResultDate = document.getElementById('receipt-result-date');
     const receiptConfidence = document.getElementById('receipt-confidence');
     const retryReceiptScanBtn = document.getElementById('retry-receipt-scan-btn');
+    const manualCropReceiptBtn = document.getElementById('manual-crop-receipt-btn');
+    const cancelReceiptCropBtn = document.getElementById('cancel-receipt-crop-btn');
+    const analyzeReceiptCropBtn = document.getElementById('analyze-receipt-crop-btn');
     const applyReceiptResultBtn = document.getElementById('apply-receipt-result-btn');
     let receiptPreviewUrl = '';
     let receiptScanRequestId = 0;
     let receiptPreparedMeta = null;
+    let receiptSourceFile = null;
+    let receiptCropRect = { x: 0.06, y: 0.04, width: 0.88, height: 0.92 };
+    let receiptCropGesture = null;
     
     const editSettlementTitleBtn = document.getElementById('edit-settlement-title-btn');
     const editTitleModal = document.getElementById('edit-title-modal');
@@ -455,6 +479,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     function showReceiptStep(stepName) {
         if (receiptSourceStep) receiptSourceStep.classList.toggle('hidden', stepName !== 'source');
         if (receiptAnalysisStep) receiptAnalysisStep.classList.toggle('hidden', stepName !== 'analysis');
+        if (receiptCropStep) receiptCropStep.classList.toggle('hidden', stepName !== 'crop');
         if (receiptReviewStep) receiptReviewStep.classList.toggle('hidden', stepName !== 'review');
     }
 
@@ -464,12 +489,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             receiptPreviewUrl = '';
         }
         if (receiptAnalysisPreview) receiptAnalysisPreview.removeAttribute('src');
+        if (receiptCropImage) receiptCropImage.removeAttribute('src');
         if (receiptReviewImage) receiptReviewImage.removeAttribute('src');
     }
 
     function resetReceiptScan({ clearFile = true } = {}) {
         receiptScanRequestId += 1;
         receiptPreparedMeta = null;
+        receiptSourceFile = null;
+        receiptCropGesture = null;
+        receiptCropRect = { x: 0.06, y: 0.04, width: 0.88, height: 0.92 };
         clearReceiptPreview();
         showReceiptStep('source');
         if (clearFile) {
@@ -539,13 +568,103 @@ document.addEventListener('DOMContentLoaded', async () => {
             receiptReviewImage.src = receiptPreviewUrl;
             receiptReviewImage.alt = fileName;
         }
+        if (receiptCropImage) {
+            receiptCropImage.src = receiptPreviewUrl;
+            receiptCropImage.alt = fileName;
+        }
     }
 
-    async function prepareReceiptImage(file) {
+    function renderReceiptCropSelection() {
+        if (!receiptCropSelection) return;
+        receiptCropSelection.style.left = `${receiptCropRect.x * 100}%`;
+        receiptCropSelection.style.top = `${receiptCropRect.y * 100}%`;
+        receiptCropSelection.style.width = `${receiptCropRect.width * 100}%`;
+        receiptCropSelection.style.height = `${receiptCropRect.height * 100}%`;
+        if (receiptCropStage) {
+            receiptCropSelection.style.setProperty('--crop-selection-width', `${receiptCropRect.width * receiptCropStage.clientWidth}px`);
+            receiptCropSelection.style.setProperty('--crop-selection-height', `${receiptCropRect.height * receiptCropStage.clientHeight}px`);
+        }
+    }
+
+    function showManualReceiptCrop(file, message = '') {
+        if (!file) return;
+        receiptSourceFile = file;
+        receiptCropRect = { x: 0.06, y: 0.04, width: 0.88, height: 0.92 };
+        setReceiptPreview(file, file.name);
+        showReceiptStep('crop');
+        requestAnimationFrame(renderReceiptCropSelection);
+        if (message) showToast(message, 'info');
+    }
+
+    function clampReceiptCrop(rect) {
+        const minimumWidth = 0.12;
+        const minimumHeight = 0.12;
+        const width = Math.max(minimumWidth, Math.min(1, rect.width));
+        const height = Math.max(minimumHeight, Math.min(1, rect.height));
+        return {
+            x: Math.max(0, Math.min(1 - width, rect.x)),
+            y: Math.max(0, Math.min(1 - height, rect.y)),
+            width,
+            height
+        };
+    }
+
+    function startReceiptCropGesture(event) {
+        if (!receiptCropSelection || !receiptCropStage) return;
+        event.preventDefault();
+        const stageBounds = receiptCropStage.getBoundingClientRect();
+        receiptCropGesture = {
+            pointerId: event.pointerId,
+            handle: event.target.closest('[data-crop-handle]')?.dataset.cropHandle || 'move',
+            startX: event.clientX,
+            startY: event.clientY,
+            stageWidth: Math.max(1, stageBounds.width),
+            stageHeight: Math.max(1, stageBounds.height),
+            rect: { ...receiptCropRect }
+        };
+        receiptCropSelection.setPointerCapture?.(event.pointerId);
+    }
+
+    function moveReceiptCropGesture(event) {
+        if (!receiptCropGesture || event.pointerId !== receiptCropGesture.pointerId) return;
+        event.preventDefault();
+        const deltaX = (event.clientX - receiptCropGesture.startX) / receiptCropGesture.stageWidth;
+        const deltaY = (event.clientY - receiptCropGesture.startY) / receiptCropGesture.stageHeight;
+        const start = receiptCropGesture.rect;
+        let next = { ...start };
+
+        if (receiptCropGesture.handle === 'move') {
+            next.x += deltaX;
+            next.y += deltaY;
+        } else {
+            if (receiptCropGesture.handle.includes('w')) {
+                next.x = start.x + deltaX;
+                next.width = start.width - deltaX;
+            }
+            if (receiptCropGesture.handle.includes('e')) next.width = start.width + deltaX;
+            if (receiptCropGesture.handle.includes('n')) {
+                next.y = start.y + deltaY;
+                next.height = start.height - deltaY;
+            }
+            if (receiptCropGesture.handle.includes('s')) next.height = start.height + deltaY;
+        }
+
+        receiptCropRect = clampReceiptCrop(next);
+        renderReceiptCropSelection();
+    }
+
+    function endReceiptCropGesture(event) {
+        if (!receiptCropGesture || event.pointerId !== receiptCropGesture.pointerId) return;
+        receiptCropSelection?.releasePointerCapture?.(event.pointerId);
+        receiptCropGesture = null;
+    }
+
+    async function prepareReceiptImage(file, options = {}) {
         const processor = window.SettleUpReceiptImage;
         if (!processor?.prepare) throw new Error('IMAGE_PROCESSOR_UNAVAILABLE');
         const prepared = await processor.prepare(file, {
-            autoCrop: true,
+            autoCrop: !options.crop,
+            crop: options.crop || null,
             onStatus: updateReceiptAnalysisStatus
         });
         return {
@@ -574,11 +693,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (receiptFileName) receiptFileName.textContent = file.name;
         if (receiptProcessingBadge) {
             const autoCropped = Boolean(preparedMeta?.autoCropped);
-            receiptProcessingBadge.textContent = autoCropped
-                ? getLocale('receiptAutoCropped', '모서리 자동 보정')
-                : getLocale('receiptImageOptimized', '이미지 자동 최적화');
+            const manuallyCropped = Boolean(preparedMeta?.manuallyCropped);
+            receiptProcessingBadge.textContent = manuallyCropped
+                ? getLocale('receiptManuallyCropped', '선택 영역 보정')
+                : autoCropped
+                    ? getLocale('receiptAutoCropped', '모서리 자동 보정')
+                    : getLocale('receiptImageOptimized', '이미지 자동 최적화');
             receiptProcessingBadge.classList.remove('hidden');
-            receiptProcessingBadge.classList.toggle('is-normalized', !autoCropped);
+            receiptProcessingBadge.classList.toggle('is-normalized', !autoCropped && !manuallyCropped);
         }
 
         const confidence = Math.max(0, Math.min(1, Number(result.confidence) || 0));
@@ -624,26 +746,46 @@ document.addEventListener('DOMContentLoaded', async () => {
         return getLocale('receiptScanFailed', '영수증을 읽지 못했습니다. 사진을 다시 촬영하거나 직접 입력해 주세요.');
     }
 
-    async function handleReceiptFile(file) {
+    async function handleReceiptFile(file, options = {}) {
         if (!file || !file.type.startsWith('image/')) {
             showToast(getLocale('receiptInvalidFile', '이미지 파일을 선택해 주세요.'), 'error');
             return;
         }
 
+        receiptSourceFile = file;
         setReceiptPreview(file, file.name);
-        updateReceiptAnalysisStatus('detecting');
+        updateReceiptAnalysisStatus(options.crop ? 'optimizing' : 'detecting');
         showReceiptStep('analysis');
 
         const requestId = ++receiptScanRequestId;
         try {
-            const preparedImage = await prepareReceiptImage(file);
+            const preparedImage = await prepareReceiptImage(file, options);
             if (requestId !== receiptScanRequestId) return;
             receiptPreparedMeta = {
                 autoCropped: preparedImage.autoCropped,
+                manuallyCropped: preparedImage.manuallyCropped,
                 cropAreaRatio: preparedImage.cropAreaRatio,
                 width: preparedImage.width,
-                height: preparedImage.height
+                height: preparedImage.height,
+                originalWidth: preparedImage.originalWidth,
+                originalHeight: preparedImage.originalHeight
             };
+
+            const isLargeEnoughForEdgeDetection = Math.min(
+                preparedImage.originalWidth || 0,
+                preparedImage.originalHeight || 0
+            ) >= 500;
+            if (!options.crop && !preparedImage.autoCropped && isLargeEnoughForEdgeDetection) {
+                showManualReceiptCrop(
+                    file,
+                    getLocale(
+                        'receiptEdgesNotFound',
+                        '영수증 모서리를 확실히 찾지 못했어요. 영역을 직접 맞춰 주세요.'
+                    )
+                );
+                return;
+            }
+
             setReceiptPreview(preparedImage.blob, file.name);
             updateReceiptAnalysisStatus('recognizing');
             const fallbackCurrency = currentSettlement?.base_currency || itemCurrencySelect?.value || 'JPY';
@@ -666,7 +808,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.error('Receipt scan failed:', error);
             if (requestId !== receiptScanRequestId) return;
             showToast(await getReceiptScanErrorMessage(error), 'error');
-            resetReceiptScan();
+            showManualReceiptCrop(
+                file,
+                getLocale('receiptAdjustAndRetry', '영수증 영역을 조정한 뒤 다시 분석해 보세요.')
+            );
         }
     }
 
@@ -1034,22 +1179,268 @@ document.addEventListener('DOMContentLoaded', async () => {
         else { btns.forEach(btn => btn.disabled = false); }
         const participantCountBadge = document.getElementById('participant-count-badge');
         if (participantCountBadge) {
-            participantCountBadge.textContent = getLocale('participantsCount', '{count}명').replace('{count}', btns.length);
+            const selectedFriends = createFriendList
+                ? createFriendList.querySelectorAll('input[type="checkbox"]:checked').length
+                : 0;
+            participantCountBadge.textContent = getLocale('participantsCount', '{count}명')
+                .replace('{count}', btns.length + selectedFriends);
+        }
+        if (selectedFriendCount && createFriendList) {
+            const selectedFriends = createFriendList.querySelectorAll('input[type="checkbox"]:checked').length;
+            selectedFriendCount.textContent = getLocale('participantsCount', '{count}명')
+                .replace('{count}', selectedFriends);
         }
     }
 
-    function getParticipantNamesFromModal() {
-        if(!participantListContainer) return ['A', 'B'];
-        const inputs = participantListContainer.querySelectorAll('.participant-name-input');
-        const names = Array.from(inputs).map(input => input.value.trim()).filter(val => val !== '');
-        return names.length >= 2 ? names : ['A', 'B']; 
+    function getSelectedFriendInvites() {
+        if (!createFriendList) return [];
+        return Array.from(createFriendList.querySelectorAll('input[type="checkbox"]:checked'))
+            .map((input) => ({
+                userId: input.dataset.userId || '',
+                nickname: input.dataset.nickname || ''
+            }))
+            .filter((friend) => friend.userId && friend.nickname);
     }
 
-    function openAddSettlementModal() {
+    function makeUniqueParticipantNames(names) {
+        const seen = new Map();
+        return names.map((name) => {
+            const base = String(name || '').trim();
+            const count = (seen.get(base) || 0) + 1;
+            seen.set(base, count);
+            return count === 1 ? base : `${base} (${count})`;
+        });
+    }
+
+    function getParticipantNamesFromModal() {
+        if(!participantListContainer) return [];
+        const inputs = participantListContainer.querySelectorAll('.participant-name-input');
+        const manualNames = Array.from(inputs).map(input => input.value.trim()).filter(Boolean);
+        const friendNames = getSelectedFriendInvites().map((friend) => friend.nickname);
+        return makeUniqueParticipantNames([...manualNames, ...friendNames]);
+    }
+
+    function createFriendListItem(name, statusText = '') {
+        const item = document.createElement('div');
+        item.className = 'friend-list-item';
+        const copy = document.createElement('div');
+        copy.style.minWidth = '0';
+        const nameElement = document.createElement('div');
+        nameElement.className = 'friend-list-name';
+        nameElement.textContent = name || getLocale('unknownUser', '알 수 없는 사용자');
+        copy.appendChild(nameElement);
+        if (statusText) {
+            const status = document.createElement('div');
+            status.className = 'friend-list-status';
+            status.textContent = statusText;
+            copy.appendChild(status);
+        }
+        item.appendChild(copy);
+        return item;
+    }
+
+    function appendFriendListEmpty(container, message) {
+        if (!container) return;
+        const empty = document.createElement('div');
+        empty.className = 'friend-list-empty';
+        empty.textContent = message;
+        container.appendChild(empty);
+    }
+
+    function renderCreateFriendPicker() {
+        if (!createFriendList || !createFriendSection) return;
+        createFriendList.innerHTML = '';
+        const friends = Array.isArray(friendDashboard.friends) ? friendDashboard.friends : [];
+        createFriendSection.classList.toggle('hidden', friends.length === 0);
+
+        friends.forEach((friend, index) => {
+            const option = document.createElement('div');
+            option.className = 'create-friend-option';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `create-friend-${index}`;
+            checkbox.dataset.userId = friend.userId;
+            checkbox.dataset.nickname = friend.nickname;
+            const label = document.createElement('label');
+            label.htmlFor = checkbox.id;
+            label.textContent = friend.nickname;
+            checkbox.addEventListener('change', updateRemoveButtons);
+            option.append(checkbox, label);
+            createFriendList.appendChild(option);
+        });
+        updateRemoveButtons();
+    }
+
+    function renderFriendDashboard() {
+        const friends = Array.isArray(friendDashboard.friends) ? friendDashboard.friends : [];
+        const incoming = Array.isArray(friendDashboard.incoming) ? friendDashboard.incoming : [];
+        const outgoing = Array.isArray(friendDashboard.outgoing) ? friendDashboard.outgoing : [];
+        if (myFriendCode) myFriendCode.textContent = friendDashboard.friendCode || '-';
+        if (friendCountBadge) {
+            friendCountBadge.textContent = getLocale('participantsCount', '{count}명')
+                .replace('{count}', friends.length);
+        }
+
+        if (incomingFriendRequests) {
+            incomingFriendRequests.innerHTML = '';
+            incoming.forEach((request) => {
+                const item = createFriendListItem(request.nickname);
+                const actions = document.createElement('div');
+                actions.className = 'friend-list-actions';
+                const rejectButton = document.createElement('button');
+                rejectButton.type = 'button';
+                rejectButton.className = 'friend-reject-btn';
+                rejectButton.title = getLocale('reject', '거절');
+                rejectButton.setAttribute('aria-label', `${request.nickname} ${getLocale('reject', '거절')}`);
+                rejectButton.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i>';
+                rejectButton.addEventListener('click', () => respondToFriendRequest(request.requestId, false));
+                const acceptButton = document.createElement('button');
+                acceptButton.type = 'button';
+                acceptButton.className = 'friend-accept-btn';
+                acceptButton.title = getLocale('accept', '수락');
+                acceptButton.setAttribute('aria-label', `${request.nickname} ${getLocale('accept', '수락')}`);
+                acceptButton.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i>';
+                acceptButton.addEventListener('click', () => respondToFriendRequest(request.requestId, true));
+                actions.append(rejectButton, acceptButton);
+                item.appendChild(actions);
+                incomingFriendRequests.appendChild(item);
+            });
+        }
+        incomingFriendRequestsWrap?.classList.toggle('hidden', incoming.length === 0);
+
+        if (outgoingFriendRequests) {
+            outgoingFriendRequests.innerHTML = '';
+            outgoing.forEach((request) => {
+                outgoingFriendRequests.appendChild(createFriendListItem(
+                    request.nickname,
+                    getLocale('waitingForAcceptance', '수락 대기 중')
+                ));
+            });
+        }
+        outgoingFriendRequestsWrap?.classList.toggle('hidden', outgoing.length === 0);
+
+        if (friendList) {
+            friendList.innerHTML = '';
+            if (!friends.length) {
+                appendFriendListEmpty(friendList, getLocale('noFriendsYet', '아직 등록된 친구가 없어요.'));
+            }
+            friends.forEach((friend) => {
+                const item = createFriendListItem(friend.nickname);
+                const actions = document.createElement('div');
+                actions.className = 'friend-list-actions';
+                const removeButton = document.createElement('button');
+                removeButton.type = 'button';
+                removeButton.className = 'friend-remove-btn';
+                removeButton.title = getLocale('removeFriend', '친구 삭제');
+                removeButton.setAttribute('aria-label', `${friend.nickname} ${getLocale('removeFriend', '친구 삭제')}`);
+                removeButton.innerHTML = '<i class="fas fa-user-minus" aria-hidden="true"></i>';
+                removeButton.addEventListener('click', () => removeFriend(friend));
+                actions.appendChild(removeButton);
+                item.appendChild(actions);
+                friendList.appendChild(item);
+            });
+        }
+        renderCreateFriendPicker();
+    }
+
+    async function loadFriendDashboard({ silent = false } = {}) {
+        if (!currentUser) return false;
+        try {
+            const { data, error } = await safeDB(supabaseClient.rpc('get_friend_dashboard'));
+            if (error) throw error;
+            friendDashboard = {
+                friendCode: data?.friendCode || '',
+                friends: Array.isArray(data?.friends) ? data.friends : [],
+                incoming: Array.isArray(data?.incoming) ? data.incoming : [],
+                outgoing: Array.isArray(data?.outgoing) ? data.outgoing : []
+            };
+            renderFriendDashboard();
+            return true;
+        } catch (error) {
+            console.error('Friend dashboard failed:', error);
+            friendDashboard = { friendCode: '', friends: [], incoming: [], outgoing: [] };
+            renderFriendDashboard();
+            if (!silent) {
+                showToast(getLocale('friendLoadFailed', '친구 목록을 불러오지 못했습니다.'), 'error');
+            }
+            return false;
+        }
+    }
+
+    async function sendFriendRequest() {
+        const code = String(friendCodeInput?.value || '').trim().toUpperCase();
+        if (!code) {
+            showToast(getLocale('enterFriendCode', '친구 코드를 입력해 주세요.'), 'error');
+            return;
+        }
+        setLoading(true);
+        try {
+            const { error } = await safeDB(supabaseClient.rpc('send_friend_request_by_code', {
+                p_friend_code: code
+            }));
+            if (error) throw error;
+            if (friendCodeInput) friendCodeInput.value = '';
+            await loadFriendDashboard({ silent: true });
+            showToast(getLocale('friendRequestSent', '친구 요청을 보냈습니다.'), 'success');
+        } catch (error) {
+            console.error(error);
+            showToast(getLocale('friendRequestFailed', '친구 요청을 보내지 못했습니다. 코드를 확인해 주세요.'), 'error');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function respondToFriendRequest(requestId, accept) {
+        setLoading(true);
+        try {
+            const { error } = await safeDB(supabaseClient.rpc('respond_friend_request', {
+                p_request_id: requestId,
+                p_accept: accept
+            }));
+            if (error) throw error;
+            await loadFriendDashboard({ silent: true });
+            showToast(
+                accept
+                    ? getLocale('friendRequestAccepted', '친구 요청을 수락했습니다.')
+                    : getLocale('friendRequestRejected', '친구 요청을 거절했습니다.'),
+                'success'
+            );
+        } catch (error) {
+            console.error(error);
+            showToast(getLocale('friendRequestActionFailed', '친구 요청을 처리하지 못했습니다.'), 'error');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function removeFriend(friend) {
+        const confirmed = await showConfirm(
+            getLocale('removeFriendConfirm', '{name}님을 친구 목록에서 삭제할까요?')
+                .replace('{name}', friend.nickname)
+        );
+        if (!confirmed) return;
+        setLoading(true);
+        try {
+            const { error } = await safeDB(supabaseClient.rpc('remove_friend', {
+                p_friend_user_id: friend.userId
+            }));
+            if (error) throw error;
+            await loadFriendDashboard({ silent: true });
+            showToast(getLocale('friendRemoved', '친구를 삭제했습니다.'), 'success');
+        } catch (error) {
+            console.error(error);
+            showToast(getLocale('friendRemoveFailed', '친구를 삭제하지 못했습니다.'), 'error');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function openAddSettlementModal() {
         if(newSettlementDateInput) newSettlementDateInput.value = getLocalDateString();
         renderParticipantInputs(2);
         if(addSettlementModal) addSettlementModal.classList.remove('hidden');
         requestAnimationFrame(() => newSettlementTitleInput?.focus());
+        await loadFriendDashboard({ silent: true });
     }
 
     function openJoinModal() {
@@ -2038,6 +2429,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const title = newSettlementTitleInput.value.trim();
         const date = newSettlementDateInput.value;
         const participants = getParticipantNamesFromModal();
+        const selectedFriends = getSelectedFriendInvites();
         const baseCurrency = baseCurrencySelect.value;
         const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
         
@@ -2057,6 +2449,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             newSettlement.is_host = true; 
             
             await syncMemberDB(newSettlement.id);
+            let friendInviteFailed = false;
+            if (selectedFriends.length) {
+                const { error: friendInviteError } = await safeDB(
+                    supabaseClient.rpc('invite_friends_to_settlement', {
+                        p_settlement_id: newSettlement.id,
+                        p_friend_ids: selectedFriends.map((friend) => friend.userId)
+                    })
+                );
+                if (friendInviteError) {
+                    friendInviteFailed = true;
+                    console.error('Automatic friend invite failed:', friendInviteError);
+                }
+            }
             
             settlements.push(newSettlement);
             settlements.sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -2065,6 +2470,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             selectSettlement(newSettlement);
             if(addSettlementModal) addSettlementModal.classList.add('hidden');
             if(newSettlementTitleInput) newSettlementTitleInput.value = ''; 
+            if (friendInviteFailed) {
+                showToast(
+                    getLocale('roomCreatedFriendInviteFailed', '방은 생성됐지만 일부 친구 자동 초대에 실패했습니다.'),
+                    'info'
+                );
+            }
         } catch(e) {
             console.error(e);
             if (e.message === 'TIMEOUT_DB' || e.name === 'AbortError' || e.message === 'OFFLINE') showToast('네트워크가 불안정합니다. 잠시 후 다시 시도해주세요.', 'error');
@@ -2986,15 +3397,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!currentSettlement) return;
         setLoading(true);
         const report = buildSettlementCaptureReport();
-        document.body.appendChild(report);
-
-        if (document.fonts && document.fonts.ready) await document.fonts.ready;
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const captureStage = document.createElement('div');
+        captureStage.className = 'settlement-capture-stage';
+        captureStage.setAttribute('aria-hidden', 'true');
+        captureStage.appendChild(report);
+        document.body.classList.add('is-capturing-report');
+        document.body.appendChild(captureStage);
 
         try {
+            if (document.fonts && document.fonts.ready) await document.fonts.ready;
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
             const reportWidth = 1120;
-            const reportHeight = report.scrollHeight;
-            const pixelRatio = Math.max(1, Math.min(2, 15000 / Math.max(1, reportHeight)));
+            const reportHeight = Math.max(1, Math.ceil(report.scrollHeight));
+            const maxCapturePixels = 12_000_000;
+            const maxCaptureSide = 14_000;
+            const pixelRatio = Math.max(0.2, Math.min(
+                2,
+                Math.sqrt(maxCapturePixels / (reportWidth * reportHeight)),
+                maxCaptureSide / reportHeight
+            ));
             const dataUrl = await htmlToImage.toPng(report, {
                 backgroundColor: '#ffffff',
                 cacheBust: true,
@@ -3019,7 +3441,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.error("이미지 캡처 에러: ", err);
             showToast("이미지 저장에 실패했습니다. (브라우저 보안 설정 때문일 수 있습니다)", 'error'); 
         } finally {
-            report.remove();
+            captureStage.remove();
+            document.body.classList.remove('is-capturing-report');
             setLoading(false);
         }
     }
@@ -3287,6 +3710,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     renderThemeOptions();
                     applyThemeMode();
                     profileModal.classList.remove('hidden');
+                    await loadFriendDashboard({ silent: true });
                 }
             });
         }
@@ -3296,6 +3720,29 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderThemeOptions();
             themeModeSelect.addEventListener('change', (event) => {
                 setThemeMode(event.target.value);
+            });
+        }
+
+        if (copyFriendCodeBtn) {
+            copyFriendCodeBtn.addEventListener('click', async () => {
+                const code = String(friendDashboard.friendCode || '').trim();
+                if (!code) return;
+                const copied = await fallbackCopyTextToClipboard(code);
+                showToast(
+                    copied
+                        ? getLocale('friendCodeCopied', '친구 코드를 복사했습니다.')
+                        : getLocale('copyFailed', '복사에 실패했습니다.'),
+                    copied ? 'success' : 'error'
+                );
+            });
+        }
+        if (sendFriendRequestBtn) sendFriendRequestBtn.addEventListener('click', sendFriendRequest);
+        if (friendCodeInput) {
+            friendCodeInput.addEventListener('input', () => {
+                friendCodeInput.value = friendCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            });
+            friendCodeInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') sendFriendRequest();
             });
         }
 
@@ -3589,6 +4036,24 @@ document.addEventListener('DOMContentLoaded', async () => {
             receiptResultAmount.addEventListener('input', () => handleAmountInput(receiptResultAmount));
         }
         if (retryReceiptScanBtn) retryReceiptScanBtn.addEventListener('click', () => resetReceiptScan());
+        if (manualCropReceiptBtn) {
+            manualCropReceiptBtn.addEventListener('click', () => {
+                if (receiptSourceFile) showManualReceiptCrop(receiptSourceFile);
+            });
+        }
+        if (cancelReceiptCropBtn) cancelReceiptCropBtn.addEventListener('click', () => resetReceiptScan());
+        if (analyzeReceiptCropBtn) {
+            analyzeReceiptCropBtn.addEventListener('click', () => {
+                if (receiptSourceFile) handleReceiptFile(receiptSourceFile, { crop: { ...receiptCropRect } });
+            });
+        }
+        if (receiptCropSelection) {
+            receiptCropSelection.addEventListener('pointerdown', startReceiptCropGesture);
+            receiptCropSelection.addEventListener('pointermove', moveReceiptCropGesture);
+            receiptCropSelection.addEventListener('pointerup', endReceiptCropGesture);
+            receiptCropSelection.addEventListener('pointercancel', endReceiptCropGesture);
+        }
+        if (receiptCropImage) receiptCropImage.addEventListener('load', renderReceiptCropSelection);
         if (applyReceiptResultBtn) applyReceiptResultBtn.addEventListener('click', applyReceiptResult);
         if (receiptScanModal) {
             receiptScanModal.addEventListener('click', (event) => {
