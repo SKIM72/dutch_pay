@@ -345,14 +345,43 @@ button.expense-card-amount { cursor: pointer; border-bottom: 1px dashed var(--pr
 .modal-content .form-grid-row { margin-bottom: 1rem; }
 .modal-content #save-expense-changes-btn, .modal-content #create-settlement-btn { width: 100%; margin-top: 0.5rem; padding: 0.85rem; font-size: 1rem; }
 
-.modal-tool-card { width: min(680px, calc(100% - 2rem)); max-width: 680px !important; margin: 0; padding: 0; overflow: hidden; border-color: var(--border); box-shadow: 0 28px 70px -36px rgba(15, 23, 42, 0.7); }
+/* 기존 코드 뒤에 display: flex; flex-direction: column; 추가 */
+.modal-tool-card { 
+    width: min(680px, calc(100% - 2rem)); 
+    max-width: 680px !important; 
+    margin: 0; 
+    padding: 0; 
+    overflow: hidden; 
+    border-color: var(--border); 
+    box-shadow: 0 28px 70px -36px rgba(15, 23, 42, 0.7); 
+    display: flex; 
+    flex-direction: column; 
+}
 .settlement-create-modal { max-width: 620px !important; }
-.modal-tool-header { min-height: 84px; display: flex; align-items: center; gap: 0.85rem; padding: 1.15rem 4.2rem 1.15rem 1.35rem; border-bottom: 1px solid var(--border); background: var(--surface-muted); }
+/* 기존 코드 뒤에 flex-shrink: 0; 추가 */
+.modal-tool-header { 
+    min-height: 84px; 
+    display: flex; 
+    align-items: center; 
+    gap: 0.85rem; 
+    padding: 1.15rem 4.2rem 1.15rem 1.35rem; 
+    border-bottom: 1px solid var(--border); 
+    background: var(--surface-muted); 
+    flex-shrink: 0; 
+}
 .modal-tool-icon { width: 42px; height: 42px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; color: white; background: var(--primary); box-shadow: 0 10px 24px -18px var(--primary); }
 .modal-tool-heading { min-width: 0; display: grid; gap: 0.15rem; }
 .modal-tool-eyebrow { color: var(--primary); font-size: 0.68rem; line-height: 1; font-weight: 800; letter-spacing: 0.08em; }
 .modal-tool-heading h2 { margin: 0; color: var(--text-main); font-size: 1.22rem; line-height: 1.35; font-weight: 800; }
-.modal-form-stack { display: grid; gap: 1.05rem; padding: 1.35rem; }
+/* 기존 코드 뒤에 overflow-y: auto; 추가 */
+/* overflow-y: auto; 에 이어서 아래 속성 추가 */
+.modal-form-stack { 
+    display: grid; 
+    gap: 1.05rem; 
+    padding: 1.35rem; 
+    overflow-y: auto; 
+    -webkit-overflow-scrolling: touch; 
+}
 .modal-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
 .settlement-info-grid { grid-template-columns: minmax(0, 1.45fr) minmax(190px, 0.75fr); }
 .modal-field { min-width: 0; }
@@ -471,7 +500,22 @@ button.expense-card-amount { cursor: pointer; border-bottom: 1px dashed var(--pr
 .receipt-result-evidence i { margin-top: 0.12rem; color: var(--primary); flex-shrink: 0; }
 .receipt-review-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.7rem; margin-top: 1rem; }
 .receipt-review-actions button { min-height: 52px; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; }
-.modal-primary-action { width: calc(100% - 2.7rem) !important; min-height: 54px; margin: 0 1.35rem 1.35rem !important; padding: 0.75rem 1rem !important; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.98rem !important; font-weight: 800; box-shadow: 0 14px 28px -22px var(--primary); }
+/* 기존 코드 뒤에 flex-shrink: 0; 추가 */
+.modal-primary-action { 
+    width: calc(100% - 2.7rem) !important; 
+    min-height: 54px; 
+    margin: 0 1.35rem 1.35rem !important; 
+    padding: 0.75rem 1rem !important; 
+    border-radius: 8px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    gap: 0.75rem; 
+    font-size: 0.98rem !important; 
+    font-weight: 800; 
+    box-shadow: 0 14px 28px -22px var(--primary); 
+    flex-shrink: 0; 
+}
 .modal-primary-action i { transition: transform 0.2s ease; }
 .modal-primary-action:hover i { transform: translateX(3px); }
 .edit-expense-modal-card .modal-form-stack { gap: 1rem; }
