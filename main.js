@@ -327,7 +327,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateSidebarVisualState();
     }
 
-    // 인앱 브라우저 강제 탈출 및 CleanURL 적용 로직
     function redirectToExternalBrowser(targetPage, isReplace = false) {
         const userAgent = navigator.userAgent.toLowerCase();
         
@@ -843,7 +842,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return new Promise((resolve) => {
             const modal = document.getElementById('custom-confirm-modal');
             if(!modal) { resolve(window.confirm(message)); return; } 
-            modal.style.zIndex = '999999'; 
+            modal.style.zIndex = '10500'; 
             document.getElementById('confirm-message').textContent = message;
             
             const confirmBtn = document.getElementById('confirm-yes-btn');
@@ -3011,20 +3010,40 @@ document.addEventListener('DOMContentLoaded', async () => {
             let amountToTransfer = Math.min(debtor.amount, creditor.amount);
             
             let detailTextParts = [];
+            let detailHtmlParts = [];
+            let totalDebt = 0;
+            
             for (const [originalCreditor, items] of Object.entries(itemizedDebts[debtor.person] || {})) {
-                const totalDebt = items.reduce((sum, it) => sum + it.amount, 0);
-                if (totalDebt > 0) {
+                const debtToThisPerson = items.reduce((sum, it) => sum + it.amount, 0);
+                if (debtToThisPerson > 0) {
                     const itemNames = items.map(it => it.name).join(', ');
-                    detailTextParts.push(`${originalCreditor}에게 ${Math.round(totalDebt).toLocaleString()}(${itemNames})`);
+                    const itemNamesEscaped = items.map(it => escapeHTML(it.name)).join(', ');
+                    detailTextParts.push(`${originalCreditor}에게 ${Math.round(debtToThisPerson).toLocaleString()}원(${itemNames})`);
+                    detailHtmlParts.push(`${escapeHTML(originalCreditor)}에게 ${Math.round(debtToThisPerson).toLocaleString()}원(${itemNamesEscaped})`);
+                    totalDebt += debtToThisPerson;
                 }
             }
-            const detailString = detailTextParts.length > 0 ? detailTextParts.join(' + ') + ' 합산됨' : '';
+            
+            let detailText = detailTextParts.join(' + ');
+            let detailHtml = detailHtmlParts.join(' + ');
+            
+            const myOriginalCredit = totalDebt - debtor.amount; 
+            
+            // 🚀 완벽한 상세 내역 생성 (내가 받을 돈 차감 표기)
+            if (myOriginalCredit > 0.5) {
+                detailText = `[총 빚 ${Math.round(totalDebt).toLocaleString()}원] : ` + detailText + ` | - (차감) 내가 결제해서 받을 돈 : ${Math.round(myOriginalCredit).toLocaleString()}원`;
+                detailHtml = `<span style="font-weight:700;">[총 빚 ${Math.round(totalDebt).toLocaleString()}원]</span> : ` + detailHtml + `<br><span style="color:#ef4444; font-weight:700; margin-top:0.3rem; display:block;">- (차감) 내가 결제해서 받을 돈 : ${Math.round(myOriginalCredit).toLocaleString()}원</span>`;
+            } else if (detailText) {
+                detailText += ' 합산됨';
+                detailHtml += ' 합산됨';
+            }
 
             transfers.push({ 
                 from: debtor.person, 
                 to: creditor.person, 
                 amount: amountToTransfer,
-                details: detailString
+                detailsText: detailText,
+                detailsHtml: detailHtml
             });
 
             debtor.amount -= amountToTransfer; creditor.amount -= amountToTransfer;
@@ -3129,14 +3148,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             div.className = `transfer-item ${isEstimate ? 'is-estimate' : 'is-final'}`;
             const linkAmount = (['KRW', 'JPY', 'TWD'].includes(baseCurrency)) ? Math.round(tr.amount) : tr.amount.toFixed(2);
             
-            // 🚀 [하이브리드 UX] 토글로 합산 상세 내역 노출
-            const detailHtml = tr.details 
+            // 🚀 [하이브리드 UX] 토글로 합산 상세 내역 노출 (HTML 직접 사용)
+            const detailHtml = tr.detailsHtml 
                 ? `<details style="grid-column: 1 / -1; margin-top: 0.4rem; text-align: left;">
                      <summary style="font-size: 0.75rem; color: rgba(255,255,255,0.7); cursor: pointer; user-select: none;">
                        <i class="fas fa-info-circle"></i> 합산 상세 내역 보기
                      </summary>
                      <div style="margin-top: 0.4rem; padding: 0.5rem; background: rgba(0,0,0,0.15); border-radius: 6px; font-size: 0.75rem; color: rgba(255,255,255,0.9); line-height: 1.4;">
-                       ${escapeHTML(tr.details)}
+                       ${tr.detailsHtml}
                      </div>
                    </details>` 
                 : '';
@@ -3332,7 +3351,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         else showToast('복사에 실패했습니다.', 'error');
     }
 
-    // 🚀 [하이브리드 UX] 캡처 리포트에 상세 내역 자동 표기
+    // 🚀 [하이브리드 UX] 캡처 리포트에 상세 내역 자동 표기 (HTML 포맷 허용)
     function buildSettlementCaptureReport() {
         const { title, date, participants, expenses, base_currency, is_settled } = currentSettlement;
         const sortedExpenses = getSortedExpenses(expenses);
@@ -3354,7 +3373,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <strong>${escapeHTML(transfer.to)}</strong>
                     </span>
                     <b>${escapeHTML(formatNumber(transfer.amount, base_currency))} ${escapeHTML(base_currency)}</b>
-                    ${transfer.details ? `<div style="margin-top: 4px; padding: 6px; border-radius: 4px; background: rgba(0,0,0,0.12); font-size: 11px; line-height: 1.35; color: rgba(255,255,255,0.9); font-weight: 500;">${escapeHTML(transfer.details)}</div>` : ''}
+                    ${transfer.detailsHtml ? `<div style="margin-top: 4px; padding: 6px; border-radius: 4px; background: rgba(0,0,0,0.06); font-size: 11px; line-height: 1.35; color: rgba(255,255,255,0.9); font-weight: 500;">${transfer.detailsHtml}</div>` : ''}
                 </div>
             `).join('')
             : `<div class="capture-balanced-state">${escapeHTML(getLocale(
@@ -4362,8 +4381,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const trRow = new Array(header.length).fill(''); 
                 trRow[0] = `${tr.from} ➡️ ${tr.to}`; 
                 trRow[1] = `${formatNumber(tr.amount, base_currency)} ${base_currency}`; 
-                if (tr.details) {
-                    trRow[2] = `(${tr.details})`;
+                if (tr.detailsText) {
+                    trRow[2] = `(${tr.detailsText})`;
                 }
                 dataForExport.push(trRow); 
             });
