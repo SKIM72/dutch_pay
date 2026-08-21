@@ -357,42 +357,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    async function triggerPushNotification(roomId) {
-        if (!("Notification" in window) || Notification.permission !== "granted") return;
-        
-        const inThisChat = window.location.pathname.includes('chat.html') && currentSettlementId === roomId;
-        if (inThisChat && !document.hidden) return;
-
-        const isAdmin = currentUser && currentUser.email.toLowerCase() === 'eowert72@gmail.com';
-        const disguise = isAdmin && localStorage.getItem('adminDisguisePush') === 'true';
-
-        let title = "SETTLE UP";
-        let body = "새로운 메시지가 도착했습니다.";
-
-        if (!disguise) {
-            const { data } = await supabaseClient.from('settlements').select('title').eq('id', roomId).single();
-            if (data) {
-                title = data.title;
-                body = `새로운 메시지가 있습니다.`;
-            }
-        } else {
-            body = ""; 
-        }
-
-        const options = { body: body, icon: 'icon.png' };
-        
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.ready.then(function(registration) {
-                registration.showNotification(title, options);
-            }).catch(function() {
-                new Notification(title, options);
-            });
-        } else {
-            new Notification(title, options);
-        }
-    }
-
-    const applyMobileUIFix = () => {
+    function applyMobileUIFix() {
         const titleGroup = document.querySelector('.header-title-group');
         if (titleGroup) {
             titleGroup.style.display = 'flex';
@@ -417,7 +382,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if(text) text.style.display = 'inline';
             }
         });
-    };
+    }
     window.addEventListener('resize', applyMobileUIFix);
     applyMobileUIFix();
 
@@ -468,14 +433,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         container.appendChild(toast);
         setTimeout(() => toast.classList.add('show'), 10);
         setTimeout(() => { toast.classList.remove('show'); setTimeout(() => toast.remove(), 300); }, 3000);
-    }
-
-    function dismissVirtualKeyboard() {
-        const activeElement = document.activeElement;
-        if (activeElement instanceof HTMLElement) activeElement.blur();
-        try {
-            navigator.virtualKeyboard?.hide?.();
-        } catch (_) {}
     }
 
     function showReceiptStep(stepName) {
@@ -905,7 +862,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // 🚀 [안전장치 3] 15초 최후통첩 로딩 타이머 (시각적 해제)
     let loadingTimeout = null;
     function setLoading(isLoading) { 
         const loader = document.getElementById('global-loader');
@@ -1084,7 +1040,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             return true;
         } catch(e) {
-            return true; // 에러 발생 시 무단 강퇴 방지
+            return true; 
         }
     }
 
@@ -2292,7 +2248,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function renderTableHeader(participants) {
         if(!expenseTableHeaderRow) return;
-        const children = Array.from(expenseTableHeaderRow.children);
         while (expenseTableHeaderRow.children.length > 3) { 
             expenseTableHeaderRow.removeChild(expenseTableHeaderRow.lastChild); 
         }
@@ -3016,12 +2971,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    // 🚀 [하이브리드 UX 로직 적용] 최소 송금 계산 및 원본 채무 상세 내역 동시 생성
     function calculateMinimumTransfers(expenses, participants) {
         const balances = {};
-        participants.forEach(p => balances[p] = 0);
+        const itemizedDebts = {};
+        
+        participants.forEach(p => {
+            balances[p] = 0;
+            itemizedDebts[p] = {};
+        });
+
         expenses.forEach(exp => {
             balances[exp.payer] += (exp.amount || 0);
-            participants.forEach(p => { balances[p] -= (exp.shares[p] || 0); });
+            participants.forEach(p => { 
+                const share = exp.shares[p] || 0;
+                balances[p] -= share; 
+                
+                if (p !== exp.payer && share > 0) {
+                    if (!itemizedDebts[p][exp.payer]) itemizedDebts[p][exp.payer] = [];
+                    itemizedDebts[p][exp.payer].push({ name: exp.name, amount: share });
+                }
+            });
         });
 
         let debtors = []; let creditors = []; 
@@ -3039,7 +3009,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         while (i < debtors.length && j < creditors.length) {
             let debtor = debtors[i]; let creditor = creditors[j];
             let amountToTransfer = Math.min(debtor.amount, creditor.amount);
-            transfers.push({ from: debtor.person, to: creditor.person, amount: amountToTransfer });
+            
+            let detailTextParts = [];
+            for (const [originalCreditor, items] of Object.entries(itemizedDebts[debtor.person] || {})) {
+                const totalDebt = items.reduce((sum, it) => sum + it.amount, 0);
+                if (totalDebt > 0) {
+                    const itemNames = items.map(it => it.name).join(', ');
+                    detailTextParts.push(`${originalCreditor}에게 ${Math.round(totalDebt).toLocaleString()}(${itemNames})`);
+                }
+            }
+            const detailString = detailTextParts.length > 0 ? detailTextParts.join(' + ') + ' 합산됨' : '';
+
+            transfers.push({ 
+                from: debtor.person, 
+                to: creditor.person, 
+                amount: amountToTransfer,
+                details: detailString
+            });
+
             debtor.amount -= amountToTransfer; creditor.amount -= amountToTransfer;
             if (debtor.amount < 0.01) i++;
             if (creditor.amount < 0.01) j++;
@@ -3098,14 +3085,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         const headingDescription = isEstimate
             ? getLocale('expectedSettlementDesc', '현재 지출 기준이며 변경 시 자동으로 다시 계산됩니다.')
             : getLocale('finalSettlementDesc', '확정된 송금 금액입니다.');
+        
         heading.innerHTML = `
-            <div class="settlement-result-label">
-                <i class="fas ${isEstimate ? 'fa-calculator' : 'fa-circle-check'}" aria-hidden="true"></i>
-                <span>${escapeHTML(headingLabel)}</span>
+            <div class="settlement-result-label" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div>
+                    <i class="fas ${isEstimate ? 'fa-calculator' : 'fa-circle-check'}" aria-hidden="true"></i>
+                    <span>${escapeHTML(headingLabel)}</span>
+                </div>
+                <button type="button" id="open-algorithm-info-btn" style="background: transparent; border: none; color: rgba(255, 255, 255, 0.7); font-size: 0.8rem; cursor: pointer; text-decoration: underline; padding: 0; display: inline-flex; align-items: center; gap: 0.2rem;">
+                    <i class="fas fa-question-circle"></i> <span data-i18n="algorithmNoticeBtn">상계 처리 안내</span>
+                </button>
             </div>
-            <small>${escapeHTML(headingDescription)}</small>
+            <small style="display: block; margin-top: 0.2rem;">${escapeHTML(headingDescription)}</small>
         `;
         finalSettlementContainer.appendChild(heading);
+
+        setTimeout(() => {
+            const infoBtn = document.getElementById('open-algorithm-info-btn');
+            const infoModal = document.getElementById('algorithm-info-modal');
+            if (infoBtn && infoModal) {
+                infoBtn.addEventListener('click', () => {
+                    infoModal.classList.remove('hidden');
+                });
+            }
+        }, 0);
 
         if (transfers.length === 0) {
             const balancedState = document.createElement('div');
@@ -3125,6 +3128,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             const div = document.createElement('div');
             div.className = `transfer-item ${isEstimate ? 'is-estimate' : 'is-final'}`;
             const linkAmount = (['KRW', 'JPY', 'TWD'].includes(baseCurrency)) ? Math.round(tr.amount) : tr.amount.toFixed(2);
+            
+            // 🚀 [하이브리드 UX] 토글로 합산 상세 내역 노출
+            const detailHtml = tr.details 
+                ? `<details style="grid-column: 1 / -1; margin-top: 0.4rem; text-align: left;">
+                     <summary style="font-size: 0.75rem; color: rgba(255,255,255,0.7); cursor: pointer; user-select: none;">
+                       <i class="fas fa-info-circle"></i> 합산 상세 내역 보기
+                     </summary>
+                     <div style="margin-top: 0.4rem; padding: 0.5rem; background: rgba(0,0,0,0.15); border-radius: 6px; font-size: 0.75rem; color: rgba(255,255,255,0.9); line-height: 1.4;">
+                       ${escapeHTML(tr.details)}
+                     </div>
+                   </details>` 
+                : '';
+
             div.innerHTML = `
                 <div class="transfer-route">
                     <span class="transfer-person">${escapeHTML(tr.from)}</span>
@@ -3133,6 +3149,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 </div>
                 <strong class="transfer-amount">${escapeHTML(formatNumber(tr.amount, baseCurrency))} ${escapeHTML(baseCurrency)}</strong>
                 ${showPaymentActions ? getPaymentActions(baseCurrency, linkAmount) : ''}
+                ${detailHtml}
             `;
             finalSettlementContainer.appendChild(div);
         });
@@ -3315,6 +3332,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         else showToast('복사에 실패했습니다.', 'error');
     }
 
+    // 🚀 [하이브리드 UX] 캡처 리포트에 상세 내역 자동 표기
     function buildSettlementCaptureReport() {
         const { title, date, participants, expenses, base_currency, is_settled } = currentSettlement;
         const sortedExpenses = getSortedExpenses(expenses);
@@ -3329,13 +3347,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             : getLocale('expectedSettlement', '예상 정산');
         const transfersHtml = transfers.length
             ? transfers.map((transfer) => `
-                <div class="capture-transfer-item">
+                <div class="capture-transfer-item" style="height: auto; min-height: 80px; padding: 12px 14px;">
                     <span class="capture-transfer-route">
                         <strong>${escapeHTML(transfer.from)}</strong>
                         <span aria-hidden="true">→</span>
                         <strong>${escapeHTML(transfer.to)}</strong>
                     </span>
                     <b>${escapeHTML(formatNumber(transfer.amount, base_currency))} ${escapeHTML(base_currency)}</b>
+                    ${transfer.details ? `<div style="margin-top: 4px; padding: 6px; border-radius: 4px; background: rgba(0,0,0,0.12); font-size: 11px; line-height: 1.35; color: rgba(255,255,255,0.9); font-weight: 500;">${escapeHTML(transfer.details)}</div>` : ''}
                 </div>
             `).join('')
             : `<div class="capture-balanced-state">${escapeHTML(getLocale(
@@ -3620,7 +3639,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             setLoading(false);
         }
     }
-
 
     function setupEventListeners() {
         const setCurrentTimeBtn = document.getElementById('set-current-time-btn');
@@ -3936,7 +3954,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         updateSidebarVisualState();
         if(authBtn) authBtn.addEventListener('click', handleAuthClick); 
 
-        // 🚀 [추가] "무료로 시작하기" 버튼 등 다른 진입점에도 인앱 강제 탈출 적용
         const landingStartBtn = document.getElementById('landing-start-btn') || document.querySelector('.landing-start-btn');
         if (landingStartBtn) {
             landingStartBtn.addEventListener('click', (e) => {
@@ -4161,7 +4178,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
 
-        [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal, document.getElementById('share-modal'), document.getElementById('join-modal'), document.getElementById('profile-modal'), editTitleModal, qrScannerModal, participantsModal].forEach(modal => {
+        // 🚀 algorithm-info-modal 포함 전체 모달 바깥영역/닫기 클릭 리스너 등록
+        [addSettlementModal, exchangeRateModal, editExpenseModal, expenseRateModal, document.getElementById('share-modal'), document.getElementById('join-modal'), document.getElementById('profile-modal'), editTitleModal, qrScannerModal, participantsModal, document.getElementById('algorithm-info-modal')].forEach(modal => {
             if(modal) {
                 modal.addEventListener('click', (e) => { 
                     if (e.target === modal) {
@@ -4270,6 +4288,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if(downloadExcelBtn) downloadExcelBtn.addEventListener('click', downloadExcel);
     }
 
+    // 🚀 [하이브리드 UX] 엑셀 다운로드 결과에 합산 상세 내역 컬럼 추가
     function downloadExcel() {
         if (!currentSettlement || currentSettlement.expenses.length === 0) { 
             showToast(getLocale('noDataToExport', 'No expense data to export.'), 'error'); 
@@ -4343,6 +4362,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const trRow = new Array(header.length).fill(''); 
                 trRow[0] = `${tr.from} ➡️ ${tr.to}`; 
                 trRow[1] = `${formatNumber(tr.amount, base_currency)} ${base_currency}`; 
+                if (tr.details) {
+                    trRow[2] = `(${tr.details})`;
+                }
                 dataForExport.push(trRow); 
             });
         }
