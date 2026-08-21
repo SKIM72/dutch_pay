@@ -936,6 +936,22 @@
                 <div id="participants-modal-list" style="display: flex; flex-direction: column; gap: 0.8rem; max-height: 60vh; overflow-y: auto;"></div>
             </div>
         </div>
+        
+        <!-- 최소 송금 알고리즘 안내 모달 -->
+        <div id="algorithm-info-modal" class="hidden">
+            <div class="modal-content card" style="max-width: 450px;">
+                <span class="close-modal-btn"><i class="fas fa-times"></i></span>
+                <h2 style="margin-bottom: 1rem;"><i class="fas fa-lightbulb" style="color: var(--primary);"></i> <span data-i18n="algorithmTitle">최소 송금 정산이란?</span></h2>
+                <div style="font-size: 0.9rem; color: var(--text-main); line-height: 1.6; word-break: keep-all;">
+                    <p style="margin-bottom: 0.8rem;" data-i18n="algorithmDesc1">Settle Up은 여러 번 송금하는 번거로움을 없애기 위해 <strong>모든 지출을 하나로 합산하여 상계 처리</strong>합니다.</p>
+                    <p style="margin-bottom: 0.8rem;" data-i18n="algorithmDesc2">누가 누구에게 빚을 졌는지 건별로 계산하지 않고, 각자의 <strong>최종 순수익(받을 돈)과 순부채(낼 돈)</strong>를 먼저 구한 뒤 가장 적은 횟수로 송금하도록 안내합니다.</p>
+                    <div style="background: var(--surface-muted); padding: 0.8rem; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 0.8rem;">
+                        <span style="font-weight: 700; color: var(--primary);"><i class="fas fa-info-circle"></i> 참고하세요</span><br>
+                        <span style="color: var(--text-muted); font-size: 0.85rem;" data-i18n="algorithmDesc3">내가 밥값을 대신 내준 친구가 나에게 돈을 보내지 않고, 다른 사람에게 송금하는 결과가 나올 수 있습니다. (전체 정산 금액은 1원 단위까지 정확히 일치합니다.)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div id="nickname-modal" class="hidden" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.8); display: flex; justify-content: center; align-items: center; z-index: 99999; backdrop-filter: blur(4px);">
             <div class="modal-content card" style="max-width: 380px; text-align: center; padding: 2.5rem 2rem;">
