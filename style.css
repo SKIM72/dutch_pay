@@ -30,8 +30,18 @@ html[data-theme="dark"] {
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
-html { width: 100%; height: 100%; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-body { width: 100%; height: 100%; font-family: var(--font-family); background-color: var(--app-bg); color: var(--text-main); overflow: hidden; overscroll-behavior: none; }
+html, body { 
+    position: fixed; /* iOS 키보드 밀림 완벽 방지 */
+    width: 100%; 
+    height: 100%; 
+    font-family: var(--font-family); 
+    background-color: var(--app-bg); 
+    color: var(--text-main); 
+    overflow: hidden; 
+    overscroll-behavior: none; 
+    -webkit-text-size-adjust: 100%; 
+    text-size-adjust: 100%;
+}
 .hidden { display: none !important; }
 .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 #app { display: flex; flex-direction: column; width: 100%; height: var(--app-height, 100vh); padding-top: env(safe-area-inset-top); }
@@ -1082,3 +1092,96 @@ html[data-theme="dark"] .social-btn.google { background-color: var(--surface-mut
         right: 1.5rem; /* 모바일 정산 추가 버튼과 동일한 가로 여백 */
     }
 }
+
+/* ==========================================
+   [추가] 정산 상세 내역 및 간소화 안내 스타일
+   ========================================== */
+
+/* 1) 일반 모드 (어두운 배경) */
+.transfer-details-toggle { 
+    grid-column: 1 / -1; 
+    margin-top: 0.4rem; 
+    text-align: left; 
+}
+.transfer-details-toggle summary { 
+    font-size: 0.75rem; 
+    color: rgba(255, 255, 255, 0.7); 
+    cursor: pointer; 
+    user-select: none; 
+}
+.transfer-details-content { 
+    margin-top: 0.4rem; 
+    padding: 0.5rem; 
+    background: rgba(0, 0, 0, 0.15); 
+    border-radius: 6px; 
+    font-size: 0.75rem; 
+    color: rgba(255, 255, 255, 0.9); 
+    line-height: 1.4; 
+}
+.algorithm-notice { 
+    margin-top: 0.6rem; 
+    padding-top: 0.6rem; 
+    border-top: 1px dashed rgba(255, 255, 255, 0.2); 
+    color: #fef08a; 
+    font-weight: 600; 
+}
+
+/* 2) 게스트 모드 (밝은 배경: .public-preview-mode) */
+.public-preview-mode .transfer-details-toggle summary { 
+    color: var(--text-muted); 
+}
+.public-preview-mode .transfer-details-content { 
+    background: var(--surface); 
+    color: var(--text-main); 
+    border: 1px solid var(--border); 
+}
+.public-preview-mode .algorithm-notice { 
+    border-top-color: var(--primary-soft-border); 
+    color: var(--primary); 
+}
+
+/* 인원별 정산 요약표 스타일 */
+.participant-stats-toggle {
+    grid-column: 1 / -1;
+    margin-bottom: 1rem;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.public-preview-mode .participant-stats-toggle {
+    background: var(--surface-muted);
+    border-color: var(--border);
+}
+.participant-stats-toggle summary {
+    padding: 0.8rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    user-select: none;
+}
+.public-preview-mode .participant-stats-toggle summary { color: var(--text-main); }
+.participant-stats-content {
+    padding: 0 1rem 1rem;
+    font-size: 0.75rem;
+}
+.stat-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1.3fr;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.7);
+    text-align: right;
+}
+.public-preview-mode .stat-row { 
+    border-bottom-color: var(--border); 
+    color: var(--text-muted); 
+}
+.stat-row.stat-header {
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.9);
+}
+.public-preview-mode .stat-row.stat-header { color: var(--text-main); }
+.stat-row span:first-child { text-align: left; font-weight: 600; }
+.stat-row:last-child { border-bottom: none; }

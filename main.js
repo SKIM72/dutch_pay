@@ -1,5 +1,14 @@
 document.addEventListener('DOMContentLoaded', async () => {
 
+    // iOS 키보드 밀림(하얀 공백) 현상 강제 복구
+    document.addEventListener('focusout', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') {
+            setTimeout(() => {
+                window.scrollTo(0, 0);
+            }, 100);
+        }
+    });
+
     // 🚀 [강력한 네트워크 복구 로직] OS의 통신 좀비 상태를 뚫고 강제로 새 연결을 생성하는 커스텀 Fetch
     const customFetch = async (url, options) => {
         // 기기가 오프라인이면 통신 시도조차 하지 않음
@@ -2848,15 +2857,18 @@ document.addEventListener('DOMContentLoaded', async () => {
                 : `<span class="expense-card-amount">${originalAmount}</span>`;
 
             const shareRows = participants.map(participant => `
-                <div class="expense-card-share-row">
-                    <span>${escapeHTML(participant)}</span>
-                    <strong>${escapeHTML(formatNumber(shares[participant] || 0, baseCurrency))} ${escapeHTML(baseCurrency)}</strong>
-                </div>
-            `).join('');
-            const splitDetailsLabel = getLocale('splitDetails', '분담 내역');
-            const participantCountLabel = getLocale('participantsCount', '{count}명')
-                .replace('{count}', participants.length);
+    <div class="expense-card-share-row">
+        <span>${escapeHTML(participant)}</span>
+        <strong>${escapeHTML(formatNumber(shares[participant] || 0, baseCurrency))} ${escapeHTML(baseCurrency)}</strong>
+    </div>
+`).join('');
 
+const splitDetailsLabel = getLocale('splitDetails', '분담 내역');
+
+// ✅ 분담금이 0원보다 큰 실제 참여자만 필터링하여 인원수 카운트
+const activeParticipantsCount = participants.filter(p => (shares[p] || 0) > 0).length;
+const participantCountLabel = getLocale('participantsCount', '{count}명')
+    .replace('{count}', activeParticipantsCount);
             const actionButton = isLocked ? '' : `
                 <button type="button" class="expense-card-delete delete-expense-btn" data-id="${expenseId}" title="지출 삭제">
                     <i class="fas fa-trash-alt"></i>
@@ -2970,7 +2982,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    // 🚀 [하이브리드 UX 로직 적용] 최소 송금 계산 및 원본 채무 상세 내역 동시 생성
+// 🚀 [하이브리드 UX 로직 적용] 최소 송금 계산 및 원본 채무 상세 내역 동시 생성
     function calculateMinimumTransfers(expenses, participants) {
         const balances = {};
         const itemizedDebts = {};
@@ -2995,8 +3007,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         let debtors = []; let creditors = []; 
         for (const [person, balance] of Object.entries(balances)) {
-            if (balance > 0.01) creditors.push({ person, amount: balance });
-            else if (balance < -0.01) debtors.push({ person, amount: Math.abs(balance) });
+            // 1. 버그 수정: originalAmount를 함께 저장하여 원본 순부채/순수익을 유지
+            if (balance > 0.01) creditors.push({ person, amount: balance, originalAmount: balance });
+            else if (balance < -0.01) debtors.push({ person, amount: Math.abs(balance), originalAmount: Math.abs(balance) });
         }
         
         debtors.sort((a, b) => b.amount - a.amount);
@@ -3016,26 +3029,63 @@ document.addEventListener('DOMContentLoaded', async () => {
             for (const [originalCreditor, items] of Object.entries(itemizedDebts[debtor.person] || {})) {
                 const debtToThisPerson = items.reduce((sum, it) => sum + it.amount, 0);
                 if (debtToThisPerson > 0) {
-                    const itemNames = items.map(it => it.name).join(', ');
-                    const itemNamesEscaped = items.map(it => escapeHTML(it.name)).join(', ');
-                    detailTextParts.push(`${originalCreditor}에게 ${Math.round(debtToThisPerson).toLocaleString()}원(${itemNames})`);
-                    detailHtmlParts.push(`${escapeHTML(originalCreditor)}에게 ${Math.round(debtToThisPerson).toLocaleString()}원(${itemNamesEscaped})`);
+                    // 💡 [개선 포인트] 항목명이 너무 많으면 "OOO 외 N건"으로 스마트하게 요약
+                    let summaryNames = '';
+                    let summaryNamesEscaped = '';
+                    if (items.length <= 2) {
+                        summaryNames = items.map(it => it.name).join(', ');
+                        summaryNamesEscaped = items.map(it => escapeHTML(it.name)).join(', ');
+                    } else {
+                        summaryNames = `${items[0].name} 외 ${items.length - 1}건`;
+                        summaryNamesEscaped = `${escapeHTML(items[0].name)} 외 ${items.length - 1}건`;
+                    }
+
+                    detailTextParts.push(`${originalCreditor}: ${Math.round(debtToThisPerson).toLocaleString()}원 (${summaryNames})`);
+                    
+                    // 💡 [개선 포인트] 가로 형태의 긴 글 대신, 영수증 느낌의 깔끔한 세로 리스트 UI
+                    detailHtmlParts.push(`
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <span style="font-size: 0.75rem; line-height: 1.3;">
+                                <strong style="font-size: 0.8rem;">${escapeHTML(originalCreditor)}</strong> 
+                                <span style="opacity: 0.75; font-size: 0.7rem; display: block; margin-top: 0.1rem;">${summaryNamesEscaped}</span>
+                            </span>
+                            <strong style="font-size: 0.8rem; flex-shrink: 0;">${Math.round(debtToThisPerson).toLocaleString()}원</strong>
+                        </div>
+                    `);
                     totalDebt += debtToThisPerson;
                 }
             }
             
-            let detailText = detailTextParts.join(' + ');
-            let detailHtml = detailHtmlParts.join(' + ');
+            // 엑셀 다운로드나 텍스트 복사용은 슬래시(/)로 구분
+            let detailText = detailTextParts.join(' / ');
+            let detailHtml = detailHtmlParts.join('');
             
-            const myOriginalCredit = totalDebt - debtor.amount; 
+            // 1. 버그 수정: 매번 깎이는 debtor.amount 대신 debtor.originalAmount(고정값) 사용
+            const myOriginalCredit = totalDebt - debtor.originalAmount; 
             
-            // 🚀 완벽한 상세 내역 생성 (내가 받을 돈 차감 표기)
             if (myOriginalCredit > 0.5) {
-                detailText = `[총 빚 ${Math.round(totalDebt).toLocaleString()}원] : ` + detailText + ` | - (차감) 내가 결제해서 받을 돈 : ${Math.round(myOriginalCredit).toLocaleString()}원`;
-                detailHtml = `<span style="font-weight:700;">[총 빚 ${Math.round(totalDebt).toLocaleString()}원]</span> : ` + detailHtml + `<br><span style="color:#ef4444; font-weight:700; margin-top:0.3rem; display:block;">- (차감) 내가 결제해서 받을 돈 : ${Math.round(myOriginalCredit).toLocaleString()}원</span>`;
-            } else if (detailText) {
-                detailText += ' 합산됨';
-                detailHtml += ' 합산됨';
+                detailText = `[총 빚 ${Math.round(totalDebt).toLocaleString()}원] : ` + detailText + ` | - 상계 차감: ${Math.round(myOriginalCredit).toLocaleString()}원`;
+                
+                // 💡 [개선 포인트] 상계(차감) 내역을 하단 점선 아래로 분리하여 가독성 극대화
+                detailHtml = `
+                    <div style="padding-bottom: 0.2rem;">
+                        ${detailHtml}
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed rgba(128,128,128,0.4); padding-top: 0.6rem; margin-top: 0.2rem; color: #ef4444; font-weight: 700;">
+                        <span><i class="fas fa-minus-circle"></i> 받을 돈 차감</span>
+                        <span>-${Math.round(myOriginalCredit).toLocaleString()}원</span>
+                    </div>
+                `;
+            }
+
+            // 2. 알고리즘 개입(대리 송금) 명시 UX 추가
+            const directDebt = (itemizedDebts[debtor.person] && itemizedDebts[debtor.person][creditor.person])
+                ? itemizedDebts[debtor.person][creditor.person].reduce((sum, it) => sum + it.amount, 0) : 0;
+                
+            if (directDebt < amountToTransfer) {
+                const algorithmNotice = `<div class="algorithm-notice"><i class="fas fa-magic"></i> 정산 간소화 배정: 원래 결제자 대신, 돈을 덜 받은 ${escapeHTML(creditor.person)}님에게 보내도록 매칭되었습니다.</div>`;
+                detailHtml += algorithmNotice;
+                detailText += ` | (정산 간소화: ${creditor.person}님에게 매칭됨)`;
             }
 
             transfers.push({ 
@@ -3150,14 +3200,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // 🚀 [하이브리드 UX] 토글로 합산 상세 내역 노출 (HTML 직접 사용)
             const detailHtml = tr.detailsHtml 
-                ? `<details style="grid-column: 1 / -1; margin-top: 0.4rem; text-align: left;">
-                     <summary style="font-size: 0.75rem; color: rgba(255,255,255,0.7); cursor: pointer; user-select: none;">
-                       <i class="fas fa-info-circle"></i> 합산 상세 내역 보기
-                     </summary>
-                     <div style="margin-top: 0.4rem; padding: 0.5rem; background: rgba(0,0,0,0.15); border-radius: 6px; font-size: 0.75rem; color: rgba(255,255,255,0.9); line-height: 1.4;">
-                       ${tr.detailsHtml}
-                     </div>
-                   </details>` 
+                ? `<details class="transfer-details-toggle">
+                    <summary>
+                    <i class="fas fa-info-circle"></i> 합산 상세 내역 보기
+                    </summary>
+                    <div class="transfer-details-content">
+                    ${tr.detailsHtml}
+                    </div>
+                </details>` 
                 : '';
 
             div.innerHTML = `
@@ -3196,6 +3246,63 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         if(finalSettlementContainer) finalSettlementContainer.innerHTML = '';
         if(completeSettlementBtn) completeSettlementBtn.classList.add('hidden');
+
+        const participantStats = {};
+        participants.forEach(p => participantStats[p] = { share: 0, paid: 0 });
+
+        expenses.forEach(exp => {
+            if (participantStats[exp.payer]) participantStats[exp.payer].paid += (exp.amount || 0);
+            participants.forEach(p => {
+                if (participantStats[p]) participantStats[p].share += (exp.shares[p] || 0);
+            });
+        });
+
+        let statsTableRows = participants.map(p => {
+            const stat = participantStats[p];
+            const net = stat.paid - stat.share; // (결제액 B - 부담액 A)
+            let netText = '';
+            let netColor = '';
+            
+            if (net > 0.5) {
+                netText = `+${formatNumber(net, base_currency)} (받을 돈)`;
+                netColor = 'color: #34d399;'; // 녹색
+            } else if (net < -0.5) {
+                netText = `${formatNumber(net, base_currency)} (보낼 돈)`;
+                netColor = 'color: #f87171;'; // 적색
+            } else {
+                netText = `0 (정산 완료)`;
+                netColor = 'color: var(--text-muted);';
+            }
+
+            return `
+                <div class="stat-row">
+                    <span>${escapeHTML(p)}</span>
+                    <span>${formatNumber(stat.share, base_currency)}</span>
+                    <span>${formatNumber(stat.paid, base_currency)}</span>
+                    <strong style="${netColor}">${netText}</strong>
+                </div>
+            `;
+        }).join('');
+
+        const statsHtml = `
+            <details class="participant-stats-toggle">
+                <summary><i class="fas fa-list-alt"></i> 인원별 실제 부담액 및 정산 금액 비교</summary>
+                <div class="participant-stats-content">
+                    <div class="stat-row stat-header">
+                        <span>참여자</span>
+                        <span>개별 부담액</span>
+                        <span>본인 결제액</span>
+                        <span>최종 정산액</span>
+                    </div>
+                    ${statsTableRows}
+                </div>
+            </details>
+        `;
+
+        if (finalSettlementContainer && expenses.length > 0) {
+            finalSettlementContainer.innerHTML = statsHtml;
+        }
+        // ==========================================
 
         const { transfers } = calculateMinimumTransfers(expenses, participants);
 
@@ -3504,11 +3611,39 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
             const now = new Date(); 
             const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-            const link = document.createElement('a'); 
-            link.download = `SettleUp_${getSafeCaptureFileName(currentSettlement.title)}_${timestamp}.png`;
-            link.href = dataUrl; 
-            link.click();
-            showToast('이미지가 성공적으로 저장되었습니다!', 'success');
+            //const link = document.createElement('a'); 
+            //link.download = `SettleUp_${getSafeCaptureFileName(currentSettlement.title)}_${timestamp}.png`;
+            //link.href = dataUrl; 
+            //link.click();
+            //showToast('이미지가 성공적으로 저장되었습니다!', 'success');
+            const fileName = `SettleUp_${getSafeCaptureFileName(currentSettlement.title)}_${timestamp}.png`;
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            if (isIOS && navigator.share) {
+                // iOS 환경: Web Share API 활용 (네이티브 공유창 호출)
+                try {
+                    const res = await fetch(dataUrl);
+                    const blob = await res.blob();
+                    const file = new File([blob], fileName, { type: 'image/png' });
+                    
+                    await navigator.share({
+                        files: [file],
+                        title: 'Settle Up 정산 내역'
+                    });
+                    showToast('공유 창에서 [이미지 저장]을 선택해 주세요.', 'info');
+                } catch (err) {
+                    // 사용자가 공유 창을 그냥 닫은 경우 에러 방지
+                    if (err.name !== 'AbortError') {
+                        showToast('이미지 저장에 실패했습니다.', 'error');
+                    }
+                }
+            } else {
+                // Android, PC 환경: 기존 a 태그 다이렉트 다운로드
+                const link = document.createElement('a'); 
+                link.download = fileName;
+                link.href = dataUrl; 
+                link.click();
+                showToast('이미지가 성공적으로 저장되었습니다!', 'success');
+            }
         } catch(err) { 
             console.error("이미지 캡처 에러: ", err);
             showToast("이미지 저장에 실패했습니다. (브라우저 보안 설정 때문일 수 있습니다)", 'error'); 
