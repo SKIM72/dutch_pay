@@ -3063,11 +3063,20 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
             // 1. 버그 수정: 매번 깎이는 debtor.amount 대신 debtor.originalAmount(고정값) 사용
             const myOriginalCredit = totalDebt - debtor.originalAmount; 
             
+            // 💡 [개선 포인트] 이 상세 내역이 '개인의 전체 상태'임을 명시하는 헤더 추가
+            const finalNetDebt = debtor.originalAmount; // 이 사람이 토해내야 할 총액
+            const summaryHeader = `
+                <div class="transfer-details-header">
+                    <span><i class="fas fa-user"></i> ${escapeHTML(debtor.person)}님의 전체 요약</span>
+                    <span>총 보낼 돈: <strong>${Math.round(finalNetDebt).toLocaleString()}원</strong></span>
+                </div>
+            `;
+            
             if (myOriginalCredit > 0.5) {
-                detailText = `[총 빚 ${Math.round(totalDebt).toLocaleString()}원] : ` + detailText + ` | - 상계 차감: ${Math.round(myOriginalCredit).toLocaleString()}원`;
+                detailText = `[${debtor.person} 전체 요약 (총 빚 ${Math.round(totalDebt).toLocaleString()}원)] : ` + detailText + ` | - 상계 차감: ${Math.round(myOriginalCredit).toLocaleString()}원`;
                 
-                // 💡 [개선 포인트] 상계(차감) 내역을 하단 점선 아래로 분리하여 가독성 극대화
-                detailHtml = `
+                // 헤더를 기존 내역 맨 위에 붙여줌
+                detailHtml = summaryHeader + `
                     <div style="padding-bottom: 0.2rem;">
                         ${detailHtml}
                     </div>
@@ -3076,6 +3085,9 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
                         <span>-${Math.round(myOriginalCredit).toLocaleString()}원</span>
                     </div>
                 `;
+            } else {
+                detailText = `[${debtor.person} 전체 요약] : ` + detailText;
+                detailHtml = summaryHeader + detailHtml;
             }
 
             // 2. 알고리즘 개입(대리 송금) 명시 UX 추가
@@ -3083,10 +3095,35 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
                 ? itemizedDebts[debtor.person][creditor.person].reduce((sum, it) => sum + it.amount, 0) : 0;
                 
             if (directDebt < amountToTransfer) {
-                const algorithmNotice = `<div class="algorithm-notice"><i class="fas fa-magic"></i> 정산 간소화 배정: 원래 결제자 대신, 돈을 덜 받은 ${escapeHTML(creditor.person)}님에게 보내도록 매칭되었습니다.</div>`;
+                // 💡 중학생도 이해하기 쉬운 친절한 문구
+                const algorithmNotice = `
+                <div class="algorithm-notice" style="line-height: 1.45;">
+                    <i class="fas fa-magic"></i> <b>정산 간소화 마법!</b><br>
+                    <span style="font-size: 0.72rem; font-weight: 500; opacity: 0.9; display: block; margin-top: 0.2rem;">
+                        여러 번 송금하는 귀찮음을 없애기 위해, 다른 사람에게 줘야 할 돈까지 모두 묶어서 <b>${escapeHTML(creditor.person)}님에게 한 번에 보내도록</b> 시스템이 대신 계산했어요.
+                    </span>
+                </div>`;
                 detailHtml += algorithmNotice;
-                detailText += ` | (정산 간소화: ${creditor.person}님에게 매칭됨)`;
+                detailText += ` | (정산 간소화: 다른 빚까지 모아서 ${creditor.person}님에게 일괄 송금)`;
             }
+
+            // 💡 [새로운 개선] 이전 사람의 한도가 다 차서 돈이 찢어진 경우 알림 띄우기
+            if (debtor.previousCreditors && debtor.previousCreditors.length > 0) {
+                const lastCreditor = debtor.previousCreditors[debtor.previousCreditors.length - 1];
+                const splitNotice = `
+                <div class="split-notice" style="line-height: 1.45;">
+                    <i class="fas fa-cut"></i> <b>분할 송금 매칭!</b><br>
+                    <span style="font-size: 0.72rem; font-weight: 500; opacity: 0.9; display: block; margin-top: 0.2rem;">
+                        <b>${escapeHTML(lastCreditor)}</b>님이 받을 돈이 모두 채워져서, 남은 금액 중 <b>${Math.round(amountToTransfer).toLocaleString()}원</b>을 <b>${escapeHTML(creditor.person)}</b>님에게 분할 매칭했습니다.
+                    </span>
+                </div>`;
+                detailHtml += splitNotice;
+                detailText += ` | (분할 매칭: ${lastCreditor}님 한도 초과로 분할됨)`;
+            }
+
+            // 기록해두기 (다음에 또 찢어지면 이 사람 이름을 띄우기 위함)
+            debtor.previousCreditors = debtor.previousCreditors || [];
+            debtor.previousCreditors.push(creditor.person);
 
             transfers.push({ 
                 from: debtor.person, 

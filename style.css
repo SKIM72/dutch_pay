@@ -1185,3 +1185,42 @@ html[data-theme="dark"] .social-btn.google { background-color: var(--surface-mut
 .public-preview-mode .stat-row.stat-header { color: var(--text-main); }
 .stat-row span:first-child { text-align: left; font-weight: 600; }
 .stat-row:last-child { border-bottom: none; }
+
+/* 개인별 전체 요약 헤더 스타일 */
+.transfer-details-header {
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.transfer-details-header > span:first-child {
+    font-weight: 700;
+    color: #a5b4fc;
+    font-size: 0.8rem;
+}
+.transfer-details-header > span:last-child {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+.transfer-details-header strong { color: white; }
+
+/* 게스트 모드(밝은 테마) 대응 */
+.public-preview-mode .transfer-details-header { border-bottom-color: var(--border); }
+.public-preview-mode .transfer-details-header > span:first-child { color: var(--primary); }
+.public-preview-mode .transfer-details-header > span:last-child { color: var(--text-muted); }
+.public-preview-mode .transfer-details-header strong { color: var(--text-main); }
+
+/* 분할 송금 매칭 알림 스타일 */
+.split-notice { 
+    margin-top: 0.6rem; 
+    padding-top: 0.6rem; 
+    border-top: 1px dashed rgba(255, 255, 255, 0.2); 
+    color: #93c5fd; /* 파스텔 블루 */
+    font-weight: 600; 
+}
+.public-preview-mode .split-notice { 
+    border-top-color: var(--primary-soft-border); 
+    color: #3b82f6; /* 라이트 모드 블루 */
+}
