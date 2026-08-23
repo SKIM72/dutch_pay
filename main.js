@@ -3510,14 +3510,13 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
             : getLocale('expectedSettlement', '예상 정산');
         const transfersHtml = transfers.length
             ? transfers.map((transfer) => `
-                <div class="capture-transfer-item" style="height: auto; min-height: 80px; padding: 12px 14px;">
+                <div class="capture-transfer-item" style="min-height: 72px; padding: 14px 16px;">
                     <span class="capture-transfer-route">
                         <strong>${escapeHTML(transfer.from)}</strong>
                         <span aria-hidden="true">→</span>
                         <strong>${escapeHTML(transfer.to)}</strong>
                     </span>
                     <b>${escapeHTML(formatNumber(transfer.amount, base_currency))} ${escapeHTML(base_currency)}</b>
-                    ${transfer.detailsHtml ? `<div style="margin-top: 4px; padding: 6px; border-radius: 4px; background: rgba(0,0,0,0.06); font-size: 11px; line-height: 1.35; color: rgba(255,255,255,0.9); font-weight: 500;">${transfer.detailsHtml}</div>` : ''}
                 </div>
             `).join('')
             : `<div class="capture-balanced-state">${escapeHTML(getLocale(
@@ -3556,7 +3555,8 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
         }).join('');
 
         report.innerHTML = `
-            <header class="capture-report-header">
+            <!-- 💡 수정: header 태그를 div 태그로 변경하여 다크모드 충돌 방지 -->
+            <div class="capture-report-header">
                 <div>
                     <span class="capture-report-brand">SETTLE UP</span>
                     <h1>${escapeHTML(title)}</h1>
@@ -3565,7 +3565,8 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
                     <span>${escapeHTML(getLocale('settlementDate', '정산 날짜'))}</span>
                     <strong>${escapeHTML(formatDisplayDate(date))}</strong>
                 </div>
-            </header>
+            </div>
+            
             <section class="capture-summary">
                 <div class="capture-summary-total">
                     <span>${escapeHTML(getLocale('settlementResult', '정산 결과'))}</span>
@@ -3584,6 +3585,7 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
                     <div class="capture-transfer-grid">${transfersHtml}</div>
                 </div>
             </section>
+            
             <section class="capture-expenses">
                 <div class="capture-section-heading">
                     <h2>${escapeHTML(getLocale('detailedExpenseList', '상세 지출 내역'))}</h2>
@@ -3591,12 +3593,14 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
                 </div>
                 <div class="capture-expense-list">${expensesHtml}</div>
             </section>
-            <footer class="capture-report-footer">
+            
+            <!-- 💡 수정: footer 태그를 div 태그로 변경 -->
+            <div class="capture-report-footer">
                 <span>Settle Up</span>
                 <span>${escapeHTML(new Date().toLocaleString(
                     currentLang === 'ja' ? 'ja-JP' : (currentLang === 'en' ? 'en-US' : 'ko-KR')
                 ))}</span>
-            </footer>
+            </div>
         `;
         return report;
     }
@@ -4479,7 +4483,7 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
         if(downloadExcelBtn) downloadExcelBtn.addEventListener('click', downloadExcel);
     }
 
-    // 🚀 [하이브리드 UX] 엑셀 다운로드 결과에 합산 상세 내역 컬럼 추가
+    // 🚀 [하이브리드 UX] 엑셀 다운로드 (지출 내역, 인원별 요약, 상세 내역 3개 시트로 분리)
     function downloadExcel() {
         if (!currentSettlement || currentSettlement.expenses.length === 0) { 
             showToast(getLocale('noDataToExport', 'No expense data to export.'), 'error'); 
@@ -4553,9 +4557,6 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
                 const trRow = new Array(header.length).fill(''); 
                 trRow[0] = `${tr.from} ➡️ ${tr.to}`; 
                 trRow[1] = `${formatNumber(tr.amount, base_currency)} ${base_currency}`; 
-                if (tr.detailsText) {
-                    trRow[2] = `(${tr.detailsText})`;
-                }
                 dataForExport.push(trRow); 
             });
         }
@@ -4563,6 +4564,10 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
         const now = new Date(); 
         const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
         const wb = XLSX.utils.book_new(); 
+        
+        // ========================================================
+        // --- 1. 메인 시트 (지출 내역) 생성 ---
+        // ========================================================
         const ws = XLSX.utils.aoa_to_sheet(dataForExport);
     
         if(!ws['!merges']) ws['!merges'] = [];
@@ -4603,8 +4608,119 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
                 else if (R > 3 && R < totalRowIdx) { ws[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" } }; }
             }
         }
-    
-        XLSX.utils.book_append_sheet(wb, ws, 'Expenses');
+        XLSX.utils.book_append_sheet(wb, ws, '지출 내역');
+
+
+        // ========================================================
+        // --- 💡 2. 인원별 요약 시트 생성 ---
+        // ========================================================
+        const participantStats = {};
+        participants.forEach(p => participantStats[p] = { share: 0, paid: 0 });
+
+        expenses.forEach(exp => {
+            if (participantStats[exp.payer]) participantStats[exp.payer].paid += (exp.amount || 0);
+            participants.forEach(p => {
+                if (participantStats[p]) participantStats[p].share += (exp.shares[p] || 0);
+            });
+        });
+
+        const summaryDataForExport = [];
+        summaryDataForExport.push([`${title} - 인원별 실제 부담액 및 정산 금액 비교`]);
+        summaryDataForExport.push([]);
+        summaryDataForExport.push(['참여자', '개별 부담액', '본인 결제액', '최종 정산액']);
+
+        participants.forEach(p => {
+            const stat = participantStats[p];
+            const net = stat.paid - stat.share;
+            let netText = '';
+            if (net > 0.5) netText = `+${formatNumber(net, base_currency)} (받을 돈)`;
+            else if (net < -0.5) netText = `${formatNumber(net, base_currency)} (보낼 돈)`;
+            else netText = `0 (정산 완료)`;
+
+            summaryDataForExport.push([
+                p,
+                `${formatNumber(stat.share, base_currency)}`,
+                `${formatNumber(stat.paid, base_currency)}`,
+                netText
+            ]);
+        });
+
+        const wsSummary = XLSX.utils.aoa_to_sheet(summaryDataForExport);
+        wsSummary['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+        wsSummary['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 25 }];
+        
+        const summaryRange = XLSX.utils.decode_range(wsSummary['!ref']);
+        for (let R = summaryRange.s.r; R <= summaryRange.e.r; ++R) {
+            for (let C = summaryRange.s.c; C <= summaryRange.e.c; ++C) {
+                const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
+                if (!wsSummary[cell_ref]) continue;
+                if (R === 0) {
+                    wsSummary[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { sz: 14, bold: true, color: { rgb: "4F46E5" } } };
+                } else if (R === 2) {
+                    wsSummary[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true }, fill: { fgColor: { rgb: "E2E8F0" } } };
+                } else if (R > 2) {
+                    wsSummary[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" } };
+                    if (C === 3) {
+                        const cellValue = wsSummary[cell_ref].v;
+                        // 받을 돈(+)은 초록색, 보낼 돈(-)은 빨간색으로 자동 지정
+                        if (cellValue.includes('+')) wsSummary[cell_ref].s.font = { bold: true, color: { rgb: "10B981" } }; 
+                        else if (cellValue.includes('-')) wsSummary[cell_ref].s.font = { bold: true, color: { rgb: "EF4444" } }; 
+                        else wsSummary[cell_ref].s.font = { color: { rgb: "64748B" } }; 
+                    }
+                }
+            }
+        }
+        XLSX.utils.book_append_sheet(wb, wsSummary, '인원별 요약');
+
+
+        // ========================================================
+        // --- 💡 3. 송금 상세 내역 전용 시트 생성 ---
+        // ========================================================
+        if (transfers.length > 0) {
+            const detailDataForExport = [];
+            detailDataForExport.push([`${title} - 정산 송금 상세 내역`]);
+            detailDataForExport.push([]);
+            detailDataForExport.push(['보내는 사람 ➡️ 받는 사람', '송금액', '합산 및 분할 매칭 상세 내역']);
+
+            transfers.forEach(tr => {
+                // 텍스트의 슬래시(/)나 바(|)를 엑셀 줄바꿈(\n)으로 변경하여 가독성 대폭 향상
+                const formattedDetailText = tr.detailsText.replace(/\s\/\s/g, '\n').replace(/\s\|\s/g, '\n\n');
+                
+                detailDataForExport.push([
+                    `${tr.from} ➡️ ${tr.to}`,
+                    `${formatNumber(tr.amount, base_currency)} ${base_currency}`,
+                    formattedDetailText
+                ]);
+            });
+
+            const wsDetail = XLSX.utils.aoa_to_sheet(detailDataForExport);
+            
+            wsDetail['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
+            // 세 번째 컬럼(상세 내역)을 매우 넓게 설정
+            wsDetail['!cols'] = [{ wch: 30 }, { wch: 20 }, { wch: 110 }]; 
+
+            const detailRange = XLSX.utils.decode_range(wsDetail['!ref']);
+            for (let R = detailRange.s.r; R <= detailRange.e.r; ++R) {
+                for (let C = detailRange.s.c; C <= detailRange.e.c; ++C) {
+                    const cell_ref = XLSX.utils.encode_cell({ c: C, r: R });
+                    if (!wsDetail[cell_ref]) continue;
+                    
+                    if (R === 0) {
+                        wsDetail[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { sz: 14, bold: true, color: { rgb: "4F46E5" } } };
+                    } else if (R === 2) {
+                        wsDetail[cell_ref].s = { alignment: { horizontal: "center", vertical: "center" }, font: { bold: true }, fill: { fgColor: { rgb: "E2E8F0" } } };
+                    } else if (R > 2) {
+                        wsDetail[cell_ref].s = { alignment: { vertical: "center", wrapText: true } }; 
+                        if (C === 0 || C === 1) {
+                            wsDetail[cell_ref].s.alignment.horizontal = "center";
+                            wsDetail[cell_ref].s.font = { bold: true };
+                        }
+                    }
+                }
+            }
+            XLSX.utils.book_append_sheet(wb, wsDetail, '송금 상세 내역'); 
+        }
+
         XLSX.writeFile(wb, `${getLocale('expenseReport', 'Expense_Report')}_${title}_${timestamp}.xlsx`, { cellStyles: true });
         showToast('엑셀 파일이 다운로드되었습니다.', 'success');
     }
