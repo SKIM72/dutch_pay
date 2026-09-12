@@ -27,18 +27,29 @@
     
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#6366f1">
-    <link rel="apple-touch-icon" href="icon.png">
-    <link rel="icon" href="icon.png" type="image/png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="icon" href="icon-192.png" type="image/png">
     <script>
         (function() {
             const mode = localStorage.getItem('settleup-theme-mode') || 'system';
             const isDark = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
             document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+
+            // 초대 링크(?code=)와 특정 정산(?id=)은 정산 제목·참여자·금액이 그대로 보이는 화면이다.
+            // 링크가 공개된 곳에 올라가면 검색엔진에 색인될 수 있으므로 색인을 막는다.
+            // (소개 페이지는 계속 색인되도록 파라미터가 있을 때만 적용한다.)
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('code') || params.has('id')) {
+                const meta = document.createElement('meta');
+                meta.name = 'robots';
+                meta.content = 'noindex, nofollow';
+                document.head.appendChild(meta);
+            }
         })();
     </script>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="style.css?v=68">
+    <link rel="stylesheet" href="style.css?v=69">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
@@ -76,11 +87,11 @@
     <div id="app">
         <header>
             <div class="brand-container" onclick="window.location.href='index.html'">
-                <img src="icon.png" alt="Settle Up Icon" id="app-icon">
+                <img src="icon-192.png" alt="Settle Up Icon" id="app-icon" width="28" height="28">
                 <h1>Settle Up</h1>
             </div>
             <div class="header-controls">
-                <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.08.22.1</span>
+                <span id="app-version-badge" class="app-version-badge" title="서비스 버전">v2026.09.10.1</span>
                 <div id="user-info-display" class="hidden" style="cursor: pointer; display: flex; align-items: center; gap: 0.4rem; font-size: 0.85rem; color: var(--text-muted); margin-right: 0.5rem; background: var(--side-bg); padding: 0.3rem 0.6rem; border-radius: 6px; border: 1px solid var(--border); max-width: 150px;" title="마이페이지 열기">
                     <i class="fas fa-user-circle"></i> <span id="user-email-text" style="display: inline-block; max-width: 100px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle;"></span>
                 </div>
@@ -177,7 +188,7 @@
                             <button id="join-room-btn" class="btn-outline hidden">
                                 <i class="fas fa-star"></i> <span data-i18n="saveToMyList">내 목록에 저장</span>
                             </button>
-                            <button id="open-share-modal-btn" class="btn-outline">
+                            <button id="open-share-modal-btn" class="btn-primary-action">
                                 <i class="fas fa-share-alt"></i> <span data-i18n="inviteShareBtn">초대 &amp; 공유</span>
                             </button>
                             <button id="copy-text-btn" class="btn-outline">
@@ -201,6 +212,7 @@
                         </button>
                     </div>
                     
+                    <div id="orphan-notice" class="orphan-notice hidden"></div>
                     <div class="card" id="summary-card">
                         <div class="summary-left">
                             <h2><i class="fas fa-chart-pie"></i><span data-i18n="settlementResult"></span></h2>
@@ -212,6 +224,8 @@
                                 </div>
                             </div>
                             <div id="summary-meta" class="summary-meta"></div>
+                            <div id="summary-my-share" class="summary-my-share hidden"></div>
+                            <div id="summary-breakdown" class="summary-breakdown hidden"></div>
                         </div>
                         <div class="summary-right">
                             <div id="final-settlement-container"></div>
@@ -283,7 +297,7 @@
                                     <label for="split-method" data-i18n="splitMethod">분담 방식</label>
                                     <div class="field-control">
                                         <i class="fas fa-chart-pie" aria-hidden="true"></i>
-                                        <select id="split-method" data-i18n-options="splitEqually,splitByAmount"></select>
+                                        <select id="split-method" data-i18n-options="splitEqually,splitSelected,splitByAmount"></select>
                                     </div>
                                 </div>
                             </div>
@@ -309,8 +323,10 @@
                                 </div>
                             </div>
 
+                            <div id="split-participant-picker" class="hidden split-participant-picker"></div>
+
                             <div id="split-amount-inputs" class="hidden dynamic-split-grid"></div>
-                            
+
                             <button id="add-expense-btn" class="expense-submit-btn">
                                 <span class="expense-submit-copy">
                                     <span data-i18n="recordExpense">기록하기</span>
@@ -360,7 +376,7 @@
             </main>
         </div>
 
-        <button id="add-settlement-fab" class="hidden"><i class="fas fa-plus"></i></button>
+        <button id="add-settlement-fab" class="hidden" aria-label="새 정산 만들기"><i class="fas fa-plus" aria-hidden="true"></i></button>
 
         <div id="add-settlement-modal" class="hidden">
             <div class="modal-content card modal-tool-card settlement-create-modal">
@@ -546,10 +562,11 @@
                             <label class="modal-field-label" for="edit-split-method" data-i18n="splitMethod">분담 방식</label>
                             <div class="field-control">
                                 <i class="fas fa-chart-pie"></i>
-                                <select id="edit-split-method" data-i18n-options="splitEqually,splitByAmount"></select>
+                                <select id="edit-split-method" data-i18n-options="splitEqually,splitSelected,splitByAmount"></select>
                             </div>
                         </div>
                     </div>
+                    <div id="edit-split-participant-picker" class="hidden split-participant-picker"></div>
                     <div id="edit-split-amount-inputs" class="hidden dynamic-split-grid"></div>
                 </div>
 
@@ -617,7 +634,7 @@
                 <i class="fas fa-keyboard" style="font-size: 2.5rem; color: var(--primary); margin-bottom: 1rem;"></i>
                 <h2 style="margin-bottom: 0.5rem; font-size: 1.25rem; justify-content: center;" data-i18n="joinCodeTitle">초대 코드 입력</h2>
                 <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem;" data-i18n="joinCodeDesc">친구에게 받은 6자리 코드를 입력하세요.</p>
-                <input type="text" id="join-code-input" data-i18n-placeholder="joinCodePlaceholder" placeholder="예: A1B2C3" style="text-align: center; font-size: 1.5rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 1rem;">
+                <input type="text" id="join-code-input" data-i18n-placeholder="joinCodePlaceholder" placeholder="예: A1B2C3D4" style="text-align: center; font-size: 1.5rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 1rem;">
                 <button id="submit-join-code-btn" style="width: 100%;" data-i18n="joinSubmit">참가하기</button>
             </div>
         </div>
@@ -908,11 +925,22 @@
         </div>
         
         <div id="edit-title-modal" class="hidden">
-            <div class="modal-content card" style="max-width: 400px;">
+            <div class="modal-content card" style="max-width: 460px;">
                 <span class="close-modal-btn"><i class="fas fa-times"></i></span>
-                <h2 style="margin-bottom: 1.5rem;"><i class="fas fa-edit" style="color: var(--primary);"></i> <span data-i18n="editTitle">정산 제목 수정</span></h2>
-                <div style="display: flex; flex-direction: column; gap: 1rem;">
-                    <input type="text" id="edit-title-input" data-i18n-placeholder="newTitlePlaceholder" style="width: 100%;">
+                <h2 style="margin-bottom: 1.5rem;"><i class="fas fa-edit" style="color: var(--primary);"></i> <span data-i18n="editRoomSettings">정산 정보 수정</span></h2>
+                <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+                    <div class="modal-field">
+                        <label class="modal-field-label" for="edit-title-input" data-i18n="editTitle">정산 제목 수정</label>
+                        <input type="text" id="edit-title-input" data-i18n-placeholder="newTitlePlaceholder" style="width: 100%;">
+                    </div>
+                    <div class="modal-field">
+                        <label class="modal-field-label" data-i18n="participants">참여자</label>
+                        <div id="edit-participant-list" class="edit-participant-list"></div>
+                        <button type="button" id="edit-add-participant-btn" class="btn-outline-small edit-participant-add">
+                            <i class="fas fa-user-plus"></i> <span data-i18n="addParticipant">참여자 추가</span>
+                        </button>
+                        <p class="edit-participant-note" data-i18n="editParticipantNote">이름을 바꾸면 기존 지출 내역의 결제자와 분담액도 함께 옮겨집니다.</p>
+                    </div>
                     <button id="save-title-btn" data-i18n="saveChanges">변경사항 저장</button>
                 </div>
             </div>
@@ -980,9 +1008,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="config.js"></script>
-    <script src="locales.js?v=40"></script>
+    <script src="locales.js?v=41"></script>
     <script src="receipt-image.js?v=3"></script>
-    <script src="main.js?v=107"></script>
-    <script src="chat.js?v=33"></script>
+    <script src="main.js?v=108"></script>
+    <script src="chat.js?v=34"></script>
 </body>
 </html>

@@ -65,8 +65,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     let currentUser = null; 
     let mySelectedRole = null; 
     const exchangeRatesCache = {};
+    const RATE_CACHE_STORAGE_KEY = 'exchangeRateCache';
+
+    // 지난 날짜의 환율은 다시 바뀌지 않으므로 브라우저에 남겨 새로고침마다 재조회하지 않는다.
+    // 'latest'는 매번 달라지므로 캐시 대상에서 제외한다.
+    function readStoredRate(cacheKey) {
+        if (cacheKey.startsWith('latest_')) return null;
+        try {
+            const store = JSON.parse(localStorage.getItem(RATE_CACHE_STORAGE_KEY) || '{}');
+            return store[cacheKey] || null;
+        } catch (e) { return null; }
+    }
+
+    function writeStoredRate(cacheKey, rate) {
+        if (cacheKey.startsWith('latest_')) return;
+        try {
+            const store = JSON.parse(localStorage.getItem(RATE_CACHE_STORAGE_KEY) || '{}');
+            store[cacheKey] = rate;
+            localStorage.setItem(RATE_CACHE_STORAGE_KEY, JSON.stringify(store));
+        } catch (e) { /* 저장 공간이 없으면 메모리 캐시만 사용한다 */ }
+    }
+
+    function rememberRate(cacheKey, rate) {
+        exchangeRatesCache[cacheKey] = rate;
+        writeStoredRate(cacheKey, rate);
+    }
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.06.30.1';
+    const APP_VERSION = 'v2026.09.10.1';
     const THEME_STORAGE_KEY = 'settleup-theme-mode';
     const VALID_THEME_MODES = new Set(['system', 'light', 'dark']);
     const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -236,7 +261,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const itemPayerSelect = document.getElementById('item-payer');
     const splitMethodSelect = document.getElementById('split-method');
     const splitAmountInputs = document.getElementById('split-amount-inputs');
-    
+    const splitParticipantPicker = document.getElementById('split-participant-picker');
+    const editSplitParticipantPicker = document.getElementById('edit-split-participant-picker');
+
     const expenseTableBody = document.querySelector('#expense-table tbody');
     const expenseTableHeaderRow = document.getElementById('expense-table-header-row');
     const expenseCardList = document.getElementById('expense-card-list');
@@ -246,6 +273,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const summaryTotalValue = document.getElementById('summary-total-value');
     const summaryTotalCurrency = document.getElementById('summary-total-currency');
     const summaryMeta = document.getElementById('summary-meta');
+    const summaryBreakdown = document.getElementById('summary-breakdown');
+    const summaryMyShare = document.getElementById('summary-my-share');
+    const orphanNotice = document.getElementById('orphan-notice');
     const finalSettlementContainer = document.getElementById('final-settlement-container');
     const completeSettlementBtn = document.getElementById('complete-settlement-btn');
     const downloadExcelBtn = document.getElementById('download-excel-btn');
@@ -293,12 +323,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const editTitleModal = document.getElementById('edit-title-modal');
     const editTitleInput = document.getElementById('edit-title-input');
     const saveTitleBtn = document.getElementById('save-title-btn');
+    const editParticipantList = document.getElementById('edit-participant-list');
+    const editAddParticipantBtn = document.getElementById('edit-add-participant-btn');
 
     let html5QrcodeScanner = null;
     const openQrScannerBtn = document.getElementById('open-qr-scanner-btn');
     const qrScannerModal = document.getElementById('qr-scanner-modal');
     const closeQrBtn = document.getElementById('close-qr-btn');
     let kickSubscription = null; 
+    let expenseSubscription = null;
 
     function updateSidebarVisualState() {
         if (!sidebar) return;
@@ -401,12 +434,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         return fallbackText || key;
     }
 
+    const ZERO_DECIMAL_CURRENCIES = ['KRW', 'JPY', 'TWD'];
+
+    function getCurrencyDecimals(currency) {
+        return ZERO_DECIMAL_CURRENCIES.includes(currency) ? 0 : 2;
+    }
+
     const formatNumber = (num, decimalsOrCurrency = 2) => {
         if (isNaN(num)) return '0';
         let decimals = 2;
         if (typeof decimalsOrCurrency === 'string') {
-            if (['KRW', 'JPY', 'TWD'].includes(decimalsOrCurrency)) decimals = 0; 
-            else decimals = 2;
+            decimals = getCurrencyDecimals(decimalsOrCurrency);
         } else {
             decimals = decimalsOrCurrency;
         }
@@ -414,7 +452,70 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const parseFormattedNumber = (str) => parseFloat(String(str).replace(/,/g, '')) || 0;
-    
+
+    // 통화가 실제로 표현할 수 있는 자리수로 값을 확정한다.
+    // 화면에서만 반올림하면 저장된 소수점 때문에 합계와 송금액이 1원씩 어긋난다.
+    function roundToCurrency(value, currency) {
+        if (!isFinite(value)) return 0;
+        const factor = Math.pow(10, getCurrencyDecimals(currency));
+        return Math.round(value * factor) / factor;
+    }
+
+    // 총액을 남김없이 나눈다. 나누어떨어지지 않는 나머지는 앞사람부터 최소 단위씩 배분해
+    // 각 몫의 합이 항상 총액과 정확히 일치하도록 만든다. (10,000원 / 3명 -> 3,334 + 3,333 + 3,333)
+    function distributeAmount(total, keys, currency) {
+        const shares = {};
+        if (!keys.length) return shares;
+
+        const factor = Math.pow(10, getCurrencyDecimals(currency));
+        const totalUnits = Math.round(total * factor);
+        const baseUnits = Math.floor(totalUnits / keys.length);
+        let remainder = totalUnits - (baseUnits * keys.length);
+
+        keys.forEach(key => {
+            const extra = remainder > 0 ? 1 : 0;
+            remainder -= extra;
+            shares[key] = (baseUnits + extra) / factor;
+        });
+        return shares;
+    }
+
+    // 직접 입력/과거 데이터처럼 몫이 이미 정해진 경우, 각 몫을 통화 단위로 맞추고
+    // 반올림하며 생긴 오차는 가장 큰 몫이 흡수하게 해서 합계를 총액과 일치시킨다.
+    function reconcileShares(shares, total, currency) {
+        const keys = Object.keys(shares);
+        if (!keys.length) return {};
+
+        const factor = Math.pow(10, getCurrencyDecimals(currency));
+        const targetUnits = Math.round(total * factor);
+        const unitMap = {};
+        let sumUnits = 0;
+
+        keys.forEach(key => {
+            const units = Math.round((shares[key] || 0) * factor);
+            unitMap[key] = units;
+            sumUnits += units;
+        });
+
+        const diff = targetUnits - sumUnits;
+        if (diff !== 0) {
+            const anchor = keys.reduce((best, key) => (unitMap[key] > unitMap[best] ? key : best), keys[0]);
+            unitMap[anchor] += diff;
+        }
+
+        const result = {};
+        keys.forEach(key => { result[key] = unitMap[key] / factor; });
+        return result;
+    }
+
+    // 과거에 저장된 소수점 몫도 화면에서는 통화 단위로 맞춰 보여준다. (DB는 건드리지 않음)
+    function normalizeExpenseShares(expense, baseCurrency) {
+        if (!expense || !expense.shares) return expense;
+        expense.amount = roundToCurrency(expense.amount || 0, baseCurrency);
+        expense.shares = reconcileShares(expense.shares, expense.amount, baseCurrency);
+        return expense;
+    }
+
     function getLocalDateString() { 
         const now = new Date(); 
         return new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0]; 
@@ -891,6 +992,91 @@ document.addEventListener('DOMContentLoaded', async () => {
         return currentUser ? `${baseKey}_${currentUser.id}` : baseKey;
     }
 
+
+    // 로그인 계정과 참여자 이름을 잇는 정보가 서버에 없으므로, 사용자가 직접 고른 값을 기기에 기억한다.
+    function getMyParticipantName(settlementId) {
+        try {
+            const store = JSON.parse(localStorage.getItem(getStorageKey('myParticipantName')) || '{}');
+            return store[String(settlementId)] || null;
+        } catch (e) { return null; }
+    }
+
+    function setMyParticipantName(settlementId, name) {
+        try {
+            const key = getStorageKey('myParticipantName');
+            const store = JSON.parse(localStorage.getItem(key) || '{}');
+            if (name) store[String(settlementId)] = name;
+            else delete store[String(settlementId)];
+            localStorage.setItem(key, JSON.stringify(store));
+        } catch (e) { /* 저장 못 해도 기본 화면은 그대로 동작한다 */ }
+    }
+
+    // "나 얼마 보내면 돼?"가 사용자가 가장 먼저 확인하는 값이라 요약 카드에서 바로 보여준다.
+    function renderMyShare(balances, transfers, baseCurrency) {
+        if (!summaryMyShare || !currentSettlement) return;
+
+        const participants = currentSettlement.participants || [];
+        if (!currentUser || !participants.length) {
+            summaryMyShare.classList.add('hidden');
+            return;
+        }
+
+        summaryMyShare.classList.remove('hidden');
+        const myName = getMyParticipantName(currentSettlement.id);
+
+        if (!myName || !participants.includes(myName)) {
+            const chips = participants.map(p => `<button type="button" class="my-share-pick" data-name="${escapeHTML(p)}">${escapeHTML(p)}</button>`).join('');
+            summaryMyShare.innerHTML = `
+                <span class="my-share-question">${escapeHTML(getLocale('whoAmI', '이 정산에서 나는 누구인가요?'))}</span>
+                <div class="my-share-options">${chips}</div>
+            `;
+            summaryMyShare.querySelectorAll('.my-share-pick').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    setMyParticipantName(currentSettlement.id, btn.dataset.name);
+                    updateSummary();
+                });
+            });
+            return;
+        }
+
+        const net = balances[myName] || 0;
+        const outgoing = transfers.filter(t => t.from === myName);
+        const incoming = transfers.filter(t => t.to === myName);
+
+        let label = getLocale('mySettled', '정산 완료');
+        let value = formatNumber(0, baseCurrency);
+        let tone = 'is-neutral';
+        let detail = '';
+
+        if (net < -0.5) {
+            label = getLocale('myToSend', '내가 보낼 돈');
+            value = formatNumber(Math.abs(net), baseCurrency);
+            tone = 'is-negative';
+            detail = outgoing.map(t => `${escapeHTML(t.to)} · ${escapeHTML(formatNumber(t.amount, baseCurrency))}`).join(' / ');
+        } else if (net > 0.5) {
+            label = getLocale('myToReceive', '내가 받을 돈');
+            value = formatNumber(net, baseCurrency);
+            tone = 'is-positive';
+            detail = incoming.map(t => `${escapeHTML(t.from)} · ${escapeHTML(formatNumber(t.amount, baseCurrency))}`).join(' / ');
+        }
+
+        summaryMyShare.innerHTML = `
+            <div class="my-share-head">
+                <span>${escapeHTML(myName)}</span>
+                <button type="button" id="my-share-reset" title="${escapeHTML(getLocale('changeMyName', '다른 사람으로 변경'))}"><i class="fas fa-rotate"></i></button>
+            </div>
+            <span class="my-share-label">${escapeHTML(label)}</span>
+            <strong class="my-share-value ${tone}">${escapeHTML(value)} ${escapeHTML(baseCurrency)}</strong>
+            ${detail ? `<span class="my-share-detail">${detail}</span>` : ''}
+        `;
+
+        const resetBtn = document.getElementById('my-share-reset');
+        if (resetBtn) resetBtn.addEventListener('click', () => {
+            setMyParticipantName(currentSettlement.id, null);
+            updateSummary();
+        });
+    }
+
     function getJoinedRooms() { 
         try {
             const rooms = JSON.parse(localStorage.getItem(getStorageKey('joinedRooms')) || '[]');
@@ -970,6 +1156,52 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (e) {
             console.error('Member sync failed:', e);
         }
+    }
+
+    // 여러 명이 동시에 지출을 넣는 것이 이 앱의 기본 사용 방식이라,
+    // 열어둔 방의 지출 변경은 새로고침 없이 바로 반영한다.
+    function setupExpenseListener(settlementId) {
+        if (expenseSubscription) {
+            supabaseClient.removeChannel(expenseSubscription);
+            expenseSubscription = null;
+        }
+        if (!settlementId || !currentUser) return;
+
+        expenseSubscription = supabaseClient
+            .channel(`expenses_room_${settlementId}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'expenses',
+                filter: `settlement_id=eq.${settlementId}`
+            }, (payload) => {
+                if (!currentSettlement || currentSettlement.id !== settlementId) return;
+
+                const expenses = currentSettlement.expenses || (currentSettlement.expenses = []);
+                const incoming = payload.new;
+                const removedId = payload.old ? payload.old.id : null;
+
+                if (payload.eventType === 'DELETE') {
+                    if (removedId == null) return;
+                    const before = expenses.length;
+                    currentSettlement.expenses = expenses.filter(exp => exp.id !== removedId);
+                    if (currentSettlement.expenses.length === before) return;
+                } else {
+                    if (!incoming) return;
+                    normalizeExpenseShares(incoming, currentSettlement.base_currency);
+                    const index = expenses.findIndex(exp => exp.id === incoming.id);
+                    // 내가 방금 저장한 건은 이미 화면에 있으므로 갱신만 하고 알림은 띄우지 않는다.
+                    const isMine = currentUser && incoming.user_id === currentUser.id;
+                    if (index > -1) expenses[index] = incoming;
+                    else expenses.push(incoming);
+                    if (!isMine) {
+                        showToast(getLocale('expenseSyncedFromOthers', '다른 참여자가 지출을 변경했습니다.'), 'info');
+                    }
+                }
+
+                render();
+            })
+            .subscribe();
     }
 
     function setupKickListener() {
@@ -1122,7 +1354,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 keys.forEach(key => {
                     const option = document.createElement('option');
                     const value = key.trim();
-                    option.value = value === 'splitEqually' ? 'equal' : 'amount';
+                    const SPLIT_OPTION_VALUES = { splitEqually: 'equal', splitSelected: 'select', splitByAmount: 'amount' };
+                    option.value = SPLIT_OPTION_VALUES[value] || value;
                     option.textContent = translations[value] || value;
                     el.appendChild(option);
                 });
@@ -1138,10 +1371,121 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderSettlementList();
     }
 
-    function setLanguage(lang) { 
-        localStorage.setItem('preferredLang', lang); 
-        if(languageSwitcher) languageSwitcher.value = lang; 
-        updateUI(lang); 
+    function setLanguage(lang) {
+        localStorage.setItem('preferredLang', lang);
+        if(languageSwitcher) languageSwitcher.value = lang;
+        updateUI(lang);
+    }
+
+    // --- 참여자 명단 수정 ---
+    // 지출은 참여자를 '이름 문자열'로 참조하므로, 이름을 바꾸면 기존 지출의
+    // payer와 shares 키도 같이 옮겨야 내역이 끊기지 않는다.
+    function renderEditParticipantList(participants) {
+        if (!editParticipantList) return;
+        editParticipantList.innerHTML = '';
+        participants.forEach(name => addEditParticipantRow(name));
+        updateEditParticipantRemoveButtons();
+    }
+
+    function addEditParticipantRow(value = '') {
+        if (!editParticipantList) return;
+        const row = document.createElement('div');
+        row.className = 'edit-participant-row';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = value;
+        input.dataset.originalName = value;
+        input.placeholder = getLocale('participantNamePlaceholder', '참여자 이름');
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'edit-participant-remove';
+        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        removeBtn.setAttribute('aria-label', getLocale('removeParticipant', '참여자 삭제'));
+        removeBtn.addEventListener('click', () => {
+            row.remove();
+            updateEditParticipantRemoveButtons();
+        });
+
+        row.append(input, removeBtn);
+        editParticipantList.appendChild(row);
+        updateEditParticipantRemoveButtons();
+    }
+
+    function updateEditParticipantRemoveButtons() {
+        if (!editParticipantList) return;
+        const rows = editParticipantList.querySelectorAll('.edit-participant-row');
+        rows.forEach(row => {
+            const btn = row.querySelector('.edit-participant-remove');
+            if (btn) btn.disabled = rows.length <= 2;
+        });
+    }
+
+    // 화면의 입력값을 { participants, renames, removed } 로 정리한다.
+    // 아직 마이그레이션이 적용되지 않은 환경인지(함수 없음) 구분한다.
+    function isMissingFunctionError(error) {
+        if (!error) return false;
+        const code = String(error.code || '');
+        const message = String(error.message || '').toLowerCase();
+        return code === 'PGRST202' || code === '42883'
+            || message.includes('could not find the function')
+            || message.includes('does not exist');
+    }
+
+    function collectEditedParticipants() {
+        if (!editParticipantList) return null;
+        const rows = Array.from(editParticipantList.querySelectorAll('.edit-participant-row input'));
+        const rawNames = rows.map(input => input.value.trim());
+
+        if (rawNames.some(name => !name)) return { error: getLocale('emptyParticipantName', '참여자 이름을 모두 입력해주세요.') };
+        if (rawNames.length < 2) return { error: getLocale('minParticipants', '참가자는 최소 2명 이상이어야 합니다.') };
+        if (new Set(rawNames).size !== rawNames.length) return { error: getLocale('duplicateParticipantName', '참여자 이름이 중복됩니다.') };
+
+        const renames = {};
+        rows.forEach((input, index) => {
+            const before = input.dataset.originalName;
+            const after = rawNames[index];
+            if (before && before !== after) renames[before] = after;
+        });
+
+        const kept = new Set(rows.map(input => input.dataset.originalName).filter(Boolean));
+        const removed = currentSettlement.participants.filter(name => !kept.has(name));
+
+        return { participants: rawNames, renames, removed };
+    }
+
+    // 이름 변경/삭제를 반영한 지출 목록을 만든다. 값이 실제로 바뀐 건만 돌려준다.
+    function applyParticipantChangesToExpenses(expenses, renames, removed, baseCurrency) {
+        const removedSet = new Set(removed);
+        const changed = [];
+
+        expenses.forEach(expense => {
+            const nextShares = {};
+            let touched = false;
+
+            Object.entries(expense.shares || {}).forEach(([name, value]) => {
+                if (removedSet.has(name)) { touched = true; return; }
+                const nextName = renames[name] || name;
+                if (nextName !== name) touched = true;
+                nextShares[nextName] = (nextShares[nextName] || 0) + value;
+            });
+
+            const nextPayer = renames[expense.payer] || expense.payer;
+            if (nextPayer !== expense.payer) touched = true;
+            if (!touched) return;
+
+            // 삭제된 참여자의 몫은 남은 인원이 나눠 갖도록 총액 기준으로 다시 맞춘다.
+            const nextAmount = Object.values(nextShares).reduce((sum, value) => sum + value, 0);
+            changed.push({
+                id: expense.id,
+                payer: nextPayer,
+                shares: reconcileShares(nextShares, roundToCurrency(nextAmount, baseCurrency), baseCurrency),
+                amount: roundToCurrency(nextAmount, baseCurrency)
+            });
+        });
+
+        return changed;
     }
 
     function renderParticipantInputs(initialCount = 2) {
@@ -1489,6 +1833,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         return `🧾 ${title} 정산 내역\n${status} · 총 지출 ${formatNumber(totalAmount, currency)} ${currency}\n참가자 ${participantCount}명 · 지출 ${expenseCount}건\n로그인 전에도 읽기 전용으로 안전하게 확인할 수 있어요.\n${shareUrl}`;
     }
 
+    // 초대 코드는 비로그인 사용자가 정산을 열람하는 유일한 통로이므로 예측 가능하면 안 된다.
+    // Math.random()은 출력 몇 개로 내부 상태를 복원할 수 있어 CSPRNG를 사용한다.
+    // 혼동하기 쉬운 문자(0/O, 1/I)는 빼서 옮겨 적기 좋게 만든다.
+    const INVITE_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+    function generateInviteCode(length = 8) {
+        const buffer = new Uint8Array(length);
+        crypto.getRandomValues(buffer);
+        let code = '';
+        for (let i = 0; i < length; i++) {
+            code += INVITE_CODE_ALPHABET[buffer[i] % INVITE_CODE_ALPHABET.length];
+        }
+        return code;
+    }
+
     function normalizeInviteCode(code) {
         const normalized = String(code || '').trim().toUpperCase();
         return normalized || null;
@@ -1821,6 +2180,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (base === target) return 1;
         const cacheKey = `${date}_${base}_${target}`;
         if (exchangeRatesCache[cacheKey]) return exchangeRatesCache[cacheKey];
+        const storedRate = readStoredRate(cacheKey);
+        if (storedRate) {
+            exchangeRatesCache[cacheKey] = storedRate;
+            return storedRate;
+        }
         
         let requestDate = date;
         if (date === 'latest' || new Date(date) > new Date()) {
@@ -1851,7 +2215,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const data = await response.json();
             const rate = data[baseLower][targetLower];
             if (!rate) throw new Error(`Rate not found for ${target}`);
-            exchangeRatesCache[cacheKey] = rate; 
+            rememberRate(cacheKey, rate);
             return rate;
         } catch (error) { 
             console.error("Exchange rate fetch error:", error);
@@ -1862,7 +2226,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const fData = await fRes.json();
                     const fRate = fData.rates[target];
                     if (fRate) {
-                        exchangeRatesCache[cacheKey] = fRate;
+                        rememberRate(cacheKey, fRate);
                         return fRate;
                     }
                 }
@@ -2211,7 +2575,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function selectSettlement(settlement) {
         currentSettlement = settlement;
-        if (!(await verifyMembership())) return; 
+        (settlement.expenses || []).forEach(exp => normalizeExpenseShares(exp, settlement.base_currency));
+        if (!(await verifyMembership())) return;
+        setupExpenseListener(settlement.id);
 
         if (currentUser && settlement.user_id === currentUser.id) {
             syncMemberDB(settlement.id);
@@ -2329,6 +2695,91 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if(splitAmountInputs) attachDynamicSplitInputListeners(splitAmountInputs, itemAmountInput, updateAddPreview, false);
         if(editSplitAmountInputs) attachDynamicSplitInputListeners(editSplitAmountInputs, editItemAmountInput, updateEditPreview, true);
+
+        renderSplitParticipantPicker(splitParticipantPicker, participants, updateAddPreview);
+        renderSplitParticipantPicker(editSplitParticipantPicker, participants, updateEditPreview);
+    }
+
+    // "이 지출은 4명 중 3명만" 같은 경우를 위해 분담 대상을 고르는 체크박스 목록
+    function renderSplitParticipantPicker(container, participants, previewUpdater) {
+        if (!container) return;
+        container.innerHTML = `<div class="manual-split-helper"><i class="fas fa-info-circle" aria-hidden="true"></i><span>${escapeHTML(getLocale('selectSplitHelper', '이 지출을 함께 부담한 사람만 선택하세요. 선택한 인원끼리 1/N로 나눕니다.'))}</span></div>`;
+
+        const list = document.createElement('div');
+        list.className = 'split-participant-list';
+
+        participants.forEach(p => {
+            const label = document.createElement('label');
+            label.className = 'split-participant-chip';
+
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = true;
+            input.dataset.participant = p;
+
+            const text = document.createElement('span');
+            text.textContent = p;
+
+            input.addEventListener('change', () => {
+                label.classList.toggle('is-checked', input.checked);
+                updateSplitPickerSummary(container);
+                if (previewUpdater) previewUpdater();
+            });
+
+            label.classList.add('is-checked');
+            label.append(input, text);
+            list.appendChild(label);
+        });
+
+        container.appendChild(list);
+
+        const summary = document.createElement('p');
+        summary.className = 'split-participant-summary';
+        container.appendChild(summary);
+        updateSplitPickerSummary(container);
+    }
+
+    function updateSplitPickerSummary(container) {
+        if (!container) return;
+        const summary = container.querySelector('.split-participant-summary');
+        if (!summary) return;
+
+        const isEdit = container === editSplitParticipantPicker;
+        const selected = getSelectedSplitParticipants(isEdit);
+        const amountEl = isEdit ? editItemAmountInput : itemAmountInput;
+        const currencyEl = isEdit ? editItemCurrencySelect : itemCurrencySelect;
+        const amount = amountEl ? parseFormattedNumber(amountEl.value) : 0;
+
+        if (!selected.length) {
+            summary.textContent = getLocale('noSplitParticipant', '분담할 참여자를 1명 이상 선택해주세요.');
+            summary.classList.add('is-warning');
+            return;
+        }
+
+        summary.classList.remove('is-warning');
+        const currency = currencyEl ? currencyEl.value : '';
+        const perPerson = amount > 0 ? `· ${formatNumber(amount / selected.length, currency)} ${currency}` : '';
+        summary.textContent = `${getLocale('splitSelectedCount', '{count}명이 분담').replace('{count}', selected.length)} ${perPerson}`.trim();
+    }
+
+    function getSelectedSplitParticipants(isEdit = false) {
+        const container = isEdit ? editSplitParticipantPicker : splitParticipantPicker;
+        if (!container) return [];
+        return Array.from(container.querySelectorAll('input[type="checkbox"]'))
+            .filter(input => input.checked)
+            .map(input => input.dataset.participant);
+    }
+
+    function setSelectedSplitParticipants(isEdit, names) {
+        const container = isEdit ? editSplitParticipantPicker : splitParticipantPicker;
+        if (!container) return;
+        const wanted = new Set(names);
+        container.querySelectorAll('input[type="checkbox"]').forEach(input => {
+            input.checked = wanted.has(input.dataset.participant);
+            const label = input.closest('.split-participant-chip');
+            if (label) label.classList.toggle('is-checked', input.checked);
+        });
+        updateSplitPickerSummary(container);
     }
 
     async function fetchAndSetRate(fetchType, currencyFrom, currencyTo, inputEl, previewUpdater, customDateStr = null) {
@@ -2382,6 +2833,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const base = currentSettlement ? currentSettlement.base_currency : '';
         const previewEl = document.getElementById('add-converted-total');
         if(previewEl) previewEl.textContent = `${formatNumber(amount * rate, base)} ${base}`;
+        updateSplitPickerSummary(splitParticipantPicker);
     }
 
     function updateExpenseSubmitValue() {
@@ -2418,6 +2870,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const base = currentSettlement ? currentSettlement.base_currency : '';
         const previewEl = document.getElementById('edit-converted-total');
         if(previewEl) previewEl.textContent = `${formatNumber(amount * rate, base)} ${base}`;
+        updateSplitPickerSummary(editSplitParticipantPicker);
     }
 
     async function createSettlement() {
@@ -2428,17 +2881,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         const participants = getParticipantNamesFromModal();
         const selectedFriends = getSelectedFriendInvites();
         const baseCurrency = baseCurrencySelect.value;
-        const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        let inviteCode = generateInviteCode();
         
         if (!title || !date || participants.length < 2) { showToast("참가자는 최소 2명 이상이어야 합니다.", "error"); return; }
 
         setLoading(true);
         try {
-            const { data, error } = await safeDB(supabaseClient.from('settlements').insert([{ 
-                title, date, participants: participants, base_currency: baseCurrency, is_settled: false, 
-                user_id: currentUser ? currentUser.id : null, invite_code: inviteCode
-            }]).select('*, expenses (*)'));
-            
+            // invite_code는 unique 제약이 있어 드물게 충돌할 수 있다. 충돌이면 새 코드로 다시 시도한다.
+            let data = null;
+            let error = null;
+            for (let attempt = 0; attempt < 5; attempt++) {
+                ({ data, error } = await safeDB(supabaseClient.from('settlements').insert([{
+                    title, date, participants: participants, base_currency: baseCurrency, is_settled: false,
+                    user_id: currentUser ? currentUser.id : null, invite_code: inviteCode
+                }]).select('*, expenses (*)')));
+
+                const isDuplicateCode = error
+                    && (String(error.code) === '23505' || String(error.message || '').includes('invite_code'));
+                if (!isDuplicateCode) break;
+                inviteCode = generateInviteCode();
+            }
+
             if (error) throw error;
             
             showToast('새로운 정산이 생성되었습니다.', 'success');
@@ -2503,7 +2966,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!rate || rate <= 0) { showToast(getLocale('invalidInput', '올바르게 입력해주세요.'), "error"); return; }
         }
 
-        const convertedAmount = originalAmount * rate;
+        const baseCurrency = currentSettlement.base_currency;
+        let convertedAmount = roundToCurrency(originalAmount * rate, baseCurrency);
         const participants = currentSettlement.participants;
         const addPayerSelect = document.getElementById('item-payer');
         const payer = addPayerSelect ? addPayerSelect.value : participants[0];
@@ -2511,8 +2975,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         let shares = {};
 
         if (splitMethod === 'equal') {
-            const equalShare = convertedAmount / participants.length;
-            participants.forEach(p => shares[p] = equalShare);
+            shares = distributeAmount(convertedAmount, participants, baseCurrency);
+        } else if (splitMethod === 'select') {
+            const selected = getSelectedSplitParticipants();
+            if (!selected.length) { showToast(getLocale('noSplitParticipant', '분담할 참여자를 1명 이상 선택해주세요.'), 'error'); return; }
+            shares = distributeAmount(convertedAmount, selected, baseCurrency);
+            participants.forEach(p => { if (!(p in shares)) shares[p] = 0; });
         } else if (splitMethod === 'amount') {
             let sumCheck = 0;
             splitAmountInputs.querySelectorAll('input').forEach(inp => {
@@ -2520,7 +2988,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                 sumCheck += pAmount; shares[p] = pAmount * rate;
             });
             if (Math.abs(sumCheck - originalAmount) > 0.01) { showToast(getLocale('amountMismatch', '금액이 일치하지 않습니다.'), "error"); return; }
+            shares = reconcileShares(shares, convertedAmount, baseCurrency);
         }
+
+        convertedAmount = Object.values(shares).reduce((sum, value) => sum + value, 0);
 
         dismissVirtualKeyboard();
         setLoading(true);
@@ -2583,7 +3054,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             const inputs = editSplitAmountInputs.querySelectorAll('input');
             inputs.forEach(inp => { const p = inp.dataset.participant; const originalShare = (expense.shares[p] || 0) / rate; inp.value = formatNumber(originalShare, currentSettlement.base_currency); });
         } else { editSplitAmountInputs.querySelectorAll('input').forEach(inp => inp.value = ''); }
-        
+
+        // 부분 분담이면 실제로 부담한 사람만 다시 체크해둔다.
+        const sharedBy = currentSettlement.participants.filter(p => (expense.shares[p] || 0) > 0);
+        setSelectedSplitParticipants(true, expense.split === 'select' ? sharedBy : currentSettlement.participants);
+
         handleSplitMethodChange(editSplitMethodSelect, editItemAmountInput, editSplitAmountInputs, true);
         if(editExpenseModal) editExpenseModal.classList.remove('hidden');
         requestAnimationFrame(() => editItemAmountInput?.focus());
@@ -2609,15 +3084,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!rate || rate <= 0) { showToast(getLocale('invalidInput', '올바르게 입력해주세요.'), 'error'); return; }
         }
 
-        const convertedAmount = originalAmount * rate;
+        const baseCurrency = currentSettlement.base_currency;
+        let convertedAmount = roundToCurrency(originalAmount * rate, baseCurrency);
         const participants = currentSettlement.participants;
         const payer = editItemPayerSelect.value;
         const splitMethod = editSplitMethodSelect.value;
         let shares = {};
 
         if (splitMethod === 'equal') {
-            const equalShare = convertedAmount / participants.length;
-            participants.forEach(p => shares[p] = equalShare);
+            shares = distributeAmount(convertedAmount, participants, baseCurrency);
+        } else if (splitMethod === 'select') {
+            const selected = getSelectedSplitParticipants(true);
+            if (!selected.length) { showToast(getLocale('noSplitParticipant', '분담할 참여자를 1명 이상 선택해주세요.'), 'error'); return; }
+            shares = distributeAmount(convertedAmount, selected, baseCurrency);
+            participants.forEach(p => { if (!(p in shares)) shares[p] = 0; });
         } else if (splitMethod === 'amount') {
             let sumCheck = 0;
             editSplitAmountInputs.querySelectorAll('input').forEach(inp => {
@@ -2625,8 +3105,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 sumCheck += pAmount; shares[p] = pAmount * rate;
             });
             if (Math.abs(sumCheck - originalAmount) > 0.01) { showToast(getLocale('amountMismatch', '금액이 일치하지 않습니다.'), 'error'); return; }
+            shares = reconcileShares(shares, convertedAmount, baseCurrency);
         }
-        
+
+        convertedAmount = Object.values(shares).reduce((sum, value) => sum + value, 0);
+
         dismissVirtualKeyboard();
         setLoading(true);
         try {
@@ -2852,7 +3335,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             const payerName = escapeHTML(exp.payer);
             const dateLabel = escapeHTML(getExpenseDateLabel(exp));
             const originalAmount = `${escapeHTML(formatNumber(exp.original_amount, exp.currency))} ${escapeHTML(exp.currency)}`;
-            const amountLabel = exp.currency !== baseCurrency
+            const isForeign = exp.currency !== baseCurrency;
+            // 외화로 입력한 지출은 기준 통화 환산액이 실제로 정산에 쓰이는 금액이므로 같이 보여준다.
+            const convertedLabel = isForeign
+                ? `<span class="expense-card-converted">≈ ${escapeHTML(formatNumber(exp.amount || 0, baseCurrency))} ${escapeHTML(baseCurrency)}</span>`
+                : '';
+            const amountLabel = isForeign
                 ? `<button type="button" class="expense-card-amount clickable-amount" data-id="${expenseId}" title="적용 환율 보기"><i class="fas fa-info-circle"></i> ${originalAmount}</button>`
                 : `<span class="expense-card-amount">${originalAmount}</span>`;
 
@@ -2885,7 +3373,7 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
                         ${actionButton}
                     </div>
                     <div class="expense-card-meta">
-                        ${amountLabel}
+                        <span class="expense-card-amount-group">${amountLabel}${convertedLabel}</span>
                         <span class="expense-card-payer"><i class="fas fa-credit-card"></i> ${payerName}</span>
                     </div>
                     <details class="expense-card-share-details">
@@ -2961,8 +3449,9 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
             const dateStr = getExpenseDateLabel(exp);
             if (dateStr) dateHtml = `<div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 2px;">${escapeHTML(dateStr)}</div>`;
             let amountHtml = `${escapeHTML(formatNumber(exp.original_amount, exp.currency))} ${expenseCurrency}`;
-            if (exp.currency !== currentSettlement.base_currency) { 
-                amountHtml = `<span class="clickable-amount" data-id="${expenseId}" title="적용 환율 보기"><i class="fas fa-info-circle"></i> ${amountHtml}</span>`;
+            if (exp.currency !== currentSettlement.base_currency) {
+                amountHtml = `<span class="clickable-amount" data-id="${expenseId}" title="적용 환율 보기"><i class="fas fa-info-circle"></i> ${amountHtml}</span>`
+                    + `<div class="table-converted-amount">≈ ${escapeHTML(formatNumber(exp.amount || 0, currentSettlement.base_currency))} ${baseCurrency}</div>`;
             }
             
             let htmlStr = `<td>${dateHtml}<div>${expenseName}</div></td><td>${amountHtml}</td><td>${payerName}</td>`;
@@ -2983,21 +3472,48 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
     }
 
 // 🚀 [하이브리드 UX 로직 적용] 최소 송금 계산 및 원본 채무 상세 내역 동시 생성
+    // 지출은 참여자를 이름 문자열로 참조하므로, 명단과 지출이 어긋난 데이터가 존재할 수 있다.
+    // (이름 변경이 중간에 실패했거나 예전 데이터가 남은 경우)
+    // 이런 이름을 빼고 계산하면 balances[이름]이 undefined가 되어 NaN이 퍼지므로,
+    // 명단 밖 이름도 정산 대상에 포함해 금액이 유실되지 않게 한다.
+    function getSettlementRoster(expenses, participants) {
+        const roster = [...participants];
+        const seen = new Set(roster);
+        const orphans = [];
+
+        const remember = (name) => {
+            if (!name || seen.has(name)) return;
+            seen.add(name);
+            roster.push(name);
+            orphans.push(name);
+        };
+
+        expenses.forEach(exp => {
+            remember(exp.payer);
+            Object.keys(exp.shares || {}).forEach(name => {
+                if ((exp.shares[name] || 0) !== 0) remember(name);
+            });
+        });
+
+        return { roster, orphans };
+    }
+
     function calculateMinimumTransfers(expenses, participants) {
         const balances = {};
         const itemizedDebts = {};
-        
-        participants.forEach(p => {
+        const { roster, orphans } = getSettlementRoster(expenses, participants);
+
+        roster.forEach(p => {
             balances[p] = 0;
             itemizedDebts[p] = {};
         });
 
         expenses.forEach(exp => {
-            balances[exp.payer] += (exp.amount || 0);
-            participants.forEach(p => { 
+            if (exp.payer in balances) balances[exp.payer] += (exp.amount || 0);
+            roster.forEach(p => {
                 const share = exp.shares[p] || 0;
-                balances[p] -= share; 
-                
+                balances[p] -= share;
+
                 if (p !== exp.payer && share > 0) {
                     if (!itemizedDebts[p][exp.payer]) itemizedDebts[p][exp.payer] = [];
                     itemizedDebts[p][exp.payer].push({ name: exp.name, amount: share });
@@ -3080,7 +3596,7 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
                     <div style="padding-bottom: 0.2rem;">
                         ${detailHtml}
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed rgba(128,128,128,0.4); padding-top: 0.6rem; margin-top: 0.2rem; color: #ef4444; font-weight: 700;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed rgba(255,255,255,0.35); padding-top: 0.6rem; margin-top: 0.2rem; color: var(--summary-card-negative, #fecaca); font-weight: 700;">
                         <span><i class="fas fa-minus-circle"></i> 받을 돈 차감</span>
                         <span>-${Math.round(myOriginalCredit).toLocaleString()}원</span>
                     </div>
@@ -3137,7 +3653,7 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
             if (debtor.amount < 0.01) i++;
             if (creditor.amount < 0.01) j++;
         }
-        return { transfers, balances }; 
+        return { transfers, balances, orphans };
     }
 
     function getPaymentActions(baseCurrency, linkAmount) {
@@ -3281,20 +3797,40 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
             if (isGuestPreview) metaItems.push(getLocale('readOnlyPreview', '읽기 전용'));
             summaryMeta.innerHTML = metaItems.map(item => `<span>${escapeHTML(item)}</span>`).join('');
         }
+        // 좌측 컬럼이 총액 하나로 비어 보이지 않도록, 바로 읽히는 보조 지표를 함께 보여준다.
+        if (summaryBreakdown) {
+            const hasExpenses = expenses.length > 0;
+            summaryBreakdown.classList.toggle('hidden', !hasExpenses);
+            if (hasExpenses) {
+                const perPerson = participants.length ? totalAmount / participants.length : 0;
+                const biggest = expenses.reduce((top, exp) => ((exp.amount || 0) > (top.amount || 0) ? exp : top), expenses[0]);
+                summaryBreakdown.innerHTML = `
+                    <div class="summary-breakdown-item">
+                        <span>${escapeHTML(getLocale('perPersonAverage', '1인당 평균'))}</span>
+                        <strong>${escapeHTML(formatNumber(perPerson, base_currency))} ${escapeHTML(base_currency)}</strong>
+                    </div>
+                    <div class="summary-breakdown-item">
+                        <span>${escapeHTML(getLocale('largestExpense', '가장 큰 지출'))}</span>
+                        <strong>${escapeHTML(biggest.name)} · ${escapeHTML(formatNumber(biggest.amount || 0, base_currency))}</strong>
+                    </div>
+                `;
+            }
+        }
         if(finalSettlementContainer) finalSettlementContainer.innerHTML = '';
         if(completeSettlementBtn) completeSettlementBtn.classList.add('hidden');
 
         const participantStats = {};
-        participants.forEach(p => participantStats[p] = { share: 0, paid: 0 });
+        const { roster: statsRoster } = getSettlementRoster(expenses, participants);
+        statsRoster.forEach(p => participantStats[p] = { share: 0, paid: 0 });
 
         expenses.forEach(exp => {
             if (participantStats[exp.payer]) participantStats[exp.payer].paid += (exp.amount || 0);
-            participants.forEach(p => {
+            statsRoster.forEach(p => {
                 if (participantStats[p]) participantStats[p].share += (exp.shares[p] || 0);
             });
         });
 
-        let statsTableRows = participants.map(p => {
+        let statsTableRows = statsRoster.map(p => {
             const stat = participantStats[p];
             const net = stat.paid - stat.share; // (결제액 B - 부담액 A)
             let netText = '';
@@ -3302,10 +3838,10 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
             
             if (net > 0.5) {
                 netText = `+${formatNumber(net, base_currency)} (받을 돈)`;
-                netColor = 'color: #34d399;'; // 녹색
+                netColor = 'color: #86efac;'; // 보라 카드 위에서 읽히도록 밝은 녹색
             } else if (net < -0.5) {
                 netText = `${formatNumber(net, base_currency)} (보낼 돈)`;
-                netColor = 'color: #f87171;'; // 적색
+                netColor = 'color: var(--summary-card-negative, #fecaca);'; // 보라 카드 위 대비 확보
             } else {
                 netText = `0 (정산 완료)`;
                 netColor = 'color: var(--text-muted);';
@@ -3336,12 +3872,21 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
             </details>
         `;
 
-        if (finalSettlementContainer && expenses.length > 0) {
-            finalSettlementContainer.innerHTML = statsHtml;
-        }
         // ==========================================
 
-        const { transfers } = calculateMinimumTransfers(expenses, participants);
+        const { transfers, balances, orphans } = calculateMinimumTransfers(expenses, participants);
+        renderMyShare(balances, transfers, base_currency);
+
+        // 명단에 없는 이름이 지출에 남아 있으면 조용히 넘기지 않고 알린다.
+        if (orphanNotice) {
+            orphanNotice.classList.toggle('hidden', orphans.length === 0);
+            if (orphans.length) {
+                orphanNotice.innerHTML = `<i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span>${escapeHTML(
+                    getLocale('orphanParticipantWarning', '{names}님이 참여자 명단에 없지만 지출 내역에 남아 있어 정산에 함께 반영했습니다. 참여 정보에서 명단을 확인해주세요.')
+                        .replace('{names}', orphans.join(', '))
+                )}</span>`;
+            }
+        }
 
         if(!finalSettlementContainer || !completeSettlementBtn) return;
 
@@ -3368,6 +3913,11 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
                 completeSettlementBtn.classList.remove('edit-mode'); 
                 completeSettlementBtn.classList.remove('hidden');
             }
+        }
+
+        // 참고용 비교표는 송금 결과를 읽은 뒤에 보는 정보라 맨 아래에 둔다.
+        if (expenses.length > 0) {
+            finalSettlementContainer.insertAdjacentHTML('beforeend', statsHtml);
         }
     }
 
@@ -3429,9 +3979,17 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
     function handleSplitMethodChange(selectEl, amountEl, splitInputsEl, isEdit = false) {
         if(!selectEl || !amountEl || !splitInputsEl) return;
         const isManualAmount = selectEl.value === 'amount';
+        const isSelectedSplit = selectEl.value === 'select';
         splitInputsEl.classList.toggle('hidden', !isManualAmount);
+
+        const picker = isEdit ? editSplitParticipantPicker : splitParticipantPicker;
+        if (picker) {
+            picker.classList.toggle('hidden', !isSelectedSplit);
+            if (isSelectedSplit) updateSplitPickerSummary(picker);
+        }
+
         amountEl.readOnly = isManualAmount;
-        
+
         if (isManualAmount) {
             amountEl.style.backgroundColor = 'var(--surface-muted)';
             amountEl.style.color = 'var(--text-muted)';
@@ -4321,9 +4879,12 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
                 if (!(await verifyMembership())) return; 
 
                 if(editTitleInput) editTitleInput.value = currentSettlement.title;
+                renderEditParticipantList(currentSettlement.participants);
                 if(editTitleModal) editTitleModal.classList.remove('hidden');
             });
         }
+
+        if(editAddParticipantBtn) editAddParticipantBtn.addEventListener('click', () => addEditParticipantRow(''));
 
         if(saveTitleBtn) {
             saveTitleBtn.addEventListener('click', async () => {
@@ -4337,24 +4898,88 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
                     return;
                 }
 
+                const edited = collectEditedParticipants();
+                if (edited && edited.error) { showToast(edited.error, 'error'); return; }
+
+                const baseCurrency = currentSettlement.base_currency;
+                const nextParticipants = edited ? edited.participants : currentSettlement.participants;
+                const expenseUpdates = edited
+                    ? applyParticipantChangesToExpenses(currentSettlement.expenses || [], edited.renames, edited.removed, baseCurrency)
+                    : [];
+
+                if (edited && edited.removed.length) {
+                    const stillPaying = (currentSettlement.expenses || []).some(exp => edited.removed.includes(exp.payer));
+                    if (stillPaying) {
+                        showToast(getLocale('removedParticipantIsPayer', '결제자로 등록된 참여자는 삭제할 수 없습니다. 해당 지출을 먼저 수정해주세요.'), 'error');
+                        return;
+                    }
+                    const confirmed = await showConfirm(
+                        getLocale('removeParticipantConfirm', '{names}님을 명단에서 빼면 해당 인원의 분담액이 나머지 인원에게 다시 나뉩니다. 계속할까요?')
+                            .replace('{names}', edited.removed.join(', '))
+                    );
+                    if (!confirmed) return;
+                }
+
                 setLoading(true);
                 try {
-                    const { error } = await safeDB(supabaseClient.from('settlements').update({ title: newTitle }).eq('id', currentSettlement.id));
+                    // 명단과 지출을 한 트랜잭션으로 함께 고친다.
+                    // 나눠서 저장하면 중간에 실패했을 때 "명단은 새 이름, 지출은 옛 이름"이 남는다.
+                    const { error: rpcError } = await safeDB(supabaseClient.rpc('update_settlement_participants', {
+                        p_settlement_id: currentSettlement.id,
+                        p_title: newTitle,
+                        p_participants: nextParticipants,
+                        p_renames: edited ? edited.renames : {},
+                        p_removed: edited ? edited.removed : []
+                    }));
 
-                    if(error) {
-                        showToast('제목 수정에 실패했습니다.', 'error');
+                    if (rpcError && !isMissingFunctionError(rpcError)) {
+                        console.error(rpcError);
+                        showToast(getLocale('roomUpdateFailed', '정산 정보 수정에 실패했습니다.'), 'error');
                         return;
                     }
 
-                    showToast('제목이 수정되었습니다.', 'success');
+                    if (rpcError) {
+                        // 마이그레이션 적용 전 환경에서는 순차 저장으로 대체한다.
+                        const { error } = await safeDB(supabaseClient
+                            .from('settlements')
+                            .update({ title: newTitle, participants: nextParticipants })
+                            .eq('id', currentSettlement.id));
+
+                        if(error) {
+                            showToast(getLocale('roomUpdateFailed', '정산 정보 수정에 실패했습니다.'), 'error');
+                            return;
+                        }
+
+                        for (const update of expenseUpdates) {
+                            const { error: expenseError } = await safeDB(supabaseClient
+                                .from('expenses')
+                                .update({ payer: update.payer, shares: update.shares, amount: update.amount })
+                                .eq('id', update.id));
+                            if (expenseError) throw expenseError;
+                        }
+                    }
+
+                    expenseUpdates.forEach(update => {
+                        const target = currentSettlement.expenses.find(exp => exp.id === update.id);
+                        if (target) Object.assign(target, update);
+                    });
+
+                    showToast(getLocale('roomUpdated', '정산 정보가 수정되었습니다.'), 'success');
                     currentSettlement.title = newTitle;
-                    
+                    currentSettlement.participants = nextParticipants;
+
                     const sIndex = settlements.findIndex(s => s.id === currentSettlement.id);
-                    if(sIndex > -1) settlements[sIndex].title = newTitle;
-                    
+                    if(sIndex > -1) {
+                        settlements[sIndex].title = newTitle;
+                        settlements[sIndex].participants = nextParticipants;
+                    }
+
                     if(settlementDisplay) settlementDisplay.textContent = newTitle;
+                    updateParticipantNames(nextParticipants);
+                    renderTableHeader(nextParticipants);
+                    render();
                     renderSettlementList();
-                    updateOpenGraphTags(currentSettlement); 
+                    updateOpenGraphTags(currentSettlement);
                     if(editTitleModal) editTitleModal.classList.add('hidden');
                 } catch(e) {
                     console.error(e);
@@ -4459,17 +5084,24 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
 
                 setLoading(true);
                 try {
-                    currentSettlement.is_settled = !currentSettlement.is_settled;
-                    const { error } = await safeDB(supabaseClient.from('settlements').update({ is_settled: currentSettlement.is_settled }).eq('id', currentSettlement.id));
-                    if (error) { 
-                        showToast('상태 업데이트 실패', 'error'); 
-                    } else { 
-                        showToast(currentSettlement.is_settled ? '정산이 완료되었습니다.' : '정산이 다시 열렸습니다.', 'info'); 
+                    const previousState = currentSettlement.is_settled;
+                    const nextState = !previousState;
+                    const { error } = await safeDB(supabaseClient.from('settlements').update({ is_settled: nextState }).eq('id', currentSettlement.id));
+                    if (error) {
+                        // 저장에 실패하면 화면만 바뀐 상태로 남지 않도록 되돌린다.
+                        currentSettlement.is_settled = previousState;
+                        showToast(getLocale('settleStateFailed', '상태 업데이트에 실패했습니다.'), 'error');
+                    } else {
+                        currentSettlement.is_settled = nextState;
+                        const sIndex = settlements.findIndex(s => s.id === currentSettlement.id);
+                        if (sIndex > -1) settlements[sIndex].is_settled = nextState;
+                        showToast(nextState ? '정산이 완료되었습니다.' : '정산이 다시 열렸습니다.', 'info');
                     }
                     render(); 
                     renderSettlementList(); 
                 } catch(e) {
                     console.error(e);
+                    render();
                     if (e.message === 'TIMEOUT_DB' || e.name === 'AbortError' || e.message === 'OFFLINE') showToast('네트워크가 불안정합니다. 다시 버튼을 눌러주세요.', 'error');
                     else showToast('에러가 발생했습니다.', 'error');
                 } finally {
@@ -4614,12 +5246,13 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
         // ========================================================
         // --- 💡 2. 인원별 요약 시트 생성 ---
         // ========================================================
+        const { roster: exportRoster } = getSettlementRoster(expenses, participants);
         const participantStats = {};
-        participants.forEach(p => participantStats[p] = { share: 0, paid: 0 });
+        exportRoster.forEach(p => participantStats[p] = { share: 0, paid: 0 });
 
         expenses.forEach(exp => {
             if (participantStats[exp.payer]) participantStats[exp.payer].paid += (exp.amount || 0);
-            participants.forEach(p => {
+            exportRoster.forEach(p => {
                 if (participantStats[p]) participantStats[p].share += (exp.shares[p] || 0);
             });
         });
@@ -4629,7 +5262,7 @@ const participantCountLabel = getLocale('participantsCount', '{count}명')
         summaryDataForExport.push([]);
         summaryDataForExport.push(['참여자', '개별 부담액', '본인 결제액', '최종 정산액']);
 
-        participants.forEach(p => {
+        exportRoster.forEach(p => {
             const stat = participantStats[p];
             const net = stat.paid - stat.share;
             let netText = '';

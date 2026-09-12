@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             body = ""; 
         }
 
-        new Notification(title, { body: body, icon: 'icon.png' });
+        new Notification(title, { body: body, icon: 'icon-192.png' });
     }
 
     const setVh = () => {

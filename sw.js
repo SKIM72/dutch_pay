@@ -1,4 +1,4 @@
-const CACHE_NAME = 'settle-up-cache-v150';
+const CACHE_NAME = 'settle-up-cache-v151';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -12,8 +12,9 @@ const PRECACHE_URLS = [
   './auth.js',
   './locales.js',
   './config.js',
-  './icon.png',
-  './logo.png'
+  './icon-192.png',
+  './icon-512.png',
+  './apple-touch-icon.png'
 ];
 
 const STATIC_DESTINATIONS = new Set(['image', 'font', 'manifest']);
