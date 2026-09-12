@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         writeStoredRate(cacheKey, rate);
     }
     const SUPPORTED_CURRENCIES = ['JPY', 'KRW', 'USD', 'CNY', 'GBP', 'CAD', 'AUD', 'HKD', 'TWD'];
-    const APP_VERSION = 'v2026.09.10.1';
+    const APP_VERSION = 'v2026.09.13.1';
     const THEME_STORAGE_KEY = 'settleup-theme-mode';
     const VALID_THEME_MODES = new Set(['system', 'light', 'dark']);
     const systemDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -2153,19 +2153,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            saveJoinedRoom(data.id);
             if (joinCodeInput) joinCodeInput.value = '';
-            
             const joinModal = document.getElementById('join-modal');
             if(joinModal) joinModal.classList.add('hidden');
-            
-            if (!joinedViaRpc) {
-                await syncMemberDB(data.id);
+
+            // 새 참가는 초대 코드를 확인하는 RPC로만 이뤄진다. 서버는 멤버가 아닌 사용자의
+            // 직접 멤버 등록을 거부하므로, RPC가 실패했다면 이미 속한 방일 때만 열 수 있다.
+            // 성공 안내는 실제로 접근할 수 있는지 확인한 뒤에 띄운다.
+            await loadData();
+            const accessible = settlements.some(s => String(s.id) === String(data.id));
+            if (!joinedViaRpc && !accessible) {
+                showToast(getLocale('joinFailed', '방에 참가하지 못했습니다. 코드를 확인하거나 잠시 후 다시 시도해주세요.'), 'error');
+                return;
             }
 
-            showToast(getLocale('joinSuccess', '성공적으로 방에 참가했습니다!'), 'success');
-            
-            await loadData();
+            saveJoinedRoom(data.id);
+            if (joinedViaRpc) showToast(getLocale('joinSuccess', '성공적으로 방에 참가했습니다!'), 'success');
             await loadSingleSettlement(data.id);
         } catch(e) {
             console.error(e);
@@ -2278,13 +2281,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     return;
                 }
 
-                await loadSingleSettlement(guestRoomId);
-                
+                const loaded = await loadSingleSettlement(guestRoomId);
+                if (!loaded) return;
+
                 if (currentUser) {
                     if (!getJoinedRooms().includes(guestRoomId)) {
                         saveJoinedRoom(guestRoomId);
-                        showToast('정산 방에 자동 참가되었습니다.', 'success');
-                        await syncMemberDB(guestRoomId);
                     }
                     
                     await loadData(); 
@@ -2306,14 +2308,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     } else {
                         const pendingId = localStorage.getItem('pendingJoinRoomId');
                         if (pendingId) {
+                            localStorage.removeItem('pendingJoinRoomId');
                             if (!isBanned(pendingId)) {
-                                saveJoinedRoom(pendingId);
-                                localStorage.removeItem('pendingJoinRoomId');
-                                showToast('이전 방에 자동 참가되었습니다.', 'success');
-                                window.history.replaceState({}, '', `${window.location.pathname}?id=${pendingId}`);
-                                await syncMemberDB(pendingId);
+                                // 초대 코드 없이 방 번호만으로는 참가할 수 없으므로, 이미 속한 방일 때만 연다.
                                 await loadData();
-                                await loadSingleSettlement(pendingId);
+                                if (await loadSingleSettlement(pendingId)) {
+                                    saveJoinedRoom(pendingId);
+                                    window.history.replaceState({}, '', `${window.location.pathname}?id=${pendingId}`);
+                                }
                             }
                         } else {
                             await loadData(); 
@@ -2357,13 +2359,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
             if (error || !data) {
                 showToast('존재하지 않거나 삭제된 정산건입니다.', 'error');
-                setTimeout(() => window.location.href = 'index.html', 2000); 
-                return;
+                setTimeout(() => window.location.href = 'index.html', 2000);
+                return false;
             }
-            await selectSettlement(data); 
+            await selectSettlement(data);
+            return true;
         } catch(e) {
             console.error(e);
             showToast('데이터를 불러오지 못했습니다.', 'error');
+            return false;
         }
     }
 
