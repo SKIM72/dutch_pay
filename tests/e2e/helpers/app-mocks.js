@@ -430,7 +430,7 @@ async function installAppMocks(page, settlement = PUBLIC_SETTLEMENT, options = {
     friendDashboard: options.friendDashboard || null
   });
 
-  await page.route('**/@supabase/supabase-js@2', (route) => route.fulfill({
+  await page.route('**/@supabase/supabase-js@*', (route) => route.fulfill({
     status: 200,
     contentType: 'application/javascript',
     body: SUPABASE_SDK_MOCK
@@ -480,7 +480,7 @@ async function installAppMocks(page, settlement = PUBLIC_SETTLEMENT, options = {
     `
   }));
 
-  await page.route('https://unpkg.com/html5-qrcode', (route) => route.fulfill({
+  await page.route('https://unpkg.com/html5-qrcode@*/**', (route) => route.fulfill({
     status: 200,
     contentType: 'application/javascript',
     body: 'window.Html5Qrcode=class{start(){return Promise.resolve()}stop(){return Promise.resolve()}clear(){}};'
@@ -517,7 +517,7 @@ async function installChatMocks(page) {
     });
   });
 
-  await page.route('**/@supabase/supabase-js@2', (route) => route.fulfill({
+  await page.route('**/@supabase/supabase-js@*', (route) => route.fulfill({
     status: 200,
     contentType: 'application/javascript',
     body: CHAT_SUPABASE_SDK_MOCK
