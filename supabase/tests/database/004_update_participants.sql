@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path = extensions, public;
 
-select plan(12);
+select plan(13);
 
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
@@ -44,15 +44,15 @@ values
   (4102, 4001, '택시', 6000, 'KRW', 6000, '나영', 'equal',
    '{"가영":2000,"나영":2000,"다영":2000}'::jsonb);
 
--- 익명 사용자는 실행할 수 없어야 한다.
-set local role anon;
-select throws_ok(
-  $$ select public.update_settlement_participants(
-       4001, '오사카 여행', '["가영","나영","다영"]'::jsonb, '{}'::jsonb, '[]'::jsonb) $$,
-  'Authentication required.',
-  'anonymous cannot update participants'
+-- 익명 사용자는 함수 본문에 닿기 전에 실행 권한 단계에서 막혀야 한다.
+select ok(
+  not has_function_privilege('anon', 'public.update_settlement_participants(bigint,text,jsonb,jsonb,jsonb)', 'EXECUTE'),
+  'anonymous users cannot execute update_settlement_participants'
 );
-reset role;
+select ok(
+  has_function_privilege('authenticated', 'public.update_settlement_participants(bigint,text,jsonb,jsonb,jsonb)', 'EXECUTE'),
+  'authenticated users can execute update_settlement_participants'
+);
 
 -- 방에 속하지 않은 사용자도 막혀야 한다.
 set local role authenticated;
